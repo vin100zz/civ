@@ -12,7 +12,7 @@ class City {
   }
 
   // Calculate resources generated based on population and terrain
-  calculateFoodProduction(terrainType) {
+  calculateProduction(terrainType) {
     const terrain = TERRAIN_TYPES[terrainType];
     return {
       food: terrain.food,
@@ -21,8 +21,8 @@ class City {
   }
 
   // Update city - accumulate resources and grow population
-  endTurn(terrainType) {
-    const { food, production } = this.calculateFoodProduction(terrainType);
+  update(terrainType) {
+    const { food, production } = this.calculateProduction(terrainType);
 
     this.food += food;
     this.production += production;
@@ -33,6 +33,36 @@ class City {
       this.food = 0;
       this.foodNeeded += 10; // Increase food needed for next growth
     }
+  }
+
+  // Check if a given tile is within this city's territory (adjacent or city tile itself)
+  isInTerritory(x, y) {
+    const dx = Math.abs(x - this.x);
+    const dy = Math.abs(y - this.y);
+    return dx <= 1 && dy <= 1;
+  }
+
+  // Check if a given tile is on the border of this city's territory
+  isOnBorder(x, y, allCities) {
+    if (!this.isInTerritory(x, y)) return false;
+
+    // Check all 4 adjacent tiles (not diagonals)
+    const adjacentTiles = [
+      { x: x - 1, y: y },
+      { x: x + 1, y: y },
+      { x: x, y: y - 1 },
+      { x: x, y: y + 1 }
+    ];
+
+    // Check if any adjacent tile is outside this city's territory
+    return adjacentTiles.some(tile => {
+      // Check map bounds
+      if (tile.x < 0 || tile.x >= 100 || tile.y < 0 || tile.y >= 100) {
+        return true; // Map edge
+      }
+      // Check if not in any city's territory
+      return !allCities.some(city => city.isInTerritory(tile.x, tile.y));
+    });
   }
 
   // Static method to create a new city from a plain object
@@ -47,3 +77,4 @@ class City {
 
 // Expose the class to the global scope
 window.City = City;
+

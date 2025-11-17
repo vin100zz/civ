@@ -5,6 +5,7 @@ const { generateInitialTerrain } = window.mapGenerator;
 const TILE_SIZE = 50;
 const VIEWPORT_WIDTH = 12;
 const VIEWPORT_HEIGHT = 10;
+const CIV_COLOR = '#ff00ff'; // Magenta color for your civilization
 
 // Terrain and Unit Types
 const TERRAIN_TYPES = {
@@ -27,6 +28,16 @@ const CivGame = () => {
     return Array.from({ length: count }).map((_, i) => (
       <i key={i} className={iconClass} style={{ marginRight: '2px', color: color }}></i>
     ));
+  };
+
+  // Check if a tile is in the territory of any city
+  const isTileInTerritory = (x, y) => {
+    return gameState.cities.some(city => city.isInTerritory(x, y));
+  };
+
+  // Check if a tile is on the border of a territory
+  const isTileOnBorder = (x, y) => {
+    return gameState.cities.some(city => city.isOnBorder(x, y, gameState.cities));
   };
   const [gameState, setGameState] = useState(() => {
     const savedState = localStorage.getItem('civGameState');
@@ -115,7 +126,7 @@ const CivGame = () => {
       // Update cities - manage resources at city level
       const newCities = prevState.cities.map(city => {
         const terrainType = prevState.terrain[city.y][city.x];
-        city.endTurn(terrainType);
+        city.update(terrainType);
         return city;
       });
 
@@ -226,11 +237,12 @@ const CivGame = () => {
                     <div
                       key={`${actualX}-${actualY}`}
                       onClick={() => handleTileClick(actualX, actualY)}
-                      className={`relative cursor-pointer border border-gray-700 ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                      className={`relative cursor-pointer ${isTileOnBorder(actualX, actualY) ? 'border-2' : 'border'} border-gray-700 ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
                       style={{
                         width: TILE_SIZE,
                         height: TILE_SIZE,
-                        backgroundColor: terrainInfo.color
+                        backgroundColor: terrainInfo.color,
+                        ...(isTileOnBorder(actualX, actualY) && { borderColor: CIV_COLOR })
                       }}
                     >
                       {/* Terrain resources overlay */}
@@ -240,7 +252,10 @@ const CivGame = () => {
                       </div>
 
                       {tile.city && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-between">
+                        <div
+                          className="absolute inset-0 flex flex-col items-center justify-between"
+                          style={{ backgroundColor: CIV_COLOR }}
+                        >
                           <div className="flex-1 flex items-center justify-center w-full">
                             <div className="text-white text-lg font-bold">
                               {tile.city.population}
@@ -252,7 +267,10 @@ const CivGame = () => {
                         </div>
                       )}
                       {tile.unit && (
-                        <div className="absolute inset-0 flex items-center justify-center text-2xl">
+                        <div
+                          className="absolute inset-0 flex items-center justify-center text-2xl"
+                          style={{ backgroundColor: CIV_COLOR }}
+                        >
                           {UNIT_TYPES[tile.unit.type].icon}
                         </div>
                       )}
