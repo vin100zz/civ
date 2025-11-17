@@ -1,0 +1,305 @@
+const { useState, useEffect } = React;
+const { generateInitialTerrain } = window.mapGenerator;
+
+// Constants
+const TILE_SIZE = 50;
+const VIEWPORT_WIDTH = 12;
+const VIEWPORT_HEIGHT = 10;
+
+// Terrain and Unit Types
+const TERRAIN_TYPES = {
+  GRASSLAND: { name: 'Prairie', color: '#90EE90', food: 2, production: 1, movement: 1 },
+  FOREST: { name: 'Forêt', color: '#228B22', food: 1, production: 2, movement: 2 },
+  HILLS: { name: 'Collines', color: '#8B7355', food: 1, production: 2, movement: 2 },
+  MOUNTAINS: { name: 'Montagnes', color: '#696969', food: 0, production: 1, movement: 3 },
+  OCEAN: { name: 'Océan', color: '#4169E1', food: 1, production: 0, movement: 1 },
+  DESERT: { name: 'Désert', color: '#F4A460', food: 0, production: 1, movement: 1 }
+};
+
+const UNIT_TYPES = {
+  SETTLER: { name: 'Colon', attack: 0, defense: 1, movement: 1, icon: '🏠' },
+  WARRIOR: { name: 'Guerrier', attack: 1, defense: 1, movement: 1, icon: '⚔️' }
+};
+
+const CivGame = () => {
+  const [gameState, setGameState] = useState(() => {
+    const savedState = localStorage.getItem('civGameState');
+    if (savedState) {
+      return JSON.parse(savedState);
+    } else {
+      return {
+        terrain: generateInitialTerrain(),
+        selectedUnit: null,
+        turn: 1,
+        cities: [],
+        units: [
+          { id: 1, type: 'SETTLER', x: 5, y: 5, movement: 1, player: 1 },
+          { id: 2, type: 'SETTLER', x: 3, y: 3, movement: 1, player: 1 },
+          { id: 3, type: 'WARRIOR', x: 6, y: 5, movement: 1, player: 1 }
+        ],
+        resources: { food: 10, production: 10, gold: 50 },
+        viewport: { x: 0, y: 0 }
+      };
+    }
+  });
+
+  // Save game state to local storage
+  useEffect(() => {
+    localStorage.setItem('civGameState', JSON.stringify(gameState));
+  }, [gameState]);
+
+  const moveUnit = (dx, dy) => {
+    if (!gameState.selectedUnit) return;
+
+    const unit = gameState.units.find(u => u.id === gameState.selectedUnit);
+    if (!unit || unit.movement <= 0) return;
+
+    const newX = unit.x + dx;
+    const newY = unit.y + dy;
+
+    if (newX < 0 || newX >= mapGenerator.MAP_WIDTH || newY < 0 || newY >= mapGenerator.MAP_HEIGHT) return;
+
+    const terrainType = TERRAIN_TYPES[gameState.terrain[newY][newX]];
+    if (unit.movement < terrainType.movement) return;
+
+    setGameState(prevState => {
+      const newUnits = prevState.units.map(u =>
+        u.id === prevState.selectedUnit
+          ? { ...u, x: newX, y: newY, movement: u.movement - terrainType.movement }
+          : u
+      );
+
+      const newXViewport = Math.max(0, Math.min(mapGenerator.MAP_WIDTH - VIEWPORT_WIDTH, newX - Math.floor(VIEWPORT_WIDTH / 2)));
+      const newYViewport = Math.max(0, Math.min(mapGenerator.MAP_HEIGHT - VIEWPORT_HEIGHT, newY - Math.floor(VIEWPORT_HEIGHT / 2)));
+
+      return {
+        ...prevState,
+        units: newUnits,
+        viewport: { x: newXViewport, y: newYViewport }
+      };
+    });
+  };
+
+  const foundCity = () => {
+    if (!gameState.selectedUnit) return;
+
+    const unit = gameState.units.find(u => u.id === gameState.selectedUnit);
+    if (!unit || unit.type !== 'SETTLER') return;
+
+    const cityName = `Ville ${gameState.cities.length + 1}`;
+    setGameState(prevState => ({
+      ...prevState,
+      cities: [
+        ...prevState.cities,
+        new City(prevState.cities.length + 1, cityName, unit.x, unit.y, 1, 1)
+      ],
+      units: prevState.units.filter(u => u.id !== prevState.selectedUnit),
+      selectedUnit: null
+    }));
+  };
+
+  const endTurn = () => {
+    setGameState(prevState => {
+      const newTurn = prevState.turn + 1;
+      const newUnits = prevState.units.map(u => ({
+        ...u,
+        movement: UNIT_TYPES[u.type].movement
+      }));
+
+      // Update cities and calculate resources
+      const newCities = prevState.cities.map(city => {
+        const terrainType = prevState.terrain[city.y][city.x];
+        const { food, production } = city.calculateProduction(terrainType);
+        city.update(food); // Example: population grows based on food
+        return city;
+      });
+
+      const newResources = {
+        food: prevState.resources.food + 2 * newCities.length,
+        production: prevState.resources.production + 2 * newCities.length,
+        gold: prevState.resources.gold + 1 * newCities.length
+      };
+
+      return {
+        ...prevState,
+        turn: newTurn,
+        units: newUnits,
+        cities: newCities,
+        resources: newResources
+      };
+    });
+  };
+
+  const handleTileClick = (x, y) => {
+    const unit = gameState.units.find(u => u.x === x && u.y === y);
+
+    if (unit && unit.player === 1) {
+      setGameState(prevState => ({
+        ...prevState,
+        selectedUnit: unit.id
+      }));
+    } else if (gameState.selectedUnit) {
+      const selectedUnitObj = gameState.units.find(u => u.id === gameState.selectedUnit);
+      if (selectedUnitObj) {
+        const dx = x - selectedUnitObj.x;
+        const dy = y - selectedUnitObj.y;
+        if (Math.abs(dx) + Math.abs(dy) === 1) {
+          moveUnit(dx, dy);
+        }
+      }
+    }
+  };
+
+  const getVisibleMap = () => {
+    const visible = [];
+    for (let y = gameState.viewport.y; y < Math.min(gameState.viewport.y + VIEWPORT_HEIGHT, mapGenerator.MAP_HEIGHT); y++) {
+      const row = [];
+      for (let x = gameState.viewport.x; x < Math.min(gameState.viewport.x + VIEWPORT_WIDTH, mapGenerator.MAP_WIDTH); x++) {
+        const unit = gameState.units.find(u => u.x === x && u.y === y);
+        const city = gameState.cities.find(c => c.x === x && c.y === y);
+        row.push({
+          terrain: gameState.terrain[y][x],
+          unit,
+          city
+        });
+      }
+      visible.push(row);
+    }
+    return visible;
+  };
+
+  const visibleMap = getVisibleMap();
+  const selectedUnitData = gameState.units.find(u => u.id === gameState.selectedUnit);
+
+  return (
+    <div className="w-full h-screen bg-gray-900 text-white p-4 flex flex-col">
+      <div className="bg-gray-800 rounded-lg p-4 mb-4 flex justify-between items-center">
+        <div className="flex gap-6">
+          <div>Tour: <span className="font-bold text-yellow-400">{gameState.turn}</span></div>
+          <div>🌾 Nourriture: <span className="font-bold">{gameState.resources.food}</span></div>
+          <div>⚙️ Production: <span className="font-bold">{gameState.resources.production}</span></div>
+          <div>💰 Or: <span className="font-bold">{gameState.resources.gold}</span></div>
+          <div>🏛️ Villes: <span className="font-bold">{gameState.cities.length}</span></div>
+        </div>
+        <button
+          onClick={endTurn}
+          className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded font-bold cursor-pointer"
+        >
+          Fin du tour
+        </button>
+      </div>
+
+      <div className="flex gap-4 flex-1">
+        <div className="bg-gray-800 rounded-lg p-4 flex-1">
+          <div className="overflow-hidden">
+            {visibleMap.map((row, y) => (
+              <div key={y + gameState.viewport.y} className="flex">
+                {row.map((tile, x) => {
+                  const actualX = x + gameState.viewport.x;
+                  const actualY = y + gameState.viewport.y;
+                  const terrainInfo = TERRAIN_TYPES[tile.terrain];
+                  const isSelected = tile.unit && tile.unit.id === gameState.selectedUnit;
+
+                  return (
+                    <div
+                      key={`${actualX}-${actualY}`}
+                      onClick={() => handleTileClick(actualX, actualY)}
+                      className={`relative cursor-pointer border border-gray-700 ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                      style={{
+                        width: TILE_SIZE,
+                        height: TILE_SIZE,
+                        backgroundColor: terrainInfo.color
+                      }}
+                    >
+                      {tile.city && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="bg-white text-black text-xs px-1 rounded font-bold">
+                            {tile.city.name}
+                          </div>
+                        </div>
+                      )}
+                      {tile.unit && (
+                        <div className="absolute inset-0 flex items-center justify-center text-2xl">
+                          {UNIT_TYPES[tile.unit.type].icon}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4">
+          <div>
+            <h3 className="text-lg font-bold mb-2">Unité sélectionnée</h3>
+            {selectedUnitData ? (
+              <div className="bg-gray-700 p-3 rounded space-y-2">
+                <div className="font-bold">{UNIT_TYPES[selectedUnitData.type].name}</div>
+                <div className="text-sm">Position: ({selectedUnitData.x}, {selectedUnitData.y})</div>
+                <div className="text-sm">Mouvement: {selectedUnitData.movement}/{UNIT_TYPES[selectedUnitData.type].movement}</div>
+
+                <div className="space-y-1 mt-3">
+                  <button
+                    onClick={() => moveUnit(0, -1)}
+                    className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                  >
+                    ▲
+                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => moveUnit(-1, 0)}
+                      className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      onClick={() => moveUnit(1, 0)}
+                      className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                    >
+                      ▶
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => moveUnit(0, 1)}
+                    className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                {selectedUnitData.type === 'SETTLER' && (
+                  <button
+                    onClick={foundCity}
+                    className="w-full bg-green-600 hover:bg-green-700 p-2 rounded mt-2 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    ➕ Fonder une ville
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm">Aucune unité sélectionnée</div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold mb-2">Villes ({gameState.cities.length})</h3>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {gameState.cities.map(city => (
+                <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
+                  <div className="font-bold">{city.name}</div>
+                  <div>Population: {city.population}</div>
+                  <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<CivGame />);
