@@ -22,6 +22,12 @@ const UNIT_TYPES = {
 };
 
 const CivGame = () => {
+  // Helper function to render repeated icons
+  const renderIcons = (count, iconClass, color) => {
+    return Array.from({ length: count }).map((_, i) => (
+      <i key={i} className={iconClass} style={{ marginRight: '2px', color: color }}></i>
+    ));
+  };
   const [gameState, setGameState] = useState(() => {
     const savedState = localStorage.getItem('civGameState');
     if (savedState) {
@@ -106,28 +112,39 @@ const CivGame = () => {
         movement: UNIT_TYPES[u.type].movement
       }));
 
-      // Update cities and calculate resources
+      // Update cities - manage resources at city level
       const newCities = prevState.cities.map(city => {
         const terrainType = prevState.terrain[city.y][city.x];
-        const { food, production } = city.calculateProduction(terrainType);
-        city.update(food); // Example: population grows based on food
+        city.endTurn(terrainType);
         return city;
       });
-
-      const newResources = {
-        food: prevState.resources.food + 2 * newCities.length,
-        production: prevState.resources.production + 2 * newCities.length,
-        gold: prevState.resources.gold + 1 * newCities.length
-      };
 
       return {
         ...prevState,
         turn: newTurn,
         units: newUnits,
-        cities: newCities,
-        resources: newResources
+        cities: newCities
       };
     });
+  };
+
+  const resetGame = () => {
+    if (confirm('Êtes-vous sûr de vouloir réinitialiser le jeu ? Toute progression sera perdue.')) {
+      localStorage.removeItem('civGameState');
+      setGameState({
+        terrain: generateInitialTerrain(),
+        selectedUnit: null,
+        turn: 1,
+        cities: [],
+        units: [
+          { id: 1, type: 'SETTLER', x: 5, y: 5, movement: 1, player: 1 },
+          { id: 2, type: 'SETTLER', x: 3, y: 3, movement: 1, player: 1 },
+          { id: 3, type: 'WARRIOR', x: 6, y: 5, movement: 1, player: 1 }
+        ],
+        resources: { food: 10, production: 10, gold: 50 },
+        viewport: { x: 0, y: 0 }
+      });
+    }
   };
 
   const handleTileClick = (x, y) => {
@@ -176,17 +193,22 @@ const CivGame = () => {
       <div className="bg-gray-800 rounded-lg p-4 mb-4 flex justify-between items-center">
         <div className="flex gap-6">
           <div>Tour: <span className="font-bold text-yellow-400">{gameState.turn}</span></div>
-          <div>🌾 Nourriture: <span className="font-bold">{gameState.resources.food}</span></div>
-          <div>⚙️ Production: <span className="font-bold">{gameState.resources.production}</span></div>
-          <div>💰 Or: <span className="font-bold">{gameState.resources.gold}</span></div>
           <div>🏛️ Villes: <span className="font-bold">{gameState.cities.length}</span></div>
         </div>
-        <button
-          onClick={endTurn}
-          className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded font-bold cursor-pointer"
-        >
-          Fin du tour
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={endTurn}
+            className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded font-bold cursor-pointer"
+          >
+            Fin du tour
+          </button>
+          <button
+            onClick={resetGame}
+            className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold cursor-pointer"
+          >
+            Réinitialiser
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 flex-1">
@@ -211,9 +233,20 @@ const CivGame = () => {
                         backgroundColor: terrainInfo.color
                       }}
                     >
+                      {/* Terrain resources overlay */}
+                      <div className="absolute top-1 left-1 text-xs font-semibold opacity-60 pointer-events-none leading-tight">
+                        <div>{renderIcons(terrainInfo.food, 'fas fa-apple-alt', '#22c55e')}</div>
+                        <div>{renderIcons(terrainInfo.production, 'fas fa-hammer', '#9ca3af')}</div>
+                      </div>
+
                       {tile.city && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="bg-white text-black text-xs px-1 rounded font-bold">
+                        <div className="absolute inset-0 flex flex-col items-center justify-between">
+                          <div className="flex-1 flex items-center justify-center w-full">
+                            <div className="text-white text-lg font-bold">
+                              {tile.city.population}
+                            </div>
+                          </div>
+                          <div className="bg-white text-black text-xs px-1 rounded font-bold whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
                             {tile.city.name}
                           </div>
                         </div>
@@ -290,6 +323,8 @@ const CivGame = () => {
                 <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
                   <div className="font-bold">{city.name}</div>
                   <div>Population: {city.population}</div>
+                  <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded}</div>
+                  <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)}</div>
                   <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
                 </div>
               ))}
