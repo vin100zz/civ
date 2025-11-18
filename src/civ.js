@@ -4,7 +4,7 @@ const { generateInitialTerrain } = window.mapGenerator;
 // Constants
 const TILE_SIZE = 50;
 const VIEWPORT_WIDTH = 12;
-const VIEWPORT_HEIGHT = 10;
+const VIEWPORT_HEIGHT = 12;
 const CIV_COLOR = '#ff00ff'; // Magenta color for your civilization
 
 // Terrain and Unit Types
@@ -24,19 +24,29 @@ const UNIT_TYPES = {
 
 const CivGame = () => {
   // Function to create initial game state
-  const getInitialGameState = () => ({
-    terrain: generateInitialTerrain(),
-    selectedUnit: null,
-    turn: 1,
-    cities: [],
-    units: [
-      { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
-      { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
-      { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
-    ],
-    resources: { food: 10, production: 10, gold: 50 },
-    viewport: { x: 0, y: 0 }
-  });
+  const getInitialGameState = () => {
+    const terrain = generateInitialTerrain();
+    const initialCities = [
+      new City(1, 'Ville 1', 3, 3, 1, 1),
+      new City(2, 'Ville 2', 4, 8, 1, 1),
+      new City(3, 'Ville 3', 9, 7, 1, 1)
+    ];
+
+    // Initialize utilized tiles for each city
+    initialCities.forEach(city => {
+      city.initializeUtilizedTiles(terrain, initialCities);
+    });
+
+    return {
+      terrain: terrain,
+      selectedUnit: null,
+      turn: 1,
+      cities: initialCities,
+      units: [],
+      resources: { food: 10, production: 10, gold: 50 },
+      viewport: { x: 0, y: 0 }
+    };
+  };
 
   // Helper function to render repeated icons
   const renderIcons = (count, iconClass, color) => {
@@ -303,7 +313,7 @@ const CivGame = () => {
           </div>
         </div>
 
-        <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4">
+        <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4 flex flex-col">
           <div>
             <h3 className="text-lg font-bold mb-2">Unité sélectionnée</h3>
             {selectedUnitData ? (
@@ -355,9 +365,9 @@ const CivGame = () => {
             )}
           </div>
 
-          <div>
+          <div className="flex-1 flex flex-col overflow-hidden">
             <h3 className="text-lg font-bold mb-2">Villes ({gameState.cities.length})</h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="space-y-2 overflow-y-auto flex-1">
               {gameState.cities.map(city => {
                 const perTurn = city.getProductionPerTurn(gameState.terrain);
                 return (

@@ -1,6 +1,6 @@
 class MapGenerator {
-  static MAP_WIDTH = 20;
-  static MAP_HEIGHT = 20;
+  static MAP_WIDTH = 12;
+  static MAP_HEIGHT = 12;
 
   static generateInitialTerrain(width = MapGenerator.MAP_WIDTH, height = MapGenerator.MAP_HEIGHT) {
     const map = [];
