@@ -44,10 +44,18 @@ const CivGame = () => {
   const getTileUtilizedBy = (x, y) => {
     return gameState.cities.find(city => city.isTileUtilized(x, y));
   };
+
+  // Check if a tile is an expanded territory tile of any city
+  const getTerritoryTileBy = (x, y) => {
+    return gameState.cities.find(city => city.isTerritoryTile(x, y));
+  };
   const [gameState, setGameState] = useState(() => {
     const savedState = localStorage.getItem('civGameState');
     if (savedState) {
-      return JSON.parse(savedState);
+      const state = JSON.parse(savedState);
+      // Convert plain JSON objects back to City instances
+      state.cities = state.cities.map(cityObj => City.fromObject(cityObj));
+      return state;
     } else {
       return {
         terrain: generateInitialTerrain(),
@@ -265,6 +273,14 @@ const CivGame = () => {
                         </div>
                       )}
 
+                      {/* Territory expansion tile overlay */}
+                      {getTerritoryTileBy(actualX, actualY) && !getTileUtilizedBy(actualX, actualY) && (
+                        <div
+                          className="absolute inset-0"
+                          style={{ backgroundColor: CIV_COLOR, opacity: 0.15 }}
+                        />
+                      )}
+
                       {tile.city && (
                         <div
                           className="absolute inset-0 flex flex-col items-center justify-between"
@@ -359,6 +375,7 @@ const CivGame = () => {
                     <div>Population: {city.population}</div>
                     <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded} (+{perTurn.food}/tour)</div>
                     <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)} (+{perTurn.production}/tour)</div>
+                    <div className="text-xs"><i className="fas fa-music" style={{marginRight: '4px', color: '#a78bfa'}}></i>Culture: {Math.floor(city.culture)}/{city.cultureNeeded} (+2/tour)</div>
                     <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
                   </div>
                 );
