@@ -23,6 +23,21 @@ const UNIT_TYPES = {
 };
 
 const CivGame = () => {
+  // Function to create initial game state
+  const getInitialGameState = () => ({
+    terrain: generateInitialTerrain(),
+    selectedUnit: null,
+    turn: 1,
+    cities: [],
+    units: [
+      { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
+      { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
+      { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
+    ],
+    resources: { food: 10, production: 10, gold: 50 },
+    viewport: { x: 0, y: 0 }
+  });
+
   // Helper function to render repeated icons
   const renderIcons = (count, iconClass, color) => {
     return Array.from({ length: count }).map((_, i) => (
@@ -57,19 +72,7 @@ const CivGame = () => {
       state.cities = state.cities.map(cityObj => City.fromObject(cityObj));
       return state;
     } else {
-      return {
-        terrain: generateInitialTerrain(),
-        selectedUnit: null,
-        turn: 1,
-        cities: [],
-        units: [
-          { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
-          { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
-          { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
-        ],
-        resources: { food: 10, production: 10, gold: 50 },
-        viewport: { x: 0, y: 0 }
-      };
+      return getInitialGameState();
     }
   });
 
@@ -157,19 +160,7 @@ const CivGame = () => {
   const resetGame = () => {
     if (confirm('Êtes-vous sûr de vouloir réinitialiser le jeu ? Toute progression sera perdue.')) {
       localStorage.removeItem('civGameState');
-      setGameState({
-        terrain: generateInitialTerrain(),
-        selectedUnit: null,
-        turn: 1,
-        cities: [],
-        units: [
-          { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
-          { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
-          { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
-        ],
-        resources: { food: 10, production: 10, gold: 50 },
-        viewport: { x: 0, y: 0 }
-      });
+      setGameState(getInitialGameState());
     }
   };
 
