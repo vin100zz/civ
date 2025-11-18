@@ -26,10 +26,19 @@ const CivGame = () => {
   // Function to create initial game state
   const getInitialGameState = () => {
     const terrain = generateInitialTerrain();
+
+    // Create 3 civilizations
+    const initialCivs = [
+      new Civilization(1, 'Jaune', '#FFFF00', 50),
+      new Civilization(2, 'Vert', '#00FF00', 50),
+      new Civilization(3, 'Magenta', '#ff00ff', 50)
+    ];
+
+    // Create cities for each civilization
     const initialCities = [
       new City(1, 'Ville 1', 3, 3, 1, 1),
-      new City(2, 'Ville 2', 4, 8, 1, 1),
-      new City(3, 'Ville 3', 9, 7, 1, 1)
+      new City(2, 'Ville 2', 4, 8, 1, 2),
+      new City(3, 'Ville 3', 9, 7, 1, 3)
     ];
 
     // Initialize utilized tiles for each city
@@ -41,6 +50,7 @@ const CivGame = () => {
       terrain: terrain,
       selectedUnit: null,
       turn: 1,
+      civilizations: initialCivs,
       cities: initialCities,
       units: [],
       resources: { food: 10, production: 10, gold: 50 },
@@ -74,10 +84,23 @@ const CivGame = () => {
   const getTerritoryTileBy = (x, y) => {
     return gameState.cities.find(city => city.isTerritoryTile(x, y));
   };
+
+  // Get civilization by ID
+  const getCivilizationById = (civId) => {
+    return gameState.civilizations?.find(civ => civ.id === civId);
+  };
+
+  // Get city's civilization
+  const getCitysCivilization = (city) => {
+    return getCivilizationById(city.civId);
+  };
+
   const [gameState, setGameState] = useState(() => {
     const savedState = localStorage.getItem('civGameState');
     if (savedState) {
       const state = JSON.parse(savedState);
+      // Convert plain JSON objects back to Civilization instances
+      state.civilizations = state.civilizations?.map(civObj => Civilization.fromObject(civObj)) || [];
       // Convert plain JSON objects back to City instances
       state.cities = state.cities.map(cityObj => City.fromObject(cityObj));
       return state;
@@ -130,7 +153,8 @@ const CivGame = () => {
     if (!unit || unit.type !== 'SETTLER') return;
 
     const cityName = `Ville ${gameState.cities.length + 1}`;
-    const newCity = new City(gameState.cities.length + 1, cityName, unit.x, unit.y, 1, 1);
+    // Assign the city to civilization 1 (player civilization)
+    const newCity = new City(gameState.cities.length + 1, cityName, unit.x, unit.y, 1, 1, 1);
     const newCities = [...gameState.cities, newCity];
 
     // Initialize utilized tiles for the new city
@@ -218,9 +242,15 @@ const CivGame = () => {
   return (
     <div className="w-full h-screen bg-gray-900 text-white p-4 flex flex-col">
       <div className="bg-gray-800 rounded-lg p-4 mb-4 flex justify-between items-center">
-        <div className="flex gap-6">
+        <div className="flex gap-4 items-center">
           <div>Tour: <span className="font-bold text-yellow-400">{gameState.turn}</span></div>
-          <div>🏛️ Villes: <span className="font-bold">{gameState.cities.length}</span></div>
+          <div className="border-l border-gray-600 pl-4">
+            {gameState.civilizations?.map(civ => (
+              <div key={civ.id} className="inline-block mr-3 px-3 py-1 rounded" style={{ backgroundColor: civ.color, color: civ.color === '#FFFF00' ? '#000' : '#fff' }}>
+                <span className="font-bold">{civ.name}</span>: <i className="fas fa-coins" style={{ marginRight: '4px', color: '#FFD700' }}></i><span>{civ.gold}</span>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="flex gap-2">
           <button
@@ -257,8 +287,8 @@ const CivGame = () => {
                       style={{
                         width: TILE_SIZE,
                         height: TILE_SIZE,
-                        backgroundColor: terrainInfo.color,
-                        ...(isTileOnBorder(actualX, actualY) && { borderColor: CIV_COLOR })
+                        backgroundColor: tile.city ? (getCitysCivilization(tile.city)?.color || '#808080') : terrainInfo.color,
+                        ...(isTileOnBorder(actualX, actualY) && { borderColor: getCitysCivilization(gameState.cities.find(c => c.isInTerritory(actualX, actualY)))?.color })
                       }}
                     >
                       {/* Terrain resources overlay */}
@@ -278,14 +308,14 @@ const CivGame = () => {
                       {getTerritoryTileBy(actualX, actualY) && !getTileUtilizedBy(actualX, actualY) && (
                         <div
                           className="absolute inset-0"
-                          style={{ backgroundColor: CIV_COLOR, opacity: 0.15 }}
+                          style={{ backgroundColor: getCitysCivilization(gameState.cities.find(c => c.isTerritoryTile(actualX, actualY)))?.color, opacity: 0.15 }}
                         />
                       )}
 
                       {tile.city && (
                         <div
                           className="absolute inset-0 flex flex-col items-center justify-between"
-                          style={{ backgroundColor: CIV_COLOR }}
+                          style={{ backgroundColor: getCitysCivilization(tile.city)?.color, opacity: 0.3 }}
                         >
                           <div className="flex-1 flex items-center justify-center w-full">
                             <div className="text-white text-lg font-bold">
@@ -300,7 +330,7 @@ const CivGame = () => {
                       {tile.unit && (
                         <div
                           className="absolute inset-0 flex items-center justify-center text-2xl"
-                          style={{ backgroundColor: CIV_COLOR }}
+                          style={{ backgroundColor: getCivilizationById(1)?.color, opacity: 0.3 }}
                         >
                           {UNIT_TYPES[tile.unit.type].icon}
                         </div>
@@ -370,9 +400,13 @@ const CivGame = () => {
             <div className="space-y-2 overflow-y-auto flex-1">
               {gameState.cities.map(city => {
                 const perTurn = city.getProductionPerTurn(gameState.terrain);
+                const civ = getCitysCivilization(city);
                 return (
                   <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
-                    <div className="font-bold">{city.name}</div>
+                    <div className="font-bold flex items-center gap-2">
+                      <div style={{ width: '16px', height: '16px', backgroundColor: civ?.color, borderRadius: '3px' }}></div>
+                      {city.name}
+                    </div>
                     <div>Population: {city.population}</div>
                     <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded} (+{perTurn.food}/tour)</div>
                     <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)} (+{perTurn.production}/tour)</div>

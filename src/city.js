@@ -1,11 +1,11 @@
 class City {
-  constructor(id, name, x, y, population = 1, player = 1) {
+  constructor(id, name, x, y, population = 1, civId = 1) {
     this.id = id;
     this.name = name;
     this.x = x;
     this.y = y;
     this.population = population;
-    this.player = player;
+    this.civId = civId;
     this.food = 0; // Current food stored in the city
     this.production = 0; // Current production stored in the city
     this.culture = 0; // Current culture accumulated in the city
@@ -246,7 +246,7 @@ class City {
 
   // Static method to create a new city from a plain object
   static fromObject(obj) {
-    const city = new City(obj.id, obj.name, obj.x, obj.y, obj.population, obj.player);
+    const city = new City(obj.id, obj.name, obj.x, obj.y, obj.population, obj.civId, obj.civId);
     city.food = obj.food || 0;
     city.production = obj.production || 0;
     city.culture = obj.culture || 0;
