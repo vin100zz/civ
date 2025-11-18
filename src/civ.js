@@ -39,6 +39,11 @@ const CivGame = () => {
   const isTileOnBorder = (x, y) => {
     return gameState.cities.some(city => city.isOnBorder(x, y, gameState.cities));
   };
+
+  // Check if a tile is utilized by any city
+  const getTileUtilizedBy = (x, y) => {
+    return gameState.cities.find(city => city.isTileUtilized(x, y));
+  };
   const [gameState, setGameState] = useState(() => {
     const savedState = localStorage.getItem('civGameState');
     if (savedState) {
@@ -50,9 +55,9 @@ const CivGame = () => {
         turn: 1,
         cities: [],
         units: [
-          { id: 1, type: 'SETTLER', x: 5, y: 5, movement: 1, player: 1 },
-          { id: 2, type: 'SETTLER', x: 3, y: 3, movement: 1, player: 1 },
-          { id: 3, type: 'WARRIOR', x: 6, y: 5, movement: 1, player: 1 }
+          { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
+          { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
+          { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
         ],
         resources: { food: 10, production: 10, gold: 50 },
         viewport: { x: 0, y: 0 }
@@ -104,12 +109,15 @@ const CivGame = () => {
     if (!unit || unit.type !== 'SETTLER') return;
 
     const cityName = `Ville ${gameState.cities.length + 1}`;
+    const newCity = new City(gameState.cities.length + 1, cityName, unit.x, unit.y, 1, 1);
+    const newCities = [...gameState.cities, newCity];
+
+    // Initialize utilized tiles for the new city
+    newCity.initializeUtilizedTiles(gameState.terrain, newCities);
+
     setGameState(prevState => ({
       ...prevState,
-      cities: [
-        ...prevState.cities,
-        new City(prevState.cities.length + 1, cityName, unit.x, unit.y, 1, 1)
-      ],
+      cities: newCities,
       units: prevState.units.filter(u => u.id !== prevState.selectedUnit),
       selectedUnit: null
     }));
@@ -125,8 +133,7 @@ const CivGame = () => {
 
       // Update cities - manage resources at city level
       const newCities = prevState.cities.map(city => {
-        const terrainType = prevState.terrain[city.y][city.x];
-        city.update(terrainType);
+        city.update(prevState.terrain, prevState.cities);
         return city;
       });
 
@@ -148,9 +155,9 @@ const CivGame = () => {
         turn: 1,
         cities: [],
         units: [
-          { id: 1, type: 'SETTLER', x: 5, y: 5, movement: 1, player: 1 },
-          { id: 2, type: 'SETTLER', x: 3, y: 3, movement: 1, player: 1 },
-          { id: 3, type: 'WARRIOR', x: 6, y: 5, movement: 1, player: 1 }
+          { id: 1, type: 'SETTLER', x: 6, y: 7, movement: 1, player: 1 },
+          { id: 2, type: 'SETTLER', x: 2, y: 3, movement: 1, player: 1 },
+          { id: 3, type: 'WARRIOR', x: 7, y: 3, movement: 1, player: 1 }
         ],
         resources: { food: 10, production: 10, gold: 50 },
         viewport: { x: 0, y: 0 }
@@ -251,6 +258,13 @@ const CivGame = () => {
                         <div>{renderIcons(terrainInfo.production, 'fas fa-hammer', '#9ca3af')}</div>
                       </div>
 
+                      {/* Utilized tile indicator */}
+                      {getTileUtilizedBy(actualX, actualY) && (
+                        <div className="absolute top-1 right-1 text-lg pointer-events-none">
+                          <i className="fas fa-check-circle text-white" style={{ textShadow: '0 0 3px black' }}></i>
+                        </div>
+                      )}
+
                       {tile.city && (
                         <div
                           className="absolute inset-0 flex flex-col items-center justify-between"
@@ -337,15 +351,18 @@ const CivGame = () => {
           <div>
             <h3 className="text-lg font-bold mb-2">Villes ({gameState.cities.length})</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {gameState.cities.map(city => (
-                <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
-                  <div className="font-bold">{city.name}</div>
-                  <div>Population: {city.population}</div>
-                  <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded}</div>
-                  <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)}</div>
-                  <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
-                </div>
-              ))}
+              {gameState.cities.map(city => {
+                const perTurn = city.getProductionPerTurn(gameState.terrain);
+                return (
+                  <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
+                    <div className="font-bold">{city.name}</div>
+                    <div>Population: {city.population}</div>
+                    <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded} (+{perTurn.food}/tour)</div>
+                    <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)} (+{perTurn.production}/tour)</div>
+                    <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

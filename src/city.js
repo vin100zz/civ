@@ -9,20 +9,31 @@ class City {
     this.food = 0; // Current food stored in the city
     this.production = 0; // Current production stored in the city
     this.foodNeeded = 2; // Food needed to grow population (base)
+    this.utilizedTiles = []; // Array of {x, y} coordinates of utilized tiles
   }
 
-  // Calculate resources generated based on population and terrain
-  calculateProduction(terrainType) {
-    const terrain = TERRAIN_TYPES[terrainType];
+  // Calculate resources generated based on utilized tiles
+  calculateFoodAndProduction(gameTerrainMap) {
+    let totalFood = 0;
+    let totalProduction = 0;
+
+    // Sum resources from each utilized tile
+    this.utilizedTiles.forEach(tile => {
+      const terrainType = gameTerrainMap[tile.y][tile.x];
+      const terrainInfo = TERRAIN_TYPES[terrainType];
+      totalFood += terrainInfo.food;
+      totalProduction += terrainInfo.production;
+    });
+
     return {
-      food: terrain.food,
-      production: terrain.production
+      food: totalFood,
+      production: totalProduction
     };
   }
 
   // Update city - accumulate resources and grow population
-  update(terrainType) {
-    const { food, production } = this.calculateProduction(terrainType);
+  update(gameTerrainMap, allCities) {
+    const { food, production } = this.calculateFoodAndProduction(gameTerrainMap);
 
     this.food += food;
     this.production += production;
@@ -30,8 +41,11 @@ class City {
     // Check if population can grow
     if (this.food >= this.foodNeeded) {
       this.population += 1;
-      this.food = 0;
-      this.foodNeeded += 10; // Increase food needed for next growth
+      this.food = 0; // Reset food level to 0
+      this.foodNeeded += 10; // Increase food needed by 10 for next growth
+
+      // Add new utilized tile if available
+      this.addUtilizedTile(gameTerrainMap, allCities);
     }
   }
 
@@ -65,12 +79,88 @@ class City {
     });
   }
 
+  // Check if a tile is utilized by this city
+  isTileUtilized(x, y) {
+    return this.utilizedTiles.some(tile => tile.x === x && tile.y === y);
+  }
+
+  // Initialize utilized tiles when city is founded - city tile + best tile
+  initializeUtilizedTiles(terrain, allCities) {
+    this.utilizedTiles = [];
+    // Always add the city tile itself
+    this.utilizedTiles.push({ x: this.x, y: this.y });
+    // Then add the best adjacent tile if available
+    const bestTile = this.selectBestTile(terrain, allCities);
+    if (bestTile) {
+      this.utilizedTiles.push(bestTile);
+    }
+  }
+
+  // Select the best unutilized tile in the territory
+  selectBestTile(terrain, allCities) {
+    const territoryTiles = [];
+
+    // Get all tiles in territory
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const tx = this.x + dx;
+        const ty = this.y + dy;
+
+        if (tx >= 0 && tx < 100 && ty >= 0 && ty < 100 && this.isInTerritory(tx, ty)) {
+          // Only add if not already utilized
+          if (!this.isTileUtilized(tx, ty)) {
+            const terrainType = terrain[ty][tx];
+            const terrainInfo = TERRAIN_TYPES[terrainType];
+            const value = terrainInfo.food + terrainInfo.production;
+            territoryTiles.push({ x: tx, y: ty, value, food: terrainInfo.food, production: terrainInfo.production });
+          }
+        }
+      }
+    }
+
+    if (territoryTiles.length === 0) return null;
+
+    // Sort by value descending, then by food descending (tiebreaker)
+    territoryTiles.sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return b.food - a.food;
+    });
+
+    return { x: territoryTiles[0].x, y: territoryTiles[0].y };
+  }
+
+  // Called when population grows - add new utilized tile if available
+  addUtilizedTile(terrain, allCities) {
+    if (this.utilizedTiles.length < this.population) {
+      const bestTile = this.selectBestTile(terrain, allCities);
+      if (bestTile) {
+        this.utilizedTiles.push(bestTile);
+      }
+    }
+  }
+
+  // Get food and production per turn based on utilized tiles
+  getProductionPerTurn(gameTerrainMap) {
+    let totalFood = 0;
+    let totalProduction = 0;
+
+    this.utilizedTiles.forEach(tile => {
+      const terrainType = gameTerrainMap[tile.y][tile.x];
+      const terrainInfo = TERRAIN_TYPES[terrainType];
+      totalFood += terrainInfo.food;
+      totalProduction += terrainInfo.production;
+    });
+
+    return { food: totalFood, production: totalProduction };
+  }
+
   // Static method to create a new city from a plain object
   static fromObject(obj) {
     const city = new City(obj.id, obj.name, obj.x, obj.y, obj.population, obj.player);
     city.food = obj.food || 0;
     city.production = obj.production || 0;
     city.foodNeeded = obj.foodNeeded || 2;
+    city.utilizedTiles = obj.utilizedTiles || [];
     return city;
   }
 }
