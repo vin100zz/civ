@@ -29,16 +29,16 @@ const CivGame = () => {
 
     // Create 3 civilizations
     const initialCivs = [
-      new Civilization(1, 'Jaune', '#FFFF00', 50),
-      new Civilization(2, 'Vert', '#00FF00', 50),
-      new Civilization(3, 'Magenta', '#ff00ff', 50)
+      new Civilization(1, 'Yellow', '#FFFF00', 50),
+      new Civilization(2, 'Green', '#00FF00', 50),
+      new Civilization(3, 'Purple', '#ff00ff', 50)
     ];
 
     // Create cities for each civilization
     const initialCities = [
-      new City(1, 'Ville 1', 3, 3, 1, 1),
-      new City(2, 'Ville 2', 4, 8, 1, 2),
-      new City(3, 'Ville 3', 9, 7, 1, 3)
+      new City(1, 'Yellcity', 3, 3, 1, 1),
+      new City(2, 'Greencity', 4, 8, 1, 2),
+      new City(3, 'Purpcity', 9, 7, 1, 3)
     ];
 
     // Initialize utilized tiles for each city
