@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 const { generateInitialTerrain } = window.mapGenerator;
 
 // Constants
@@ -6,6 +6,41 @@ const TILE_SIZE = 50;
 const VIEWPORT_WIDTH = 12;
 const VIEWPORT_HEIGHT = 12;
 const CIV_COLOR = '#ff00ff'; // Magenta color for your civilization
+
+// Utility: convert hex color to {r,g,b}
+function hexToRgb(hex) {
+  if (!hex) return null;
+  const h = hex.replace('#', '');
+  const bigint = parseInt(h, 16);
+  if (h.length === 3) {
+    // shorthand e.g. #f0f -> ff00ff
+    return {
+      r: parseInt(h[0] + h[0], 16),
+      g: parseInt(h[1] + h[1], 16),
+      b: parseInt(h[2] + h[2], 16)
+    };
+  }
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
+}
+
+// Utility: return rgba CSS string from hex and alpha
+function hexToRgba(hex, alpha = 1) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+// Utility: choose black or white depending on background luminance
+function contrastColor(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#000';
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return luminance > 0.6 ? '#000' : '#fff';
+}
 
 // Terrain and Unit Types
 const TERRAIN_TYPES = {
@@ -194,6 +229,12 @@ const CivGame = () => {
   const resetGame = () => {
     if (confirm('Êtes-vous sûr de vouloir réinitialiser le jeu ? Toute progression sera perdue.')) {
       localStorage.removeItem('civGameState');
+      // stop simulation if running
+      if (simRef.current) {
+        clearInterval(simRef.current);
+        simRef.current = null;
+      }
+      setSimRunning(false);
       setGameState(getInitialGameState());
     }
   };
@@ -239,6 +280,40 @@ const CivGame = () => {
   const visibleMap = getVisibleMap();
   const selectedUnitData = gameState.units.find(u => u.id === gameState.selectedUnit);
 
+  // Simulation mode: runs endTurn every 200ms when active
+  const [simRunning, setSimRunning] = useState(false);
+  const simRef = useRef(null);
+
+  // Toggle simulation on/off
+  const toggleSimulation = () => {
+    if (simRunning) {
+      // stop
+      if (simRef.current) {
+        clearInterval(simRef.current);
+        simRef.current = null;
+      }
+      setSimRunning(false);
+    } else {
+      // start
+      setSimRunning(true);
+      // use setInterval to call endTurn every 200ms
+      simRef.current = setInterval(() => {
+        // call existing endTurn function
+        endTurn();
+      }, 200);
+    }
+  };
+
+  // Ensure simulation stops when unmounting
+  useEffect(() => {
+    return () => {
+      if (simRef.current) {
+        clearInterval(simRef.current);
+        simRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="w-full h-screen bg-gray-900 text-white p-4 flex flex-col">
       <div className="bg-gray-800 rounded-lg p-4 mb-4 flex justify-between items-center">
@@ -260,6 +335,12 @@ const CivGame = () => {
             Fin du tour
           </button>
           <button
+            onClick={toggleSimulation}
+            className={`px-4 py-2 rounded font-bold cursor-pointer ${simRunning ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-500'}`}
+          >
+            {simRunning ? 'Arrêter' : 'Simuler'}
+          </button>
+          <button
             onClick={resetGame}
             className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold cursor-pointer"
           >
@@ -270,7 +351,8 @@ const CivGame = () => {
 
       <div className="flex gap-4 flex-1">
         <div className="bg-gray-800 rounded-lg p-4 flex-1">
-          <div className="overflow-hidden">
+          {/* map wrapper: position relative so absolute labels can be placed over/around tiles */}
+          <div className="overflow-visible" style={{ position: 'relative', overflow: 'visible' }}>
             {visibleMap.map((row, y) => (
               <div key={y + gameState.viewport.y} className="flex">
                 {row.map((tile, x) => {
@@ -278,6 +360,12 @@ const CivGame = () => {
                   const actualY = y + gameState.viewport.y;
                   const terrainInfo = TERRAIN_TYPES[tile.terrain];
                   const isSelected = tile.unit && tile.unit.id === gameState.selectedUnit;
+                  // Prepare label colors based on city's civilization
+                  let civForLabel = null;
+                  if (tile.city) civForLabel = getCitysCivilization(tile.city);
+                  const labelBg = hexToRgba(civForLabel?.color || '#ffffff', 0.9);
+                  // always use black text for city labels per user's request
+                  const labelColor = '#000';
 
                   return (
                     <div
@@ -288,17 +376,20 @@ const CivGame = () => {
                         width: TILE_SIZE,
                         height: TILE_SIZE,
                         backgroundColor: tile.city ? (getCitysCivilization(tile.city)?.color || '#808080') : terrainInfo.color,
+                        overflow: 'visible',
                         ...(isTileOnBorder(actualX, actualY) && { borderColor: getCitysCivilization(gameState.cities.find(c => c.isInTerritory(actualX, actualY)))?.color })
                       }}
                     >
                       {/* Terrain resources overlay */}
-                      <div className="absolute top-1 left-1 text-xs font-semibold opacity-60 pointer-events-none leading-tight">
-                        <div>{renderIcons(terrainInfo.food, 'fas fa-apple-alt', '#22c55e')}</div>
-                        <div>{renderIcons(terrainInfo.production, 'fas fa-hammer', '#9ca3af')}</div>
-                      </div>
+                      {!(tile.city && tile.city.x === actualX && tile.city.y === actualY) && (
+                        <div className="absolute top-1 left-1 text-xs font-semibold opacity-60 pointer-events-none leading-tight">
+                          <div>{renderIcons(terrainInfo.food, 'fas fa-apple-alt', '#22c55e')}</div>
+                          <div>{renderIcons(terrainInfo.production, 'fas fa-hammer', '#9ca3af')}</div>
+                        </div>
+                      )}
 
                       {/* Utilized tile indicator */}
-                      {getTileUtilizedBy(actualX, actualY) && (
+                      {getTileUtilizedBy(actualX, actualY) && !(tile.city && tile.city.x === actualX && tile.city.y === actualY) && (
                         <div className="absolute top-1 right-1 text-lg pointer-events-none">
                           <i className="fas fa-check-circle text-white" style={{ textShadow: '0 0 3px black' }}></i>
                         </div>
@@ -313,19 +404,24 @@ const CivGame = () => {
                       )}
 
                       {tile.city && (
-                        <div
-                          className="absolute inset-0 flex flex-col items-center justify-between"
-                          style={{ backgroundColor: getCitysCivilization(tile.city)?.color, opacity: 0.3 }}
-                        >
-                          <div className="flex-1 flex items-center justify-center w-full">
-                            <div className="text-white text-lg font-bold">
-                              {tile.city.population}
+                        <>
+                          <div
+                            className="absolute inset-0 flex flex-col items-center justify-center"
+                            style={{ backgroundColor: getCitysCivilization(tile.city)?.color, opacity: 0.3 }}
+                          >
+                            <div className="flex-1 flex items-center justify-center w-full" style={{ marginBottom: '12px' }}>
+                              <div style={{ backgroundColor: 'rgba(0,0,0,0.65)', padding: '2px 8px', borderRadius: 6 }}>
+                                <div className="text-white text-3xl font-extrabold" style={{ textShadow: '0 0 6px rgba(0,0,0,0.7)', lineHeight: '1' }}>
+                                  {tile.city.population}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-white text-black text-xs px-1 rounded font-bold whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
+                          {/* Label juste sous la tuile */}
+                          <div style={{ position: 'absolute', left: '50%', bottom: -6, transform: 'translateX(-50%)', whiteSpace: 'nowrap', backgroundColor: labelBg, color: labelColor, padding: '2px 4px', borderRadius: 6, fontWeight: 700, fontSize: '12px', lineHeight: '1', zIndex: 1000, pointerEvents: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
                             {tile.city.name}
                           </div>
-                        </div>
+                        </>
                       )}
                       {tile.unit && (
                         <div
@@ -340,81 +436,86 @@ const CivGame = () => {
                 })}
               </div>
             ))}
-          </div>
-        </div>
 
-        <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4 flex flex-col">
-          <div>
-            <h3 className="text-lg font-bold mb-2">Unité sélectionnée</h3>
-            {selectedUnitData ? (
-              <div className="bg-gray-700 p-3 rounded space-y-2">
-                <div className="font-bold">{UNIT_TYPES[selectedUnitData.type].name}</div>
-                <div className="text-sm">Position: ({selectedUnitData.x}, {selectedUnitData.y})</div>
-                <div className="text-sm">Mouvement: {selectedUnitData.movement}/{UNIT_TYPES[selectedUnitData.type].movement}</div>
-
-                <div className="space-y-1 mt-3">
-                  <button
-                    onClick={() => moveUnit(0, -1)}
-                    className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
-                  >
-                    ▲
-                  </button>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => moveUnit(-1, 0)}
-                      className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
-                    >
-                      ◀
-                    </button>
-                    <button
-                      onClick={() => moveUnit(1, 0)}
-                      className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
-                    >
-                      ▶
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => moveUnit(0, 1)}
-                    className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
-                  >
-                    ▼
-                  </button>
-                </div>
-
-                {selectedUnitData.type === 'SETTLER' && (
-                  <button
-                    onClick={foundCity}
-                    className="w-full bg-green-600 hover:bg-green-700 p-2 rounded mt-2 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    ➕ Fonder une ville
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="text-gray-500 text-sm">Aucune unité sélectionnée</div>
-            )}
+            {/* city-labels removed: labels are rendered per-tile to ensure exact positioning */}
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <h3 className="text-lg font-bold mb-2">Villes ({gameState.cities.length})</h3>
-            <div className="space-y-2 overflow-y-auto flex-1">
-              {gameState.cities.map(city => {
-                const perTurn = city.getProductionPerTurn(gameState.terrain);
-                const civ = getCitysCivilization(city);
-                return (
-                  <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
-                    <div className="font-bold flex items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: civ?.color, borderRadius: '3px' }}></div>
-                      {city.name}
+          <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4 flex flex-col">
+            <div>
+              <h3 className="text-lg font-bold mb-2">Unité sélectionnée</h3>
+              {selectedUnitData ? (
+                <div className="bg-gray-700 p-3 rounded space-y-2">
+                  <div className="font-bold">{UNIT_TYPES[selectedUnitData.type].name}</div>
+                  <div className="text-sm">Position: ({selectedUnitData.x}, {selectedUnitData.y})</div>
+                  <div className="text-sm">Mouvement: {selectedUnitData.movement}/{UNIT_TYPES[selectedUnitData.type].movement}</div>
+
+                  <div className="space-y-1 mt-3">
+                    <button
+                      onClick={() => moveUnit(0, -1)}
+                      className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                    >
+                      ▲
+                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => moveUnit(-1, 0)}
+                        className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        onClick={() => moveUnit(1, 0)}
+                        className="flex-1 bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                      >
+                        ▶
+                      </button>
                     </div>
-                    <div>Population: {city.population}</div>
-                    <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded} (+{perTurn.food}/tour)</div>
-                    <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)} (+{perTurn.production}/tour)</div>
-                    <div className="text-xs"><i className="fas fa-music" style={{marginRight: '4px', color: '#a78bfa'}}></i>Culture: {Math.floor(city.culture)}/{city.cultureNeeded} (+2/tour)</div>
-                    <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
+                    <button
+                      onClick={() => moveUnit(0, 1)}
+                      className="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded flex items-center justify-center cursor-pointer"
+                    >
+                      ▼
+                    </button>
                   </div>
-                );
-              })}
+
+                  {selectedUnitData.type === 'SETTLER' && (
+                    <button
+                      onClick={foundCity}
+                      className="w-full bg-green-600 hover:bg-green-700 p-2 rounded mt-2 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      ➕ Fonder une ville
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">Aucune unité sélectionnée</div>
+              )}
+            </div>
+
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <h3 className="text-lg font-bold mb-2">Villes ({gameState.cities.length})</h3>
+              <div className="space-y-2 overflow-y-auto flex-1">
+                {gameState.cities.map(city => {
+                  const perTurn = city.getProductionPerTurn(gameState.terrain);
+                  // consumption: 2 food per population per turn
+                  const consumption = 2 * city.population;
+                  const netFoodPerTurn = perTurn.food - consumption;
+                  const civ = getCitysCivilization(city);
+                  return (
+                    <div key={city.id} className="bg-gray-700 p-2 rounded text-sm">
+                      <div className="font-bold flex items-center gap-2">
+                        <div style={{ width: '16px', height: '16px', backgroundColor: civ?.color, borderRadius: '3px' }}></div>
+                        {city.name}
+                      </div>
+                      <div>Population: {city.population}</div>
+                      <div className="text-xs"><i className="fas fa-apple-alt" style={{marginRight: '4px', color: '#22c55e'}}></i>Nourriture: {Math.floor(city.food)}/{city.foodNeeded} ({netFoodPerTurn >= 0 ? '+' + netFoodPerTurn : netFoodPerTurn}/tour)</div>
+                      <div className="text-xs"><i className="fas fa-hammer" style={{marginRight: '4px', color: '#9ca3af'}}></i>Production: {Math.floor(city.production)} (+{perTurn.production}/tour)</div>
+                      <div className="text-xs"><i className="fas fa-music" style={{marginRight: '4px', color: '#a78bfa'}}></i>Culture: {Math.floor(city.culture)}/{city.cultureNeeded} (+2/tour)</div>
+                      <div className="text-xs text-gray-400">({city.x}, {city.y})</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

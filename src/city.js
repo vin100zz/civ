@@ -22,10 +22,16 @@ class City {
 
     // Sum resources from each utilized tile
     this.utilizedTiles.forEach(tile => {
-      const terrainType = gameTerrainMap[tile.y][tile.x];
-      const terrainInfo = TERRAIN_TYPES[terrainType];
-      totalFood += terrainInfo.food;
-      totalProduction += terrainInfo.production;
+      // If this is the city tile, it always yields 2 food and 2 production
+      if (tile.x === this.x && tile.y === this.y) {
+        totalFood += 2;
+        totalProduction += 2;
+      } else {
+        const terrainType = gameTerrainMap[tile.y][tile.x];
+        const terrainInfo = TERRAIN_TYPES[terrainType];
+        totalFood += terrainInfo.food;
+        totalProduction += terrainInfo.production;
+      }
     });
 
     return {
@@ -36,20 +42,39 @@ class City {
 
   // Update city - accumulate resources and grow population
   update(gameTerrainMap, allCities) {
+    // First, compute production from utilized tiles
     const { food, production } = this.calculateFoodAndProduction(gameTerrainMap);
 
+    // Add produced resources
     this.food += food;
     this.production += production;
     this.culture += 2; // Produce 2 culture points per turn
 
-    // Check if population can grow
+    // FIRST: check growth (if enough food gathered this turn)
     if (this.food >= this.foodNeeded) {
       this.population += 1;
-      this.food = 0; // Reset food level to 0
+      this.food = 0; // Reset food level to 0 after growth
       this.foodNeeded += 10; // Increase food needed by 10 for next growth
 
       // Add new utilized tile if available
       this.addUtilizedTile(gameTerrainMap, allCities);
+      // Important: do NOT apply consumption this same turn after growth
+      // (the food reserve is explicitly reset to 0 by the growth rule)
+    } else {
+      // If no growth this turn, apply normal consumption
+      const consumption = 2 * this.population;
+      this.food -= consumption;
+
+      // If food becomes negative -> population decreases (if possible) and we remove one utilized tile
+      if (this.food < 0 && this.population > 1) {
+        this.population = Math.max(1, this.population - 1);
+        // Reset food to 0 after a population loss
+        this.food = 0;
+        // Reverse of growth: decrease foodNeeded by 10 but never below initial base (2)
+        this.foodNeeded = Math.max(2, this.foodNeeded - 10);
+        // Remove one utilized tile (least valuable, never remove the city tile)
+        this.removeLeastValuableUtilizedTile(gameTerrainMap);
+      }
     }
 
     // Check if culture reaches threshold for territory expansion
@@ -60,6 +85,39 @@ class City {
       // Add new territory tile if available
       this.addTerritoryTile(gameTerrainMap, allCities);
     }
+  }
+
+  // Remove the least valuable utilized tile (excluding the city tile)
+  removeLeastValuableUtilizedTile(terrain) {
+    if (!this.utilizedTiles || this.utilizedTiles.length <= 1) return; // keep city tile
+
+    // Build list of removable tiles (exclude city tile)
+    const removable = this.utilizedTiles.filter(t => !(t.x === this.x && t.y === this.y));
+    if (removable.length === 0) return;
+
+    // Compute value for each removable tile
+    const withValue = removable.map(t => {
+      const terrainType = terrain[t.y][t.x];
+      const info = TERRAIN_TYPES[terrainType];
+      return {
+        x: t.x,
+        y: t.y,
+        value: info.food + info.production,
+        food: info.food,
+        production: info.production
+      };
+    });
+
+    // Sort ascending by value, then by production ascending so food-preferred tiles are kept
+    withValue.sort((a, b) => {
+      if (a.value !== b.value) return a.value - b.value;
+      return a.production - b.production;
+    });
+
+    const toRemove = withValue[0];
+
+    // Remove from utilizedTiles
+    this.utilizedTiles = this.utilizedTiles.filter(t => !(t.x === toRemove.x && t.y === toRemove.y));
   }
 
   // Check if a given tile is within this city's territory (adjacent or city tile itself, or expanded territory)
@@ -92,7 +150,7 @@ class City {
         return true; // Map edge
       }
       // Check if not in any city's territory
-      return !allCities.some(city => city.isInTerritory(tile.x, tile.y));
+      return !allCities.some(city => city.isTerritoryTile(tile.x, tile.y));
     });
   }
 
@@ -221,10 +279,15 @@ class City {
 
   // Called when culture reaches threshold - add new territory tile if available
   addUtilizedTile(terrain, allCities) {
-    if (this.utilizedTiles.length < this.population) {
+    // A city can utilize up to (population + 1) tiles (the city tile + population)
+    while (this.utilizedTiles.length < this.population + 1) {
       const bestTile = this.selectBestTile(terrain, allCities);
-      if (bestTile) {
+      if (!bestTile) break;
+      // avoid adding duplicates just in case
+      if (!this.utilizedTiles.some(t => t.x === bestTile.x && t.y === bestTile.y)) {
         this.utilizedTiles.push(bestTile);
+      } else {
+        break;
       }
     }
   }
@@ -235,10 +298,16 @@ class City {
     let totalProduction = 0;
 
     this.utilizedTiles.forEach(tile => {
-      const terrainType = gameTerrainMap[tile.y][tile.x];
-      const terrainInfo = TERRAIN_TYPES[terrainType];
-      totalFood += terrainInfo.food;
-      totalProduction += terrainInfo.production;
+      // City tile always gives 2/2
+      if (tile.x === this.x && tile.y === this.y) {
+        totalFood += 2;
+        totalProduction += 2;
+      } else {
+        const terrainType = gameTerrainMap[tile.y][tile.x];
+        const terrainInfo = TERRAIN_TYPES[terrainType];
+        totalFood += terrainInfo.food;
+        totalProduction += terrainInfo.production;
+      }
     });
 
     return { food: totalFood, production: totalProduction };
@@ -260,4 +329,3 @@ class City {
 
 // Expose the class to the global scope
 window.City = City;
-
