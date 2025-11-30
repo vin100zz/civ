@@ -65,14 +65,14 @@ const CivGame = () => {
     // Create 3 civilizations
     const initialCivs = [
       new Civilization(1, 'Yellow', '#FFFF00', 50),
-      new Civilization(2, 'Green', '#00FF00', 50),
+      new Civilization(2, 'Blue', '#0000FF', 50),
       new Civilization(3, 'Purple', '#ff00ff', 50)
     ];
 
     // Create cities for each civilization
     const initialCities = [
       new City(1, 'Yellcity', 3, 3, 1, 1),
-      new City(2, 'Greencity', 4, 8, 1, 2),
+      new City(2, 'Bluecity', 4, 8, 1, 2),
       new City(3, 'Purpcity', 9, 7, 1, 3)
     ];
 
@@ -280,6 +280,126 @@ const CivGame = () => {
   const visibleMap = getVisibleMap();
   const selectedUnitData = gameState.units.find(u => u.id === gameState.selectedUnit);
 
+  // Compute territory contours (closed SVG paths) for visible viewport,
+  // taking into account city tile, utilized tiles and expanded territory tiles.
+  const territoryContours = gameState.cities.map(city => {
+    const edges = [];
+    for (let y = gameState.viewport.y; y < Math.min(gameState.viewport.y + VIEWPORT_HEIGHT, mapGenerator.MAP_HEIGHT); y++) {
+      for (let x = gameState.viewport.x; x < Math.min(gameState.viewport.x + VIEWPORT_WIDTH, mapGenerator.MAP_WIDTH); x++) {
+        // determine whether this tile belongs to the city's territory
+        // use city.isInTerritory which includes the city tile and adjacent tiles by design
+        const inTerritory = city.isInTerritory ? city.isInTerritory(x, y) : (
+          (city.x === x && city.y === y) || (city.isTileUtilized && city.isTileUtilisé(x, y)) || (city.isTerritoryTile && city.isTerritoryTile(x, y))
+        );
+        if (!inTerritory) continue;
+        const dx = x - gameState.viewport.x;
+        const dy = y - gameState.viewport.y;
+        const left = dx * TILE_SIZE;
+        const top = dy * TILE_SIZE;
+
+        // For each of the four sides, if the adjacent tile is NOT in territory, add the segment
+        const neighborChecks = [ [0,-1], [0,1], [-1,0], [1,0] ];
+        const segs = [
+          { x1: left, y1: top, x2: left + TILE_SIZE, y2: top }, // top
+          { x1: left, y1: top + TILE_SIZE, x2: left + TILE_SIZE, y2: top + TILE_SIZE }, // bottom
+          { x1: left, y1: top, x2: left, y2: top + TILE_SIZE }, // left
+          { x1: left + TILE_SIZE, y1: top, x2: left + TILE_SIZE, y2: top + TILE_SIZE } // right
+        ];
+
+        for (let si = 0; si < neighborChecks.length; si++) {
+          const nx = x + neighborChecks[si][0];
+          const ny = y + neighborChecks[si][1];
+          // neighbor is in territory if city.isInTerritory reports true for it
+          const neighborInTerritory = city.isInTerritory ? city.isInTerritory(nx, ny) : (
+            (city.x === nx && city.y === ny) || (city.isTileUtilisé && city.isTileUtilisé(nx, ny)) || (city.isTerritoryTile && city.isTerritoryTile(nx, ny))
+          );
+          if (!neighborInTerritory) {
+            edges.push(segs[si]);
+          }
+        }
+      }
+    }
+
+    // Merge edges into continuous closed paths
+    // Build adjacency map between points
+    const adj = new Map();
+    const edgeKeys = new Set();
+    const addEdge = (a, b) => {
+      const key = `${a}|${b}`;
+      const rkey = `${b}|${a}`;
+      if (edgeKeys.has(key) || edgeKeys.has(rkey)) return; // avoid duplicate
+      edgeKeys.add(key);
+      if (!adj.has(a)) adj.set(a, new Set());
+      if (!adj.has(b)) adj.set(b, new Set());
+      adj.get(a).add(b);
+      adj.get(b).add(a);
+    };
+
+    edges.forEach(e => {
+      const a = `${e.x1},${e.y1}`;
+      const b = `${e.x2},${e.y2}`;
+      addEdge(a, b);
+    });
+
+    const paths = [];
+    const usedEdges = new Set();
+
+    const pickUnusedEdge = () => {
+      for (const key of edgeKeys) {
+        if (!usedEdges.has(key)) return key;
+      }
+      return null;
+    };
+
+    // Helper to mark undirected edge used
+    const markUsed = (u, v) => {
+      const k = `${u}|${v}`;
+      const rk = `${v}|${u}`;
+      usedEdges.add(k);
+      usedEdges.add(rk);
+    };
+
+    let startEdge = pickUnusedEdge();
+    while (startEdge) {
+      const [startA, startB] = startEdge.split('|');
+      // start from startA -> startB
+      const pathPoints = [startA, startB];
+      markUsed(startA, startB);
+      let prev = startA;
+      let curr = startB;
+      // walk until we return to startA or cannot continue
+      while (true) {
+        const neighbors = Array.from(adj.get(curr) || []);
+        // pick next neighbor that's not prev and whose edge not used
+        let next = null;
+        for (const n of neighbors) {
+          const edgeKey = `${curr}|${n}`;
+          if (!usedEdges.has(edgeKey)) {
+            next = n;
+            break;
+          }
+        }
+        if (!next) break;
+        pathPoints.push(next);
+        markUsed(curr, next);
+        prev = curr;
+        curr = next;
+        if (curr === pathPoints[0]) break; // closed loop
+      }
+
+      // convert pathPoints to SVG path
+      if (pathPoints.length > 1) {
+        const coords = pathPoints.map(p => p.split(',').map(Number));
+        const d = coords.map((c, i) => `${i===0 ? 'M' : 'L'} ${c[0]} ${c[1]}`).join(' ') + ' Z';
+        paths.push(d);
+      }
+
+      startEdge = pickUnusedEdge();
+    }
+
+    return { cityId: city.id, civColor: getCivilizationById(city.civId)?.color || CIV_COLOR, paths };
+  });
+
   // Simulation mode: runs endTurn every 200ms when active
   const [simRunning, setSimRunning] = useState(false);
   const simRef = useRef(null);
@@ -366,18 +486,23 @@ const CivGame = () => {
                   const labelBg = hexToRgba(civForLabel?.color || '#ffffff', 0.9);
                   // always use black text for city labels per user's request
                   const labelColor = '#000';
+                  // which city (if any) utilizes this tile? used to color the utilized icon
+                  const utilByCity = getTileUtilizedBy(actualX, actualY);
+                  const utilIconColor = utilByCity ? (getCitysCivilization(utilByCity)?.color || '#ffffff') : '#ffffff';
 
                   return (
                     <div
                       key={`${actualX}-${actualY}`}
                       onClick={() => handleTileClick(actualX, actualY)}
-                      className={`relative cursor-pointer ${isTileOnBorder(actualX, actualY) ? 'border-2' : 'border'} border-gray-700 ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                      className={`relative cursor-pointer ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
                       style={{
                         width: TILE_SIZE,
                         height: TILE_SIZE,
+                        boxSizing: 'border-box',
+                        border: '1px solid rgba(0,0,0,0.05)', // encore plus léger (alpha 0.05)
                         backgroundColor: tile.city ? (getCitysCivilization(tile.city)?.color || '#808080') : terrainInfo.color,
                         overflow: 'visible',
-                        ...(isTileOnBorder(actualX, actualY) && { borderColor: getCitysCivilization(gameState.cities.find(c => c.isInTerritory(actualX, actualY)))?.color })
+                        // keep territory contour drawn as SVG overlay
                       }}
                     >
                       {/* Terrain resources overlay */}
@@ -388,10 +513,10 @@ const CivGame = () => {
                         </div>
                       )}
 
-                      {/* Utilized tile indicator */}
-                      {getTileUtilizedBy(actualX, actualY) && !(tile.city && tile.city.x === actualX && tile.city.y === actualY) && (
-                        <div className="absolute top-1 right-1 text-lg pointer-events-none">
-                          <i className="fas fa-check-circle text-white" style={{ textShadow: '0 0 3px black' }}></i>
+                      {/* Utilized tile indicator: small, top-right, colored with civ color */}
+                      {utilByCity && !(tile.city && tile.city.x === actualX && tile.city.y === actualY) && (
+                        <div style={{ position: 'absolute', top: -2, right: 2, pointerEvents: 'none' }}>
+                          <i className="fas fa-check-circle" style={{ color: utilIconColor, fontSize: '11px', lineHeight: 1, textShadow: '0 0 2px rgba(0,0,0,0.5)' }} aria-hidden="true" />
                         </div>
                       )}
 
@@ -399,7 +524,7 @@ const CivGame = () => {
                       {getTerritoryTileBy(actualX, actualY) && !getTileUtilizedBy(actualX, actualY) && (
                         <div
                           className="absolute inset-0"
-                          style={{ backgroundColor: getCitysCivilization(gameState.cities.find(c => c.isTerritoryTile(actualX, actualY)))?.color, opacity: 0.15 }}
+                          style={{ backgroundColor: getCitysCivilization(gameState.cities.find(c => c.isTerritoryTile(actualX, actualY)))?.color, opacity: 0.08 }}
                         />
                       )}
 
@@ -437,7 +562,27 @@ const CivGame = () => {
               </div>
             ))}
 
-            {/* city-labels removed: labels are rendered per-tile to ensure exact positioning */}
+            {/* draw territory contours as SVG overlay: one line per boundary edge */}
+            <svg
+              width={VIEWPORT_WIDTH * TILE_SIZE}
+              height={VIEWPORT_HEIGHT * TILE_SIZE}
+              style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none', overflow: 'visible' }}
+            >
+              {territoryContours.map((group, groupIndex) => (
+                group.paths.map((d, i) => (
+                  <path
+                    key={`contour-${group.cityId}-${i}`}
+                    d={d}
+                    stroke={group.civColor}
+                    strokeWidth={5}
+                    fill="none"
+                    opacity={0.7}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                ))
+              ))}
+            </svg>
           </div>
 
           <div className="w-64 bg-gray-800 rounded-lg p-4 space-y-4 flex flex-col">
