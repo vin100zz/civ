@@ -16,13 +16,12 @@ Puis ouvrir http://127.0.0.1:8005. Sous Windows, `start.bat` fait la même chose
 Dans l'interface :
 
 - **Play / Step / Speed** : lecture continue, tour par tour, vitesse. Espace = lecture/pause, N = un tour.
-- **New game** : nouvelle partie. La même graine redonne exactement la même partie.
-- **Save / Load** : enregistre la partie sous un nom (dossier `saves/`) et la recharge ; une partie rechargée se poursuit comme l'originale.
-- **View as** : voir le monde comme une civilisation (brouillard compris).
+- **New game, Save, Saved games** : ouvrent la fenêtre « Game ». Nouvelle partie (la même graine redonne exactement la même partie), enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
+- **Sur la carte** : « View as » pour voir le monde comme une civilisation (brouillard compris), les calques Territory / Grid / AI missions, le zoom et la mini-carte. Sous ces boutons : cases polluées, niveau de réchauffement, vaisseaux en vol.
+- **Rail de droite** : World (classement des civilisations), Empire, City, Science, History, Chronicle. Science et History occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.
 - **Clic sur une ville** : production, citoyens, cases exploitées, pollution, et pourquoi l'IA a choisi cette production.
-- **Clic sur une unité ou un territoire** : onglet Empire de la civilisation, avec son vaisseau spatial, ce que son IA veut, ses expéditions outre-mer et ses missions. La case « AI missions » les dessine sur la carte.
-- **Science, History, Log** : arbre des technologies, courbes par civilisation, journal des événements (cliquer une ligne centre la carte).
-- En haut à gauche de la carte : cases polluées, niveau de réchauffement, vaisseaux en vol.
+- **Clic sur une unité ou un territoire** : panneau Empire de la civilisation, avec son vaisseau spatial, ce que son IA veut, ses expéditions outre-mer et ses missions. Le calque « AI missions » les dessine sur la carte.
+- **Science, History, Chronicle** : arbre des technologies, courbes par civilisation, journal des événements (cliquer une ligne la situe sur la carte).
 
 Une partie se termine par la conquête du monde, par l'arrivée d'un vaisseau spatial sur Alpha du Centaure, ou au score en 2060.
 

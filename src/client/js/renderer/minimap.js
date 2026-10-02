@@ -2,6 +2,14 @@
 
 import { store, tileIndex, player } from '../state.js';
 
+const WIDTH = 320;          // pixels on screen (css/style.css)
+const OCEAN = [22, 44, 74];
+
+function rgb(color) {
+  const value = parseInt(color.slice(1), 16);
+  return [value >> 16, (value >> 8) & 255, value & 255];
+}
+
 export class Minimap {
   constructor(canvas, mapView) {
     this.canvas = canvas;
@@ -25,7 +33,7 @@ export class Minimap {
   render() {
     const { map, state } = store;
     if (!map || !state) return;
-    const scale = Math.max(1, Math.floor(240 / map.width));
+    const scale = Math.max(1, Math.floor(WIDTH / map.width));
     const canvas = this.canvas;
     if (canvas.width !== map.width * scale || canvas.height !== map.height * scale) {
       canvas.width = map.width * scale;
@@ -33,21 +41,26 @@ export class Minimap {
     }
     const ctx = this.ctx;
     const explored = state.explored || null;
+    // Dimmed terrain, so that the territories and the cities stand out.
+    const ground = store.terrains.map((terrain) =>
+      (terrain.land ? rgb(terrain.color).map((c) => c * 0.62) : OCEAN));
+    const civ = state.players.map((p) => rgb(p.color));
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const index = tileIndex(x, y);
         if (explored && explored[index] === '0') {
-          ctx.fillStyle = '#000';
+          ctx.fillStyle = '#06080B';
         } else {
           const owner = store.owner ? store.owner[index] : -1;
-          const terrain = store.terrains[map.terrain[index]];
-          ctx.fillStyle = owner >= 0 && terrain.land ? player(owner).color : terrain.color;
+          let color = ground[map.terrain[index]];
+          if (owner >= 0) color = color.map((c, i) => c * 0.3 + civ[owner][i] * 0.7);
+          ctx.fillStyle = `rgb(${color[0] | 0}, ${color[1] | 0}, ${color[2] | 0})`;
         }
         ctx.fillRect(x * scale, y * scale, scale, scale);
       }
     }
     for (const city of state.cities) {
-      ctx.fillStyle = '#000';
+      ctx.fillStyle = '#0B0E13';
       ctx.fillRect(city.x * scale - 1, city.y * scale - 1, scale + 2, scale + 2);
       ctx.fillStyle = '#fff';
       ctx.fillRect(city.x * scale, city.y * scale, scale, scale);
@@ -55,13 +68,16 @@ export class Minimap {
     // Frame of the main view (may wrap around the world).
     const view = this.mapView;
     const w = view.width / view.tile * scale;
-    const h = view.height / view.tile * scale;
+    const h = Math.min(view.height / view.tile, map.height) * scale;
     const left = view.cx * scale - w / 2;
-    const top = view.cy * scale - h / 2;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
+    const top = Math.max(0, view.cy * scale - h / 2);
     for (const shift of [-map.width * scale, 0, map.width * scale]) {
-      ctx.strokeRect(left + shift + 0.5, top + 0.5, w, h);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(left + shift + 0.5, top + 0.5, w, h - 1);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(left + shift + 0.5, top + 0.5, w, h - 1);
     }
   }
 }

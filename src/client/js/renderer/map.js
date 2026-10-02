@@ -1,32 +1,59 @@
 // The main map: terrain, improvements, territory, cities and units on a canvas,
 // with drag to pan and wheel to zoom. The world wraps horizontally.
 
-import { F, U, store, tileIndex, player, emit } from '../state.js';
+import { F, U, store, tileIndex, player, emit, inkOn, swatch } from '../state.js';
 import { sprite } from './sprites.js';
 
 const MIN_TILE = 10;
 const MAX_TILE = 96;
 const DIRS8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
 const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const INK = '#0B0E13';
+const GOLD = '#E2B659';
+const FONT = 'Geist, "Segoe UI", system-ui, sans-serif';
+export const MISSION_COLORS = {
+  found_city: '#7bdc6a', improve: '#c9a25b', defend: '#6ab0ff', attack_city: '#ff5a4a',
+  attack_unit: '#ff9d4a', explore: '#d7d7d7', help_wonder: '#e58cff', trade: '#ffd94a',
+  explore_sea: '#8fd3ff', embark: '#4ad9c8',
+};
 const ORDER_MARK = {
   fortified: 'F', fortify: 'F', sentry: 'S', road: 'R', railroad: 'R', irrigate: 'I', mine: 'M',
   fortress: 'O', clean: 'P',
 };
+
+function roundRect(ctx, x, y, w, h, radius) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, radius);
+  else ctx.rect(x, y, w, h);
+}
 
 export class MapView {
   constructor(canvas, tooltip) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.tooltip = tooltip;
+    this.ratio = window.devicePixelRatio || 1;
     this.tile = 32;          // pixels per tile
     this.cx = 40;            // camera centre, in tiles
     this.cy = 25;
     this.dirty = false;
     this.hover = null;
+    this.marker = null;      // a tile to point at, e.g. the event picked in the chronicle
     this.onViewChange = () => {};
     this._bind();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     this.resize();
+  }
+
+  // Pixels per tile, kept to a whole number of device pixels: with a fractional size,
+  // rounding gives neighbouring tiles different sizes and leaves black gaps between them.
+  get tile() {
+    return this._tile;
+  }
+
+  set tile(value) {
+    const clamped = Math.min(MAX_TILE, Math.max(MIN_TILE, value));
+    this._tile = Math.round(clamped * this.ratio) / this.ratio;
   }
 
   // Asks for a redraw on the next animation frame (several calls give one redraw).
@@ -47,6 +74,7 @@ export class MapView {
     this.canvas.width = this.width * ratio;
     this.canvas.height = this.height * ratio;
     this.ratio = ratio;
+    this.tile = this._tile;  // snap again, the ratio may have changed
     this._clamp();
     this.invalidate();
   }
@@ -69,6 +97,24 @@ export class MapView {
     this.onViewChange();
   }
 
+  zoomBy(factor) {
+    this.tile = this.tile * factor;
+    this._clamp();
+    this.invalidate();
+    this.onViewChange();
+  }
+
+  setMarker(tile) {
+    this.marker = tile;
+    this.invalidate();
+  }
+
+  // One tile of terrain with its improvements, for views other than the map.
+  drawTile(ctx, tx, ty, px, py, size) {
+    if (!store.map || ty < 0 || ty >= store.map.height) return;
+    this._drawTerrain(ctx, tileIndex(tx, ty), tx, ty, px, py, size);
+  }
+
   // ── Geometry ────────────────────────────────────────────────────────────
 
   _clamp() {
@@ -80,12 +126,20 @@ export class MapView {
     this.cx = ((this.cx % w) + w) % w;
   }
 
+  // Screen position of a tile corner. Only the origin is rounded, then tiles are counted
+  // in whole device pixels, so neighbouring tiles always touch exactly.
+  _screen(t, centre, extent) {
+    const step = Math.round(this.tile * this.ratio);
+    const origin = Math.round((extent / 2 - centre * this.tile) * this.ratio);
+    return (origin + t * step) / this.ratio;
+  }
+
   screenX(tx) {
-    return Math.round((tx - this.cx) * this.tile + this.width / 2);
+    return this._screen(tx, this.cx, this.width);
   }
 
   screenY(ty) {
-    return Math.round((ty - this.cy) * this.tile + this.height / 2);
+    return this._screen(ty, this.cy, this.height);
   }
 
   tileAt(px, py) {
@@ -203,22 +257,24 @@ export class MapView {
     const rect = this.canvas.getBoundingClientRect();
     this.tooltip.innerHTML = html;
     this.tooltip.hidden = false;
-    const x = e.clientX - rect.left + 16;
-    const y = e.clientY - rect.top + 16;
-    this.tooltip.style.left = `${Math.min(x, this.width - 290)}px`;
-    this.tooltip.style.top = `${Math.min(y, this.height - 140)}px`;
+    const x = e.clientX - rect.left + 18;
+    const y = e.clientY - rect.top + 18;
+    const box = this.tooltip.getBoundingClientRect();
+    this.tooltip.style.left = `${Math.max(8, Math.min(x, this.width - box.width - 12))}px`;
+    this.tooltip.style.top = `${Math.max(8, Math.min(y, this.height - box.height - 12))}px`;
   }
 
   _describe(tile) {
     const { map, state } = store;
     const index = tileIndex(tile.x, tile.y);
-    if (state.explored && state.explored[index] === '0') return 'Unexplored';
+    const where = `<span class="mono">${tile.x}, ${tile.y}</span>`;
+    if (state.explored && state.explored[index] === '0') {
+      return `<div class="tip-title"><span>Unexplored</span>${where}</div>`;
+    }
     const terrain = store.terrains[map.terrain[index]];
     const flags = map.flags[index];
-    const lines = [];
-    let name = terrain.name;
-    if ((flags & F.SPECIAL) && terrain.special) name += ` (${terrain.special.name})`;
-    lines.push(`<b>${name}</b> <span class="muted">${tile.x}, ${tile.y}</span>`);
+    let ground = terrain.name;
+    if ((flags & F.SPECIAL) && terrain.special) ground += ` (${terrain.special.name})`;
     const works = [];
     if (flags & F.RAILROAD) works.push('railroad');
     else if (flags & F.ROAD) works.push('road');
@@ -227,25 +283,41 @@ export class MapView {
     if (flags & F.FORTRESS) works.push('fortress');
     if (flags & F.HUT) works.push('hut');
     if (flags & F.POLLUTION) works.push('<span class="bad">pollution</span>');
-    if (works.length) lines.push(works.join(', '));
+
     const city = store.cityAt.get(index);
-    if (city) {
-      const owner = player(city.owner);
-      lines.push(`<b>${city.name}</b> — ${owner.nation}, size ${city.size}`);
-      if (city.production) lines.push(`Building: ${city.production}`);
-      if (city.disorder) lines.push('<span class="bad">Civil disorder</span>');
-    }
     const units = store.unitsAt.get(index);
+    const owner = store.owner ? store.owner[index] : -1;
+    const rows = [];
+    let title = `<span>${ground}</span>`;
+    let hint = '';
+    if (city) {
+      const civ = player(city.owner);
+      title = `${swatch(civ.color)}<span>${city.name}</span>`;
+      rows.push(['Owner', `${civ.nation} · size ${city.size}${city.capital ? ' · capital' : ''}`]);
+      rows.push(['Terrain', [ground, ...works].join(' · ')]);
+      rows.push(['Building', city.production || '<span class="bad">nothing</span>']);
+      if (city.disorder) rows.push(['Status', '<span class="bad">Civil disorder</span>']);
+      else if (city.celebrating) rows.push(['Status', '<span class="good">Celebrating</span>']);
+      hint = 'Click to open the city';
+    } else {
+      if (works.length) rows.push(['Works', works.join(' · ')]);
+      if (owner >= 0) rows.push(['Territory', player(owner).nation]);
+    }
     if (units && units.length) {
       const counts = new Map();
       for (const unit of units) {
-        const key = `${player(unit[U.OWNER]).name} ${store.unitDefs[unit[U.TYPE]].name}`
+        const key = (city ? '' : `${player(unit[U.OWNER]).name} `) + store.unitDefs[unit[U.TYPE]].name
           + (unit[U.ABOARD] ? ' (aboard)' : '');
         counts.set(key, (counts.get(key) || 0) + 1);
       }
-      for (const [key, count] of counts) lines.push(count > 1 ? `${key} ×${count}` : key);
+      const list = [...counts].map(([key, count]) => (count > 1 ? `${key} ×${count}` : key));
+      rows.push([city ? 'Garrison' : 'Units', list.join(', ')]);
+      if (!city) hint = 'Click to select its civilization';
     }
-    return lines.join('<br>');
+    const body = rows.length
+      ? `<dl class="tip-rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';
+    return `<div class="tip-title">${title}${where}</div>${body}`
+      + (hint ? `<div class="tip-foot">${hint}</div>` : '');
   }
 
   // ── Drawing ─────────────────────────────────────────────────────────────
@@ -253,7 +325,7 @@ export class MapView {
   render() {
     const ctx = this.ctx;
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = '#06080B';
     ctx.fillRect(0, 0, this.width, this.height);
     const { map, state } = store;
     if (!map || !state) return;
@@ -442,11 +514,11 @@ export class MapView {
         const py = this.screenY(ty);
         const size = this.screenX(tx + 1) - px;
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.13;
+        ctx.globalAlpha = 0.12;
         ctx.fillRect(px, py, size, size);
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.92;
         ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(1, size / 16);
+        ctx.lineWidth = Math.max(1, Math.min(2, size / 16));
         ctx.beginPath();
         DIRS4.forEach(([dx, dy], i) => {
           const y = ty + dy;
@@ -483,56 +555,65 @@ export class MapView {
 
   _drawCity(ctx, city, units, px, py, size) {
     const color = player(city.owner).color;
-    const inset = Math.max(1, Math.round(size * 0.06));
-    ctx.fillStyle = '#000';
-    ctx.fillRect(px + inset - 1, py + inset - 1, size - 2 * inset + 2, size - 2 * inset + 2);
+    const inset = Math.max(1, Math.round(size * 0.08));
+    const box = size - 2 * inset;
+    roundRect(ctx, px + inset, py + inset, box, box, size * 0.2);
     ctx.fillStyle = color;
-    ctx.fillRect(px + inset, py + inset, size - 2 * inset, size - 2 * inset);
-    const image = sprite('city', 'city');
-    if (image && size >= 16) {
-      ctx.imageSmoothingEnabled = false;
-      ctx.globalAlpha = 0.55;
-      ctx.drawImage(image, px + inset, py + inset, size - 2 * inset, size - 2 * inset);
-      ctx.globalAlpha = 1;
-    }
-    if (city.walls) {
-      ctx.strokeStyle = '#111';
-      ctx.lineWidth = Math.max(2, size * 0.09);
-      ctx.strokeRect(px + inset, py + inset, size - 2 * inset, size - 2 * inset);
-    }
+    ctx.fill();
+    // Walls show as a heavier outline.
+    ctx.lineWidth = Math.max(1.5, size * (city.walls ? 0.1 : 0.045));
+    ctx.strokeStyle = INK;
+    ctx.stroke();
     if (size >= 12) {
-      ctx.font = `bold ${Math.round(size * 0.52)}px Georgia, serif`;
+      const ink = inkOn(color);
+      ctx.font = `700 ${Math.round(size * 0.5)}px ${FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.lineWidth = Math.max(2, size * 0.09);
-      ctx.strokeStyle = '#000';
-      ctx.fillStyle = city.disorder ? '#ff5a4a' : '#fff';
-      ctx.strokeText(String(city.size), px + size / 2, py + size / 2 + 1);
+      if (city.disorder) ctx.fillStyle = ink === INK ? '#9B1C1C' : '#FFC2B8';
+      else ctx.fillStyle = ink;
       ctx.fillText(String(city.size), px + size / 2, py + size / 2 + 1);
     }
     if (size >= 22) {
       const garrison = units ? units.length : 0;
-      if (garrison) this._badge(ctx, px + size - inset, py + inset, String(garrison), size);
-      if (city.capital) {
-        ctx.fillStyle = '#ffd94a';
-        ctx.font = `${Math.round(size * 0.32)}px sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('★', px + inset + 1, py + inset);
-      }
+      if (garrison) this._badge(ctx, px + size - inset + 2, py + inset - 2, String(garrison), size);
     }
   }
 
+  // The name under the city, in a dark pill: civilization dot, star for a capital.
   _drawCityLabel(ctx, city, px, py, size) {
-    const label = city.name;
-    ctx.font = `${Math.max(10, Math.min(15, Math.round(size * 0.36)))}px "Segoe UI", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillStyle = store.selectedCity === city.id ? '#ffd94a' : '#fff';
-    ctx.strokeText(label, px + size / 2, py + size + 1);
-    ctx.fillText(label, px + size / 2, py + size + 1);
+    const fontSize = Math.max(10, Math.min(13, Math.round(size * 0.3)));
+    ctx.font = `600 ${fontSize}px ${FONT}`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    const star = city.capital ? '★ ' : '';
+    const starWidth = star ? ctx.measureText(star).width : 0;
+    const nameWidth = ctx.measureText(city.name).width;
+    const h = fontSize + 8;
+    const pad = Math.round(h * 0.42);
+    const dot = Math.round(fontSize * 0.56);
+    const w = pad + dot + 5 + starWidth + nameWidth + pad;
+    const x = Math.round(px + size / 2 - w / 2);
+    const y = Math.round(py + size + 1);
+    const selected = store.selectedCity === city.id;
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = 'rgba(11, 14, 19, 0.88)';
+    ctx.fill();
+    ctx.lineWidth = selected ? 1.5 : 1;
+    ctx.strokeStyle = selected ? GOLD : 'rgba(255, 255, 255, 0.18)';
+    ctx.stroke();
+    const middle = y + h / 2 + 0.5;
+    ctx.fillStyle = player(city.owner).color;
+    ctx.beginPath();
+    ctx.arc(x + pad + dot / 2, middle, dot / 2, 0, Math.PI * 2);
+    ctx.fill();
+    let tx = x + pad + dot + 5;
+    if (star) {
+      ctx.fillStyle = GOLD;
+      ctx.fillText(star, tx, middle);
+      tx += starWidth;
+    }
+    ctx.fillStyle = city.disorder ? '#FFAAA0' : '#F0F2F6';
+    ctx.fillText(city.name, tx, middle);
   }
 
   _drawUnits(ctx, units, px, py, size) {
@@ -545,88 +626,117 @@ export class MapView {
     }
     const definition = store.unitDefs[top[U.TYPE]];
     const color = player(top[U.OWNER]).color;
-    const inset = Math.max(1, Math.round(size * 0.12));
+    const inset = Math.max(1, Math.round(size * 0.14));
     const box = size - 2 * inset;
+    const radius = size * 0.16;
+    ctx.lineWidth = Math.max(1, size * 0.04);
+    ctx.strokeStyle = INK;
     if (units.length > 1) {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(px + inset + 2, py + inset - 2, box, box);
+      // A second card behind the first: there is a stack here.
+      const shift = Math.max(2, Math.round(size * 0.07));
+      roundRect(ctx, px + inset + shift, py + inset - shift, box, box, radius);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.fillStyle = 'rgba(11, 14, 19, 0.45)';
+      ctx.fill();
+      ctx.stroke();
     }
-    ctx.fillStyle = '#000';
-    ctx.fillRect(px + inset - 1, py + inset - 1, box + 2, box + 2);
+    roundRect(ctx, px + inset, py + inset, box, box, radius);
     ctx.fillStyle = color;
-    ctx.fillRect(px + inset, py + inset, box, box);
+    ctx.fill();
+    ctx.stroke();
     const image = sprite('unit', definition.sprite);
     if (image && size >= 14) {
       ctx.imageSmoothingEnabled = false;
-      const scale = Math.min(box / image.width, box / image.height);
+      const room = box * 0.82;
+      const scale = Math.min(room / image.width, room / image.height);
       const w = image.width * scale;
       const h = image.height * scale;
       ctx.drawImage(image, px + inset + (box - w) / 2, py + inset + (box - h) / 2, w, h);
     }
     if (size >= 22) {
-      if (units.length > 1) this._badge(ctx, px + size - inset, py + inset, String(units.length), size);
+      if (units.length > 1) {
+        this._badge(ctx, px + size - inset + size * 0.12, py + inset - size * 0.12, String(units.length), size);
+      }
       const mark = ORDER_MARK[top[U.ORDER]];
       if (mark) {
-        ctx.font = `bold ${Math.round(size * 0.28)}px sans-serif`;
+        ctx.font = `700 ${Math.round(size * 0.26)}px ${FONT}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
         ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#000';
+        ctx.strokeStyle = INK;
         ctx.fillStyle = '#fff';
-        ctx.strokeText(mark, px + inset + 1, py + size - inset);
-        ctx.fillText(mark, px + inset + 1, py + size - inset);
+        ctx.strokeText(mark, px + inset + 2, py + size - inset - 1);
+        ctx.fillText(mark, px + inset + 2, py + size - inset - 1);
       }
       if (top[U.VETERAN]) {
-        ctx.fillStyle = '#ffd94a';
+        ctx.fillStyle = GOLD;
+        ctx.strokeStyle = INK;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(px + inset + size * 0.1, py + inset + size * 0.1, size * 0.06, 0, Math.PI * 2);
+        ctx.arc(px + inset + size * 0.03, py + inset + size * 0.03, size * 0.07, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
       }
     }
   }
 
   _badge(ctx, right, top, text, size) {
     const h = Math.round(size * 0.3);
-    ctx.font = `bold ${Math.round(h * 0.85)}px sans-serif`;
-    const w = Math.max(h, ctx.measureText(text).width + 4);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(right - w, top, w, h);
+    ctx.font = `700 ${Math.round(h * 0.78)}px ${FONT}`;
+    const w = Math.max(h, ctx.measureText(text).width + h * 0.5);
+    roundRect(ctx, right - w, top, w, h, h / 2);
+    ctx.fillStyle = INK;
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(233, 236, 241, 0.85)';
+    ctx.stroke();
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, right - w / 2, top + h / 2 + 1);
+    ctx.fillText(text, right - w / 2, top + h / 2 + 0.5);
   }
 
   _drawMissions(ctx) {
     const detail = store.playerDetail;
     if (!detail || !detail.ai || !detail.ai.missions) return;
-    const colors = {
-      found_city: '#7bdc6a', improve: '#c9a25b', defend: '#6ab0ff', attack_city: '#ff5a4a',
-      attack_unit: '#ff9d4a', explore: '#d7d7d7', help_wonder: '#e58cff', trade: '#ffd94a',
-      explore_sea: '#8fd3ff', embark: '#4ad9c8',
-    };
     const ts = this.tile;
     for (const mission of detail.ai.missions) {
+      const color = MISSION_COLORS[mission.kind] || '#fff';
+      const defend = mission.kind === 'defend';
       for (const tx of this._wrapped(mission.x)) {
-        const px = this.screenX(tx);
-        const py = this.screenY(mission.y);
-        ctx.strokeStyle = colors[mission.kind] || '#fff';
-        ctx.lineWidth = 2;
+        const cx = this.screenX(tx) + ts / 2;
+        const cy = this.screenY(mission.y) + ts / 2;
         ctx.setLineDash(mission.units ? [] : [4, 3]);
         ctx.beginPath();
-        ctx.arc(px + ts / 2, py + ts / 2, ts * 0.46, 0, Math.PI * 2);
+        ctx.arc(cx, cy, ts * 0.52, 0, Math.PI * 2);
+        if (!defend) {
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = 4;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = defend ? 0.6 : 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = defend ? 1.5 : 2;
         ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.setLineDash([]);
-        if (ts >= 22 && mission.kind !== 'defend') {
-          ctx.font = '10px sans-serif';
+        if (ts >= 22 && !defend) {
+          const text = mission.kind.replaceAll('_', ' ');
+          ctx.font = `600 11px ${FONT}`;
+          const w = ctx.measureText(text).width + 14;
+          const h = 17;
+          const y = cy - ts / 2 - h - 3;
+          roundRect(ctx, cx - w / 2, y, w, h, h / 2);
+          ctx.fillStyle = 'rgba(11, 14, 19, 0.92)';
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = color;
+          ctx.stroke();
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = '#000';
-          ctx.fillStyle = colors[mission.kind] || '#fff';
-          const text = mission.kind.replace('_', ' ');
-          ctx.strokeText(text, px + ts / 2, py - 1);
-          ctx.fillText(text, px + ts / 2, py - 1);
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = color;
+          ctx.fillText(text, cx, y + h / 2 + 0.5);
         }
       }
     }
@@ -647,14 +757,30 @@ export class MapView {
       for (const tx of this._wrapped(x)) {
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
-        ctx.strokeRect(this.screenX(tx) + 1, this.screenY(y) + 1, ts - 2, ts - 2);
+        roundRect(ctx, this.screenX(tx) + 1, this.screenY(y) + 1, ts - 2, ts - 2, Math.min(6, ts * 0.14));
+        ctx.stroke();
       }
     };
-    if (this.hover) draw(this.hover.x, this.hover.y, 'rgba(255, 255, 255, 0.55)');
     const detail = store.cityDetail;
     if (detail && store.selectedCity === detail.id) {
       for (const tile of detail.tiles) {
-        if (tile.worked) draw(tile.x, tile.y, 'rgba(255, 217, 74, 0.9)');
+        if (tile.worked) draw(tile.x, tile.y, GOLD);
+      }
+    }
+    if (this.hover) draw(this.hover.x, this.hover.y, 'rgba(255, 255, 255, 0.85)');
+    if (this.marker) {
+      const rings = [[ts * 0.68, 6, 'rgba(11, 14, 19, 0.8)'], [ts * 0.68, 3, GOLD],
+        [ts * 0.98, 2, 'rgba(226, 182, 89, 0.4)']];
+      for (const tx of this._wrapped(this.marker.x)) {
+        const cx = this.screenX(tx) + ts / 2;
+        const cy = this.screenY(this.marker.y) + ts / 2;
+        for (const [radius, width, color] of rings) {
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = width;
+          ctx.stroke();
+        }
       }
     }
   }

@@ -57,6 +57,30 @@ export function yearLabel(year) {
   return year < 0 ? `${-year} BC` : `${year} AD`;
 }
 
+// Colors of the civilizations, tuned for the dark interface: the rules give the classic,
+// fully saturated ones, which glare on a dark panel and hide the text drawn on them.
+const PALETTE = {
+  romans: '#E8C93A', babylonians: '#58C46B', germans: '#A9B4C2', egyptians: '#3FC5D6',
+  americans: '#4F7FEA', greeks: '#F2F0E8', indians: '#F08A3C', russians: '#E5484D',
+  zulus: '#C25B8E', french: '#8C8CF5', aztecs: '#2F9E6B', chinese: '#F29AD8',
+  english: '#F0508C', mongols: '#B07A45', barbarians: '#C8402F',
+};
+
+function recolor(players) {
+  for (const p of players) p.color = PALETTE[p.civ] || p.color;
+}
+
+// Black or white, whichever reads better on the given "#rrggbb" color.
+export function inkOn(color) {
+  const value = parseInt(color.slice(1), 16);
+  const light = (0.2126 * (value >> 16) + 0.7152 * ((value >> 8) & 255) + 0.0722 * (value & 255)) / 255;
+  return light > 0.5 ? '#0B0E13' : '#FFFFFF';
+}
+
+export function swatch(color) {
+  return `<span class="swatch" style="background:${color}"></span>`;
+}
+
 const CITY_OFFSETS = [
   [0, 0], [0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1],
   [0, -2], [2, 0], [0, 2], [-2, 0], [-1, -2], [1, -2], [2, -1], [2, 1], [1, 2], [-1, 2],
@@ -97,6 +121,8 @@ function setRules(rules) {
 }
 
 export function handleMessage(message) {
+  if (message.state) recolor(message.state.players);
+  if (message.player) recolor([message.player]);
   switch (message.type) {
     case 'init':
       setRules(message.rules);

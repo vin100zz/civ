@@ -1,21 +1,31 @@
-// Wires everything together: connection, map, panels and the top bar.
+// Wires everything together: connection, map, panels, the top bar and the dialogs.
 
 import { connect, send } from './net.js';
-import { store, on, handleMessage, yearLabel, player } from './state.js';
-import { MapView } from './renderer/map.js';
+import { store, on, emit, handleMessage, yearLabel } from './state.js';
+import { icon, mountIcons } from './icons.js';
+import { MapView, MISSION_COLORS } from './renderer/map.js';
 import { Minimap } from './renderer/minimap.js';
 import { preload, setOnLoad } from './renderer/sprites.js';
 import { renderCivs, renderCiv } from './panels/civs.js';
-import { renderCity } from './panels/city.js';
+import { renderCity, setTileRenderer } from './panels/city.js';
 import { renderTech, resetTechLayout } from './panels/tech.js';
 import { renderChart } from './panels/chart.js';
 import { renderLog } from './panels/log.js';
+import {
+  initDialogs, openGameDialog, resetGameDialog, refreshSaves, setDialogStatus, showGameOver,
+} from './dialogs.js';
 
 const $ = (id) => document.getElementById(id);
+mountIcons();
 const mapView = new MapView($('map'), $('tooltip'));
 const minimap = new Minimap($('minimap'), mapView);
-setOnLoad(() => mapView.invalidate());
+setOnLoad(() => {
+  mapView.invalidate();
+  if (activeTab === 'city') panels.city();
+});
 mapView.onViewChange = () => minimap.render();
+setTileRenderer((...args) => mapView.drawTile(...args));
+initDialogs();
 
 const panels = {
   civs: () => renderCivs($('panel-civs')),
@@ -25,62 +35,67 @@ const panels = {
   chart: () => renderChart($('panel-chart')),
   log: () => renderLog($('panel-log')),
 };
+// Science and History take the whole width; the city opens a wide sheet beside the map.
+const WORKSPACES = ['tech', 'chart'];
 let activeTab = 'civs';
+let mapTab = 'civs';         // the last tab that leaves the map in view
+let gameOverSeen = null;     // "seed:turn" of the finished game already announced
+
+function syncDock() {
+  const dock = $('dock');
+  dock.classList.toggle('full', WORKSPACES.includes(activeTab));
+  dock.classList.toggle('wide', activeTab === 'city' && store.selectedCity !== null);
+}
 
 function showTab(name) {
   activeTab = name;
-  document.querySelectorAll('#tabs button').forEach((b) =>
+  if (!WORKSPACES.includes(name)) mapTab = name;
+  if (name !== 'log') mapView.setMarker(null);
+  $('tooltip').hidden = true;
+  document.querySelectorAll('#rail button').forEach((b) =>
     b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((p) =>
     p.classList.toggle('active', p.id === `panel-${name}`));
+  syncDock();
   panels[name]();
 }
 
 function refreshActivePanel() {
+  syncDock();
   panels[activeTab]();
 }
 
 function refreshClock() {
   const state = store.state;
   if (!state) return;
+  const max = store.rules.max_turns;
   $('year').textContent = yearLabel(state.year);
-  $('turn').textContent = `turn ${state.turn} · seed ${state.seed}`;
-  const banner = $('banner');
-  if (state.finished) {
-    const winner = state.winner !== null ? player(state.winner) : null;
-    const how = {
-      conquest: 'conquer the world', spaceship: 'reach Alpha Centauri',
-      score: 'have the greatest civilization',
-    }[state.victory] || 'win';
-    banner.textContent = winner ? `Game over — the ${winner.nation} ${how}.` : 'Game over.';
-    banner.hidden = false;
-  } else {
-    banner.hidden = true;
+  $('turn').innerHTML = `Turn ${state.turn} <span class="muted">of ${max}</span>`;
+  $('turn-progress').style.width = `${Math.min(100, 100 * state.turn / max)}%`;
+  $('seed-label').textContent = `seed ${state.seed}`;
+  $('gameover-pill').hidden = !state.finished;
+  if (state.finished && gameOverSeen !== `${state.seed}:${state.turn}`) {
+    gameOverSeen = `${state.seed}:${state.turn}`;
+    showGameOver();
   }
   // The state of the planet, once pollution has appeared.
   const world = [];
-  if (state.polluted) world.push(`☣ ${state.polluted} polluted`);
+  if (state.polluted) world.push(`<b>${state.polluted}</b> polluted tile${state.polluted === 1 ? '' : 's'}`);
   if (state.warming && (state.warming.level || state.warming.count)) {
-    world.push(`🌡 warming ${state.warming.level}/${state.warming.threshold}`
-      + (state.warming.count ? ` (${state.warming.count} so far)` : ''));
+    world.push(`Global warming <b>${state.warming.level}/${state.warming.threshold}</b>`
+      + (state.warming.count ? ` · ${state.warming.count} so far` : ''));
   }
-  const ships = state.players.filter((p) => p.spaceship && p.spaceship.arrival_turn !== null);
+  const ships = state.players.filter((p) => p.spaceship && p.spaceship.arrival_turn !== null
+    && p.spaceship.arrival_turn > state.turn);
   for (const p of ships) {
-    world.push(`🚀 ${p.name}: ${Math.max(0, p.spaceship.arrival_turn - state.turn)} turns`);
+    world.push(`${p.name} spaceship lands in <b>${p.spaceship.arrival_turn - state.turn} turns</b>`);
   }
-  $('world').textContent = world.join(' · ');
-}
-
-function refreshSaves() {
-  const select = $('saves');
-  const current = select.value;
-  select.innerHTML = '<option value="">Saved games…</option>'
-    + store.saves.map((name) => `<option value="${name}">${name}</option>`).join('');
-  if (store.saves.includes(current)) select.value = current;
+  $('world').innerHTML = world.map((text) => `<span class="world-chip">${text}</span>`).join('');
 }
 
 let noticeTimer = null;
 function showNotice({ text, ok }) {
+  if ($('game-dialog').open) setDialogStatus(text, ok ? 'ok' : 'error');
   const notice = $('notice');
   notice.textContent = text;
   notice.className = ok ? '' : 'error';
@@ -98,6 +113,19 @@ function refreshPovList() {
   select.value = current === null ? '' : String(current);
 }
 
+function refreshLegend() {
+  const legend = $('mission-legend');
+  legend.hidden = !store.options.missions;
+  if (legend.hidden) return;
+  const detail = store.playerDetail;
+  const missions = detail && detail.id === store.selectedPlayer && detail.ai ? detail.ai.missions || [] : [];
+  const kinds = [...new Set(missions.map((m) => m.kind))];
+  legend.innerHTML = kinds.length
+    ? `<b>AI missions · ${detail.nation}</b>` + kinds.map((kind) => `<span class="legend-item">
+        <span class="ring" style="color:${MISSION_COLORS[kind] || '#fff'}"></span>${kind.replaceAll('_', ' ')}</span>`).join('')
+    : '<b>AI missions</b><span>Select a civilization to see what its AI is doing.</span>';
+}
+
 function requestDetails() {
   if (store.selectedPlayer !== null) send({ cmd: 'player', id: store.selectedPlayer });
   if (store.selectedCity !== null) send({ cmd: 'city', id: store.selectedCity });
@@ -108,10 +136,11 @@ function requestDetails() {
 on('init', () => {
   preload(store.rules);
   resetTechLayout();
-  $('players').value = store.state.players.filter((p) => !p.barbarian).length;
-  $('players').max = store.rules.defaults.max_players;
+  resetGameDialog();
+  gameOverSeen = null;
+  mapView.setMarker(null);
+  $('world-size').textContent = `${store.map.width} × ${store.map.height}`;
   refreshPovList();
-  refreshSaves();
   refreshClock();
   mapView.fitWorld();
   // Start on the first civilization's land rather than on the middle of the ocean.
@@ -120,6 +149,8 @@ on('init', () => {
   mapView.tile = Math.max(mapView.tile, 28);
   mapView.invalidate();
   minimap.render();
+  refreshLegend();
+  requestDetails();
   refreshActivePanel();
 });
 
@@ -143,9 +174,13 @@ on('state', () => {
 });
 
 on('status', () => {
-  const button = $('btn-play');
-  button.textContent = store.playing ? '⏸ Pause' : '▶ Play';
-  button.classList.toggle('playing', store.playing);
+  $('play-icon').innerHTML = icon(store.playing ? 'pause' : 'play', 18, 2.4);
+  $('play-label').textContent = store.playing ? 'Pause' : 'Play';
+  // Light the speed that is the closest to the server's delay.
+  const buttons = [...document.querySelectorAll('#speed button')];
+  const nearest = buttons.reduce((a, b) =>
+    (Math.abs(Number(b.dataset.delay) - store.delay) < Math.abs(Number(a.dataset.delay) - store.delay) ? b : a));
+  buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === nearest)));
 });
 
 on('saves', refreshSaves);
@@ -153,15 +188,16 @@ on('notice', showNotice);
 
 on('city', () => {
   mapView.invalidate();
-  if (activeTab === 'city') renderCity($('panel-city'));
+  if (activeTab === 'city') refreshActivePanel();
 });
 
 on('player', () => {
   if (store.options.missions) mapView.invalidate();
+  refreshLegend();
   if (activeTab === 'civ' || activeTab === 'tech') refreshActivePanel();
 });
 
-// ── Selections ──────────────────────────────────────────────────────────────
+// ── Selections and requests from the panels ─────────────────────────────────
 
 on('select-player', (id) => {
   store.selectedPlayer = id;
@@ -181,54 +217,71 @@ on('select-city', (id) => {
   showTab('city');
 });
 
+on('close-city', () => {
+  store.selectedCity = null;
+  store.cityDetail = null;
+  mapView.invalidate();
+  showTab(store.selectedPlayer !== null ? 'civ' : 'civs');
+});
+
 on('center', ({ x, y }) => mapView.centerOn(x, y));
+on('locate', ({ x, y }) => {
+  mapView.centerOn(x, y);
+  mapView.setMarker({ x, y });
+});
+on('show-tab', showTab);
+on('back-to-map', () => showTab(mapTab));
 
 // ── Controls ────────────────────────────────────────────────────────────────
 
-document.querySelectorAll('#tabs button').forEach((button) => {
+document.querySelectorAll('#rail button').forEach((button) => {
   button.addEventListener('click', () => showTab(button.dataset.tab));
 });
 
 $('btn-play').addEventListener('click', () => send({ cmd: store.playing ? 'pause' : 'play' }));
 $('btn-step').addEventListener('click', () => send({ cmd: 'step' }));
-$('speed').addEventListener('change', (e) => send({ cmd: 'speed', delay: Number(e.target.value) }));
+document.querySelectorAll('#speed button').forEach((button) => {
+  button.addEventListener('click', () => send({ cmd: 'speed', delay: Number(button.dataset.delay) }));
+});
 $('pov').addEventListener('change', (e) => {
   send({ cmd: 'pov', player: e.target.value === '' ? null : Number(e.target.value) });
 });
-$('btn-new').addEventListener('click', () => {
-  const seed = parseInt($('seed').value, 10);
-  const players = parseInt($('players').value, 10);
-  send({ cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null,
-         players: Number.isFinite(players) ? players : null });
-});
-$('btn-save').addEventListener('click', () => {
-  if (!store.state) return;
-  const suggestion = `seed${store.state.seed}-turn${store.state.turn}`;
-  const name = window.prompt('Name of the saved game (letters, digits, - and _):', suggestion);
-  if (name) send({ cmd: 'save', name: name.trim() });
-});
-$('btn-load').addEventListener('click', () => {
-  const name = $('saves').value;
-  if (name) send({ cmd: 'load', name });
-  else showNotice({ text: 'Choose a saved game in the list first.', ok: false });
-});
-for (const [id, option] of [['opt-territory', 'territory'], ['opt-grid', 'grid'], ['opt-missions', 'missions']]) {
-  $(id).addEventListener('change', (e) => {
-    store.options[option] = e.target.checked;
+$('btn-new').addEventListener('click', () => openGameDialog('seed'));
+$('btn-save').addEventListener('click', () => openGameDialog('save'));
+$('btn-saves').addEventListener('click', () => openGameDialog('save'));
+$('gameover-pill').addEventListener('click', showGameOver);
+
+document.querySelectorAll('.toggle').forEach((button) => {
+  button.addEventListener('click', () => {
+    const option = button.dataset.option;
+    store.options[option] = !store.options[option];
+    button.setAttribute('aria-pressed', String(store.options[option]));
+    refreshLegend();
     mapView.invalidate();
   });
-}
+});
+$('zoom-in').addEventListener('click', () => mapView.zoomBy(1.25));
+$('zoom-out').addEventListener('click', () => mapView.zoomBy(1 / 1.25));
+$('zoom-fit').addEventListener('click', () => {
+  mapView.fitWorld();
+  minimap.render();
+});
 
 window.addEventListener('keydown', (e) => {
+  if (document.querySelector('dialog[open]')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.code === 'Space') {
     e.preventDefault();
     send({ cmd: store.playing ? 'pause' : 'play' });
   } else if (e.key === 'n' || e.key === 'N') {
     send({ cmd: 'step' });
+  } else if (e.key === 'Escape') {
+    if (WORKSPACES.includes(activeTab)) showTab(mapTab);
+    else if (activeTab === 'city' && store.selectedCity !== null) emit('close-city');
   }
 });
 
 connect(handleMessage, (online) => {
-  $('connection').className = `dot ${online ? 'on' : 'off'}`;
+  $('connection').className = `status ${online ? 'on' : 'off'}`;
+  $('connection-label').textContent = online ? 'Live' : 'Offline';
 });

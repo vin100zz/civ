@@ -5,67 +5,96 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Civilization — observer</title>
   <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header id="topbar">
-    <div class="brand">CIVILIZATION</div>
+    <div class="brand">
+      <span class="brand-mark" data-icon="globe" data-size="22"></span>
+      <span class="brand-name">CIVILIZATION</span>
+      <span class="pill roomy">Observer</span>
+    </div>
+    <div class="vr"></div>
     <div class="clock">
       <span id="year">—</span>
-      <span id="turn" class="muted"></span>
+      <div class="clock-turn">
+        <span id="turn">&nbsp;</span>
+        <div class="progress"><span id="turn-progress"></span></div>
+      </div>
+      <button id="gameover-pill" class="pill gold" title="Show the final standings" hidden>Game over</button>
     </div>
-    <div class="group">
-      <button id="btn-play" title="Play / pause (space)">▶ Play</button>
-      <button id="btn-step" title="Play one turn (N)">Step</button>
-      <label>Speed
-        <select id="speed">
-          <option value="1.5">Slow</option>
-          <option value="0.4" selected>Normal</option>
-          <option value="0.1">Fast</option>
-          <option value="0">Maximum</option>
-        </select>
-      </label>
+    <div class="spacer"></div>
+    <div class="transport">
+      <button id="btn-play" class="btn primary" title="Play / pause (Space)">
+        <span id="play-icon"></span><span id="play-label">Play</span><span class="kbd roomy">Space</span>
+      </button>
+      <button id="btn-step" class="btn" title="Play one turn (N)">
+        <span data-icon="step" data-size="16"></span><span>Step</span><span class="kbd roomy">N</span>
+      </button>
+      <div class="vr"></div>
+      <span class="sub roomy">Speed</span>
+      <div id="speed" class="seg" role="group" aria-label="Speed">
+        <button data-delay="1.5">Slow</button>
+        <button data-delay="0.4">Normal</button>
+        <button data-delay="0.1">Fast</button>
+        <button data-delay="0">Max</button>
+      </div>
     </div>
-    <div class="group">
-      <label>View as
-        <select id="pov"><option value="">Everything</option></select>
-      </label>
-      <label class="check"><input type="checkbox" id="opt-territory" checked> Territory</label>
-      <label class="check"><input type="checkbox" id="opt-grid"> Grid</label>
-      <label class="check"><input type="checkbox" id="opt-missions"> AI missions</label>
-    </div>
-    <div class="group right">
-      <button id="btn-save" title="Save this game on the server">Save</button>
-      <select id="saves" title="Saved games"><option value="">Saved games…</option></select>
-      <button id="btn-load">Load</button>
-    </div>
-    <div class="group">
-      <label>Seed <input id="seed" type="number" min="1" placeholder="random"></label>
-      <label>Civs <input id="players" type="number" min="2" max="14"></label>
-      <button id="btn-new">New game</button>
-      <span id="connection" class="dot off" title="Connection to the server"></span>
+    <div class="spacer"></div>
+    <div class="game-actions">
+      <span id="seed-label" class="mono sub roomy"></span>
+      <button id="btn-save" class="btn ghost" title="Save this game on the server">
+        <span data-icon="save" data-size="17"></span><span>Save</span>
+      </button>
+      <button id="btn-saves" class="btn ghost" title="Load a saved game">
+        <span data-icon="folder" data-size="17"></span><span>Saved games</span>
+      </button>
+      <button id="btn-new" class="btn">
+        <span data-icon="plus" data-size="16"></span><span>New game</span>
+      </button>
+      <div id="connection" class="status off" title="Connection to the server">
+        <span class="dot"></span><span id="connection-label">Offline</span>
+      </div>
     </div>
   </header>
 
   <main>
     <section id="map-area">
       <canvas id="map"></canvas>
-      <canvas id="minimap" width="240" height="150"></canvas>
-      <div id="tooltip" hidden></div>
-      <div id="banner" hidden></div>
-      <div id="notice" hidden></div>
-      <div id="world" class="muted"></div>
+
+      <div id="map-tools">
+        <label class="pov glass">
+          <span data-icon="eye" data-size="17"></span>
+          <span class="muted">View as</span>
+          <select id="pov"><option value="">Everything</option></select>
+        </label>
+        <div class="toggles glass" role="group" aria-label="Map layers">
+          <button class="toggle" data-option="territory" aria-pressed="true"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>Territory</button>
+          <button class="toggle" data-option="grid" aria-pressed="false"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>Grid</button>
+          <button class="toggle" data-option="missions" aria-pressed="false"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>AI missions</button>
+        </div>
+        <div id="world"></div>
+      </div>
+
+      <div id="zoom" class="glass">
+        <button id="zoom-in" aria-label="Zoom in" title="Zoom in" data-icon="plus" data-stroke="2"></button>
+        <button id="zoom-out" aria-label="Zoom out" title="Zoom out" data-icon="minus" data-stroke="2"></button>
+        <button id="zoom-fit" aria-label="Fit the whole world" title="Fit the whole world" data-icon="fit" data-size="17" data-stroke="2"></button>
+      </div>
+
+      <div id="minimap-card" class="glass">
+        <div class="minimap-head"><b>World</b><span id="world-size" class="mono muted"></span></div>
+        <canvas id="minimap" width="320" height="200"></canvas>
+      </div>
+      <div id="mission-legend" class="glass" hidden></div>
+
+      <div id="tooltip" class="glass" role="tooltip" hidden></div>
     </section>
 
-    <aside id="sidebar">
-      <nav id="tabs">
-        <button data-tab="civs" class="active">Civilizations</button>
-        <button data-tab="civ">Empire</button>
-        <button data-tab="city">City</button>
-        <button data-tab="tech">Science</button>
-        <button data-tab="chart">History</button>
-        <button data-tab="log">Log</button>
-      </nav>
+    <aside id="dock">
       <div id="panel-civs" class="panel active"></div>
       <div id="panel-civ" class="panel"></div>
       <div id="panel-city" class="panel"></div>
@@ -73,7 +102,78 @@
       <div id="panel-chart" class="panel"></div>
       <div id="panel-log" class="panel"></div>
     </aside>
+
+    <nav id="rail" aria-label="Sections">
+      <button data-tab="civs" class="active"><span data-icon="globe" data-size="22" data-stroke="1.6"></span>World</button>
+      <button data-tab="civ"><span data-icon="crown" data-size="22" data-stroke="1.6"></span>Empire</button>
+      <button data-tab="city"><span data-icon="city" data-size="22" data-stroke="1.6"></span>City</button>
+      <button data-tab="tech"><span data-icon="flask" data-size="22" data-stroke="1.6"></span>Science</button>
+      <button data-tab="chart"><span data-icon="chart" data-size="22" data-stroke="1.6"></span>History</button>
+      <button data-tab="log"><span data-icon="list" data-size="22" data-stroke="1.6"></span>Chronicle</button>
+    </nav>
   </main>
+
+  <div id="notice" role="status" hidden></div>
+
+  <dialog id="game-dialog" aria-labelledby="game-title">
+    <div class="dialog-head">
+      <h1 id="game-title">Game</h1>
+      <button class="btn ghost icon" data-close aria-label="Close"><span data-icon="close" data-stroke="2"></span></button>
+    </div>
+    <div class="dialog-body">
+      <section class="dialog-col">
+        <div>
+          <h2>New game</h2>
+          <p class="sub">The AI plays every civilization. The current game is replaced.</p>
+        </div>
+        <div class="fields">
+          <div class="field">
+            <label for="seed">Seed</label>
+            <div class="row">
+              <input id="seed" class="input mono" type="text" inputmode="numeric" placeholder="Random" autocomplete="off">
+              <button id="btn-dice" class="btn icon tall" aria-label="Draw a random seed" title="Draw a random seed"><span data-icon="dice"></span></button>
+            </div>
+            <span class="sub">Same seed, same world. Empty draws one at random.</span>
+          </div>
+          <div class="field">
+            <span id="players-label" class="field-label">Civilizations</span>
+            <div class="stepper" role="group" aria-labelledby="players-label">
+              <button id="players-less" aria-label="One fewer" data-icon="minus" data-size="16" data-stroke="2"></button>
+              <output id="players">7</output>
+              <button id="players-more" aria-label="One more" data-icon="plus" data-size="16" data-stroke="2"></button>
+            </div>
+            <span id="players-hint" class="sub"></span>
+          </div>
+        </div>
+        <div class="dialog-foot">
+          <span id="map-info" class="sub"></span>
+          <button class="btn ghost tall" data-close>Cancel</button>
+          <button id="btn-start" class="btn primary tall">Start new game</button>
+        </div>
+      </section>
+      <section class="dialog-col alt">
+        <div>
+          <h2>Saved games</h2>
+          <p class="sub">Kept on the server, with the charts and the chronicle.</p>
+        </div>
+        <div class="field">
+          <label for="save-name">Save the current game as</label>
+          <div class="row">
+            <input id="save-name" class="input mono" type="text" maxlength="40" autocomplete="off">
+            <button id="btn-do-save" class="btn tall"><span data-icon="save" data-size="16"></span>Save</button>
+          </div>
+          <span class="sub">Letters, digits, - and _ · 40 characters at most.</span>
+        </div>
+        <div class="field grow">
+          <span class="field-label">On the server</span>
+          <div id="saves" class="saves"></div>
+        </div>
+        <p id="dialog-status" class="sub" role="status"></p>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="gameover" aria-label="Game over"></dialog>
 
   <script type="module" src="js/main.js"></script>
 </body>

@@ -83,9 +83,9 @@ src/
     sim/                runner (parties sans UI), metrics (chiffres par tour, détection de blocage)
   client/
     index.html  css/style.css
-    js/  main.js  net.js  state.js
+    js/  main.js  net.js  state.js  icons.js  dialogs.js (partie, fin de partie)
          renderer/      map (carte), minimap, sprites
-         panels/        civs (liste et empire), city, tech, chart, log
+         panels/        civs (monde et empire), city, tech, chart, log
   tests/                119 tests : config, carte, villes, unités, empire, mer et air,
                         fin de partie et sauvegardes, IA, API
 ```

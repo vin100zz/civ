@@ -1,36 +1,88 @@
-// "City" tab: what a city produces, how its citizens feel, and why the AI builds what it builds.
+// "City" panel: what a city produces, how its citizens feel, and why the AI builds what it builds.
 
-import { store, U, player, emit } from '../state.js';
-import { swatch } from './civs.js';
+import { store, U, player, emit, inkOn } from '../state.js';
+import { icon } from '../icons.js';
 
-function citizens(stats, specialists) {
-  const faces = '😀'.repeat(stats.happy) + '🙂'.repeat(stats.content) + '😠'.repeat(stats.unhappy);
-  const others = '🎭'.repeat(specialists.entertainer) + '💰'.repeat(specialists.taxman)
-    + '🔬'.repeat(specialists.scientist);
-  return `<span class="citizens">${faces}${others ? ' ' + others : ''}</span>`;
+const LAND = 450;           // pixels of the land view (css/style.css)
+const FACE = {
+  happy: ['var(--good)', 'M8.5 14c1 1.4 2.2 2 3.5 2s2.5 -.6 3.5 -2'],
+  content: ['var(--soft)', 'M8.5 15h7'],
+  unhappy: ['var(--bad)', 'M8.5 16c1-1.4 2.2-2 3.5-2s2.5 .6 3.5 2'],
+};
+const SPECIALIST = { entertainer: 'E', taxman: 'T', scientist: 'S' };
+let drawTile = null;        // (ctx, tx, ty, px, py, size): the map's own terrain drawing
+
+export function setTileRenderer(renderer) {
+  drawTile = renderer;
 }
 
-function tileGrid(detail) {
+function signed(value) {
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+function citizens(stats, specialists) {
+  const faces = [];
+  for (const mood of ['happy', 'content', 'unhappy']) {
+    const [color, mouth] = FACE[mood];
+    for (let i = 0; i < stats[mood]; i++) {
+      faces.push(`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="${color}"
+        stroke-width="1.6" stroke-linecap="round" role="img" aria-label="${mood} citizen">
+        <circle cx="12" cy="12" r="9.5" fill="var(--raise)"/><path d="M9 10v.6M15 10v.6"/><path d="${mouth}"/></svg>`);
+    }
+  }
+  const others = [];
+  for (const [kind, letter] of Object.entries(SPECIALIST)) {
+    for (let i = 0; i < (specialists[kind] || 0); i++) {
+      others.push(`<span class="specialist" title="${kind}">${letter}</span>`);
+    }
+  }
+  return faces.join('') + (others.length ? `<span class="sep"></span>${others.join('')}` : '');
+}
+
+function landGrid(detail, owner) {
   const byOffset = new Map(detail.tiles.map((t) => [`${t.dx},${t.dy}`, t]));
   const cells = [];
   for (let dy = -2; dy <= 2; dy++) {
     for (let dx = -2; dx <= 2; dx++) {
       const tile = byOffset.get(`${dx},${dy}`);
       if (!tile) {
-        cells.push('<div class="city-tile blank"></div>');
+        cells.push('<div class="land-cell blank"></div>');
         continue;
       }
       const index = tile.y * store.map.width + tile.x;
       const terrain = store.terrains[store.map.terrain[index]];
-      const classes = ['city-tile'];
-      if (!tile.worked) classes.push('unworked');
-      if (dx === 0 && dy === 0) classes.push('center');
       const [food, shields, trade] = tile.yields;
-      cells.push(`<div class="${classes.join(' ')}" style="background:${terrain.color}"
-        title="${terrain.name}"><b>${food}/${shields}/${trade}</b></div>`);
+      const center = dx === 0 && dy === 0;
+      const classes = ['land-cell'];
+      if (tile.worked) classes.push('worked');
+      if (center) classes.push('center');
+      const mark = center
+        ? `<span class="city-mark" style="background:${owner.color};color:${inkOn(owner.color)}">${detail.size}</span>` : '';
+      cells.push(`<div class="${classes.join(' ')}" title="${terrain.name}${tile.worked ? ' — worked' : ''}">${mark}
+        <span class="yields"><span class="food">${food}</span><span class="shield">${shields}</span><span class="trade">${trade}</span></span></div>`);
     }
   }
-  return `<div class="city-grid">${cells.join('')}</div>`;
+  return `<div class="land"><canvas id="city-land"></canvas><div class="land-grid">${cells.join('')}</div></div>`;
+}
+
+function paintLand(container, detail) {
+  const canvas = container.querySelector('#city-land');
+  if (!canvas || !drawTile) return;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = LAND * ratio;
+  canvas.height = LAND * ratio;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const size = LAND / 5;
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      drawTile(ctx, detail.x + dx, detail.y + dy, (dx + 2) * size, (dy + 2) * size, size);
+    }
+  }
 }
 
 function unitList(units) {
@@ -41,69 +93,153 @@ function unitList(units) {
     counts.set(name, (counts.get(name) || 0) + 1);
   }
   return [...counts].map(([name, count]) =>
-    `<span class="tag">${name}${count > 1 ? ' ×' + count : ''}</span>`).join('');
+    `<span class="chip big">${name}${count > 1 ? ` <span class="muted">×${count}</span>` : ''}</span>`).join('');
+}
+
+function turnsFor(missing, perTurn) {
+  if (missing <= 0) return 0;
+  return perTurn > 0 ? Math.ceil(missing / perTurn) : null;
 }
 
 export function renderCity(container) {
   const detail = store.cityDetail;
   if (store.selectedCity === null || !detail || detail.id !== store.selectedCity) {
-    container.innerHTML = '<p class="empty">Click a city on the map.</p>';
+    container.innerHTML = `<p class="empty"><b>No city selected</b>Click a city on the map to see
+      what it produces, how its citizens feel and why the AI builds what it builds.</p>`;
     return;
   }
   const c = detail;
   const s = c.stats;
   const owner = player(c.owner);
+  const siblings = store.state.cities.filter((city) => city.owner === c.owner);
+  const position = siblings.findIndex((city) => city.id === c.id);
+  const worked = c.tiles.filter((t) => t.worked).length;
+
   const buildings = c.buildings.map((id) => {
     const building = store.buildingDefs[id];
-    return `<span class="tag" title="${building.description || ''}">${building.wonder ? '★ ' : ''}${building.name}</span>`;
+    return `<span class="chip big" title="${building.description || ''}">${building.wonder ? '★ ' : ''}${building.name}
+      ${building.upkeep ? `<span class="trade">${building.upkeep}g</span>` : ''}</span>`;
   }).join('') || '<span class="muted">None</span>';
+
   const foodPercent = Math.min(100, 100 * c.food / c.food_box);
+  const growth = turnsFor(c.food_box - c.food, s.food_surplus);
+  const foodNote = s.food_surplus < 0 ? '<span class="bad">starving</span>'
+    : growth === null ? 'not growing' : `grows in ${plural(growth, 'turn')}`;
   const shieldPercent = c.production_cost ? Math.min(100, 100 * c.shields / c.production_cost) : 0;
-  const flags = [];
-  if (c.capital) flags.push('capital');
-  if (c.disorder) flags.push('<span class="bad">civil disorder</span>');
-  if (c.celebrating) flags.push('<span class="good">celebrating</span>');
+  const done = c.production_cost ? turnsFor(c.production_cost - c.shields, s.shield_surplus) : null;
+  const doneNote = !c.production_cost ? ''
+    : done === 0 ? '<b class="good">done next turn</b>'
+      : done === null ? '<span class="bad">no progress</span>' : `${plural(done, 'turn')}`;
+  const decided = c.decision
+    ? `${c.decision.bought ? 'bought' : 'decided'} on turn ${c.decision.turn}` : '';
+  const mood = c.disorder ? ['Civil disorder', 'var(--bad)']
+    : c.celebrating ? ['Celebrating', 'var(--gold)'] : ['In order', 'var(--good)'];
+  const specialists = Object.entries(c.specialists).filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${count} ${kind}`).join(', ');
 
   let decision = '';
   if (c.decision) {
+    const best = Math.max(0.001, ...c.decision.candidates.map((candidate) => candidate.score));
     const rows = c.decision.candidates.map((candidate, i) => `
-      <tr class="${i === 0 ? 'chosen' : ''}">
-        <td>${candidate.name}<div class="reason">${candidate.reason}</div></td>
-        <td>${candidate.score}</td><td>${candidate.turns || '—'}</td></tr>`).join('');
+      <div class="candidate${i === 0 ? ' chosen' : ''}">
+        <span class="rank">${i + 1}</span>
+        <div class="what">
+          <span class="name">${candidate.name}<small>${candidate.kind}</small>${i === 0 ? '<em>Chosen</em>' : ''}</span>
+          <span class="reason">${candidate.reason}</span>
+        </div>
+        <span class="turns">${candidate.turns ? plural(candidate.turns, 'turn') : '—'}</span>
+        <div class="score"><span class="bar thin"><span style="width:${Math.max(2, 100 * candidate.score / best)}%"></span></span>
+          <b>${Math.round(candidate.score * 10) / 10}</b></div>
+      </div>`).join('');
     decision = `
-      <h3>Why this production (decided turn ${c.decision.turn}${c.decision.bought ? ', bought' : ''})</h3>
-      <table class="candidates"><thead><tr><th>Candidate</th><th>Score</th><th>Turns</th></tr></thead>
-        <tbody>${rows}</tbody></table>`;
+      <div class="stack" style="gap:10px">
+        <div class="ai-title"><span class="ai-badge">AI</span><h2>Why this production</h2>
+          <span class="sub">${decided}</span></div>
+        ${rows}
+      </div>`;
   }
+  const scroll = container.scrollTop;
 
   container.innerHTML = `
-    <h2>${swatch(owner.color)}${c.name} <span class="muted">— ${owner.nation}, size ${c.size}</span></h2>
-    <div>${citizens(s, c.specialists)} ${flags.join(' · ')}</div>
-    <h3>Production</h3>
-    <dl class="kv">
-      <dt>Building</dt><dd>${c.production || '<span class="bad">nothing</span>'}
-        ${c.production_cost ? `— ${c.shields}/${c.production_cost} shields` : ''}
-        <div class="bar"><span style="width:${shieldPercent}%"></span></div></dd>
-      <dt>Food</dt><dd><span class="food">${s.food}</span> produced,
-        <span class="${s.food_surplus < 0 ? 'bad' : 'good'}">${s.food_surplus >= 0 ? '+' : ''}${s.food_surplus}</span>
-        — box ${c.food}/${c.food_box}
-        <div class="bar"><span style="width:${foodPercent}%; background: var(--food)"></span></div></dd>
-      <dt>Shields</dt><dd><span class="shield">${s.shields}</span> produced, ${s.shield_upkeep} for units,
-        <b>${s.shield_surplus >= 0 ? '+' : ''}${s.shield_surplus}</b></dd>
-      <dt>Trade</dt><dd><span class="trade">${s.trade}</span> (${s.corruption} lost to corruption)
-        → luxury ${s.luxury}, tax ${s.tax}, science ${s.science}</dd>
-      <dt>Maintenance</dt><dd>${s.building_upkeep} gold per turn</dd>
-      ${s.pollution ? `<dt>Pollution</dt><dd><span class="bad">index ${s.pollution}</span>
-        — each turn a tile around the city may be polluted</dd>` : ''}
-      ${c.trade_routes.length ? `<dt>Trade routes</dt><dd>${c.trade_routes.join(', ')}</dd>` : ''}
-    </dl>
-    <h3>Land (food / shields / trade — worked tiles are bright)</h3>
-    ${tileGrid(c)}
-    <h3>Buildings</h3><div>${buildings}</div>
-    <h3>Units in the city</h3><div>${unitList(c.units_here)}</div>
-    <h3>Units supported</h3><div>${unitList(c.units_supported)}</div>
-    ${decision}
-    <p><button id="city-center">Show on map</button></p>`;
-  container.querySelector('#city-center').addEventListener('click', () =>
-    emit('center', { x: c.x, y: c.y }));
+    <div class="panel-head city-head">
+      <span class="avatar" style="background:${owner.color};color:${inkOn(owner.color)}">${c.size}</span>
+      <div class="titles"><h1>${c.capital ? '★ ' : ''}${c.name}</h1>
+        <span class="who">${owner.nation} · size ${c.size} · founded turn ${c.founded_turn}
+          · <span class="mono">${c.x}, ${c.y}</span></span></div>
+      <div class="city-nav">
+        <span class="sub">City ${position + 1} of ${siblings.length}</span>
+        <div class="arrows">
+          <button data-step="-1" aria-label="Previous city" title="Previous city">${icon('left', 16, 2)}</button>
+          <button data-step="1" aria-label="Next city" title="Next city">${icon('right', 16, 2)}</button>
+        </div>
+        <button id="city-center" class="btn small" style="height:40px">Centre on map</button>
+        <button id="city-close" class="btn ghost icon" aria-label="Close the city panel" title="Close (Esc)">${icon('close', 18, 2)}</button>
+      </div>
+    </div>
+    <div class="city-body">
+      <div class="city-left">
+        <div class="between"><h2>Land</h2><span class="sub">${worked} of ${c.tiles.length} tiles worked</span></div>
+        ${landGrid(c, owner)}
+        <div class="land-legend">
+          <span><i style="background:var(--food)"></i>Food</span>
+          <span><i style="background:var(--shield)"></i>Shields</span>
+          <span><i style="background:var(--trade)"></i>Trade</span>
+          <span class="worked-key"><i></i>Worked tile</span>
+        </div>
+        <h2 style="margin-top:10px">Buildings <small>· ${s.building_upkeep} gold per turn</small></h2>
+        <div class="chips">${buildings}</div>
+        <div class="two" style="margin-top:10px">
+          <div class="stack" style="gap:8px"><h2>Units in the city</h2><div class="chips">${unitList(c.units_here)}</div></div>
+          <div class="stack" style="gap:8px"><h2>Units supported</h2><div class="chips">${unitList(c.units_supported)}</div></div>
+        </div>
+      </div>
+      <div class="city-right">
+        <div class="stack" style="gap:10px">
+          <div class="between"><h2>Citizens</h2>
+            <span class="sub">${s.happy} happy · ${s.content} content · ${s.unhappy} unhappy${specialists ? ` · ${specialists}` : ''}</span></div>
+          <div class="citizens">${citizens(s, c.specialists)}
+            <span class="order" style="color:${mood[1]}">${mood[0]}</span></div>
+        </div>
+        <div class="card">
+          <div class="between"><span class="sub">Building</span><span class="sub">${c.buy_cost ? `buy now: ${c.buy_cost} gold` : decided}</span></div>
+          <div class="between"><span class="big">${c.production || '<span class="bad">Nothing</span>'}</span>
+            ${c.production_cost ? `<span class="soft" style="font-size:13px"><b style="color:var(--text)">${c.shields}</b> / ${c.production_cost} shields · ${doneNote}</span>` : ''}</div>
+          <div class="bar"><span style="width:${shieldPercent}%;background:var(--shield)"></span></div>
+        </div>
+        <div class="ledger">
+          <div class="ledger-row"><i style="background:var(--food)"></i><span class="what">Food</span>
+            <span class="value ${s.food_surplus < 0 ? 'bad' : 'food'}">${signed(s.food_surplus)}</span>
+            <div class="detail"><span>${s.food} produced · box ${c.food} / ${c.food_box} · ${foodNote}</span>
+              <div class="bar thin"><span style="width:${foodPercent}%;background:var(--food)"></span></div></div></div>
+          <div class="ledger-row"><i style="background:var(--shield)"></i><span class="what">Shields</span>
+            <span class="value ${s.shield_surplus < 0 ? 'bad' : 'shield'}">${signed(s.shield_surplus)}</span>
+            <div class="detail"><span>${s.shields} produced · ${s.shield_upkeep} to support units</span></div></div>
+          <div class="ledger-row"><i style="background:var(--trade)"></i><span class="what">Trade</span>
+            <span class="value trade">${s.trade}</span>
+            <div class="detail"><span>${s.corruption} lost to corruption · luxury ${s.luxury} · tax ${s.tax} · <span class="sci">science ${s.science}</span></span></div></div>
+          ${s.pollution ? `<div class="ledger-row"><i style="background:var(--bad)"></i><span class="what">Pollution</span>
+            <span class="value bad">${s.pollution}</span>
+            <div class="detail"><span>each turn a tile around the city may be polluted</span></div></div>` : ''}
+          ${c.trade_routes.length ? `<div class="ledger-row"><i style="background:var(--gold)"></i><span class="what">Routes</span>
+            <span class="value">${c.trade_routes.length}</span>
+            <div class="detail"><span>${c.trade_routes.join(', ')}</span></div></div>` : ''}
+        </div>
+        ${decision}
+      </div>
+    </div>`;
+  container.scrollTop = scroll;
+  paintLand(container, c);
+
+  container.querySelector('#city-center').addEventListener('click', () => emit('center', { x: c.x, y: c.y }));
+  container.querySelector('#city-close').addEventListener('click', () => emit('close-city'));
+  container.querySelectorAll('[data-step]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const count = siblings.length;
+      const next = siblings[(Math.max(0, position) + Number(button.dataset.step) + count) % count];
+      if (next) {
+        emit('select-city', next.id);
+        emit('center', { x: next.x, y: next.y });
+      }
+    });
+  });
 }
