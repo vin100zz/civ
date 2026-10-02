@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Civilization — observer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">CIVILIZATION</div>
+    <div class="clock">
+      <span id="year">—</span>
+      <span id="turn" class="muted"></span>
+    </div>
+    <div class="group">
+      <button id="btn-play" title="Play / pause (space)">▶ Play</button>
+      <button id="btn-step" title="Play one turn (N)">Step</button>
+      <label>Speed
+        <select id="speed">
+          <option value="1.5">Slow</option>
+          <option value="0.4" selected>Normal</option>
+          <option value="0.1">Fast</option>
+          <option value="0">Maximum</option>
+        </select>
+      </label>
+    </div>
+    <div class="group">
+      <label>View as
+        <select id="pov"><option value="">Everything</option></select>
+      </label>
+      <label class="check"><input type="checkbox" id="opt-territory" checked> Territory</label>
+      <label class="check"><input type="checkbox" id="opt-grid"> Grid</label>
+      <label class="check"><input type="checkbox" id="opt-missions"> AI missions</label>
+    </div>
+    <div class="group right">
+      <button id="btn-save" title="Save this game on the server">Save</button>
+      <select id="saves" title="Saved games"><option value="">Saved games…</option></select>
+      <button id="btn-load">Load</button>
+    </div>
+    <div class="group">
+      <label>Seed <input id="seed" type="number" min="1" placeholder="random"></label>
+      <label>Civs <input id="players" type="number" min="2" max="14"></label>
+      <button id="btn-new">New game</button>
+      <span id="connection" class="dot off" title="Connection to the server"></span>
+    </div>
+  </header>
+
+  <main>
+    <section id="map-area">
+      <canvas id="map"></canvas>
+      <canvas id="minimap" width="240" height="150"></canvas>
+      <div id="tooltip" hidden></div>
+      <div id="banner" hidden></div>
+      <div id="notice" hidden></div>
+      <div id="world" class="muted"></div>
+    </section>
+
+    <aside id="sidebar">
+      <nav id="tabs">
+        <button data-tab="civs" class="active">Civilizations</button>
+        <button data-tab="civ">Empire</button>
+        <button data-tab="city">City</button>
+        <button data-tab="tech">Science</button>
+        <button data-tab="chart">History</button>
+        <button data-tab="log">Log</button>
+      </nav>
+      <div id="panel-civs" class="panel active"></div>
+      <div id="panel-civ" class="panel"></div>
+      <div id="panel-city" class="panel"></div>
+      <div id="panel-tech" class="panel"></div>
+      <div id="panel-chart" class="panel"></div>
+      <div id="panel-log" class="panel"></div>
+    </aside>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

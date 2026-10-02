@@ -1,0 +1,146 @@
+# Terrain definitions.
+# Source: OpenCivOne GameData.cs (TerrainDefinition, TerrainModification arrays).
+# yields: [food, shields, trade]
+# defense: multiplier applied to the defender (original stores it in halves: 2 = x1.0)
+# irrigation / mine: either a yield bonus (`bonus`) or a terrain change (`becomes`), with the
+#   number of settler turns. `needs_water` = requires an adjacent ocean, river or irrigated tile.
+# pattern_bonus: extra yields on the fixed "shield" pattern ((7x + 11y) & 2 == 0).
+# road_trade: +1 trade when the tile has a road.
+
+- id: desert
+  name: Desert
+  move_cost: 1
+  defense: 1.0
+  yields: [0, 1, 0]
+  road_trade: true
+  special: {id: oasis, name: Oasis, yields: [3, 1, 0], sprite: oasis}
+  irrigation: {bonus: 1, turns: 5, needs_water: true}
+  mine: {bonus: 1, turns: 5}
+  sprite: desert
+  base_sprite: grassland
+  color: "#d9c27a"
+
+- id: plains
+  name: Plains
+  move_cost: 1
+  defense: 1.0
+  yields: [1, 1, 0]
+  road_trade: true
+  special: {id: horses, name: Horses, yields: [1, 3, 0], sprite: horse}
+  irrigation: {bonus: 1, turns: 5, needs_water: true}
+  mine: {becomes: forest, turns: 15}
+  sprite: plains
+  base_sprite: grassland
+  color: "#b8b04a"
+
+- id: grassland
+  name: Grassland
+  move_cost: 1
+  defense: 1.0
+  yields: [2, 0, 0]
+  road_trade: true
+  pattern_bonus: {yields: [0, 1, 0], sprite: shield}
+  irrigation: {bonus: 1, turns: 5, needs_water: true}
+  mine: {becomes: forest, turns: 10}
+  sprite: grassland
+  color: "#4f9d3a"
+
+- id: forest
+  name: Forest
+  move_cost: 2
+  defense: 1.5
+  yields: [1, 2, 0]
+  special: {id: game, name: Game, yields: [3, 2, 0], sprite: game}
+  irrigation: {becomes: plains, turns: 5}
+  sprite: forest
+  base_sprite: grassland
+  color: "#2f6b2a"
+
+- id: hills
+  name: Hills
+  move_cost: 2
+  defense: 2.0
+  yields: [1, 0, 0]
+  special: {id: coal, name: Coal, yields: [1, 2, 0], sprite: coal}
+  irrigation: {bonus: 1, turns: 10, needs_water: true}
+  mine: {bonus: 3, turns: 10}
+  sprite: hills
+  base_sprite: grassland
+  color: "#7d8a4a"
+
+- id: mountains
+  name: Mountains
+  move_cost: 3
+  defense: 3.0
+  yields: [0, 1, 0]
+  special: {id: gold, name: Gold, yields: [0, 1, 6], sprite: gold}
+  mine: {bonus: 1, turns: 10}
+  sprite: mountains
+  base_sprite: grassland
+  color: "#8c8c8c"
+
+- id: tundra
+  name: Tundra
+  move_cost: 1
+  defense: 1.0
+  yields: [1, 0, 0]
+  special: {id: game, name: Game, yields: [3, 0, 0], sprite: game}
+  sprite: tundra
+  base_sprite: grassland
+  color: "#a9b7a0"
+
+- id: arctic
+  name: Arctic
+  move_cost: 2
+  defense: 1.0
+  yields: [0, 0, 0]
+  special: {id: seals, name: Seals, yields: [2, 0, 0], sprite: seal}
+  sprite: arctic
+  base_sprite: grassland
+  color: "#eef3f6"
+
+- id: swamp
+  name: Swamp
+  move_cost: 2
+  defense: 1.5
+  yields: [1, 0, 0]
+  special: {id: oil, name: Oil, yields: [1, 4, 0], sprite: oil}
+  irrigation: {becomes: grassland, turns: 15}
+  mine: {becomes: forest, turns: 15}
+  sprite: swamp
+  base_sprite: grassland
+  color: "#4d7a6a"
+
+- id: jungle
+  name: Jungle
+  move_cost: 2
+  defense: 1.5
+  yields: [1, 0, 0]
+  special: {id: gems, name: Gems, yields: [1, 0, 4], sprite: gems}
+  irrigation: {becomes: grassland, turns: 15}
+  mine: {becomes: forest, turns: 15}
+  sprite: jungle
+  base_sprite: grassland
+  color: "#1f7a3f"
+
+- id: ocean
+  name: Ocean
+  domain: sea
+  move_cost: 1
+  defense: 1.0
+  yields: [1, 0, 2]
+  special: {id: fish, name: Fish, yields: [3, 0, 2], sprite: fish}
+  sprite: ocean
+  color: "#2b5fa8"
+
+- id: river
+  name: River
+  move_cost: 1
+  defense: 1.5
+  yields: [2, 0, 1]
+  pattern_bonus: {yields: [0, 1, 0], sprite: shield}
+  irrigation: {bonus: 1, turns: 5}
+  is_water_source: true
+  sprite: river_overlay
+  base_sprite: grassland
+  color: "#3f8fd0"

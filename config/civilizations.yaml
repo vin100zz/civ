@@ -1,0 +1,369 @@
+# Civilizations: the 14 of Civ 1, plus the barbarians.
+# Source: OpenCivOne GameData.cs (NationDefinition array). City names are the original ones.
+# name: adjective ("the Roman capital"), nation: the people ("the Romans").
+# personality, each -1, 0 or 1:
+#   mood:     -1 friendly      .. 1 aggressive
+#   policy:   -1 perfectionist .. 1 expansionist
+#   ideology: -1 militaristic  .. 1 civilized
+# playable: false = never picked as a regular civilization (barbarians).
+
+- id: romans
+  nation: Romans
+  name: Roman
+  leader: Caesar
+  color: "#ffff00"
+  personality: {mood: 0, policy: 1, ideology: 1}
+  city_names:
+    - Rome
+    - Caesarea
+    - Carthage
+    - Nicopolis
+    - Byzantium
+    - Brundisium
+    - Syracuse
+    - Antioch
+    - Palmyra
+    - Cyrene
+    - Gordion
+    - Tyrus
+    - Jerusalem
+    - Seleucia
+    - Ravenna
+    - Artaxata
+
+- id: babylonians
+  nation: Babylonians
+  name: Babylonian
+  leader: Hammurabi
+  color: "#00ff00"
+  personality: {mood: -1, policy: -1, ideology: 1}
+  city_names:
+    - Babylon
+    - Sumer
+    - Uruk
+    - Nineveh
+    - Ashur
+    - Ellipi
+    - Akkad
+    - Eridu
+    - Kish
+    - Nippur
+    - Shuruppak
+    - Zariqum
+    - Izibia
+    - Nimrud
+    - Arbela
+    - Zamua
+
+- id: germans
+  nation: Germans
+  name: German
+  leader: Frederick
+  color: "#808080"
+  personality: {mood: 1, policy: -1, ideology: 1}
+  city_names:
+    - Berlin
+    - Leipzig
+    - Hamburg
+    - Bremen
+    - Frankfurt
+    - Bonn
+    - Nuremberg
+    - Cologne
+    - Hannover
+    - Munich
+    - Stuttgart
+    - Heidelburg
+    - Salzburg
+    - Konigsberg
+    - Dortmund
+    - Brandenburg
+
+- id: egyptians
+  nation: Egyptians
+  name: Egyptian
+  leader: Ramesses
+  color: "#00ffff"
+  personality: {mood: 0, policy: 0, ideology: 1}
+  city_names:
+    - Thebes
+    - Memphis
+    - Oryx
+    - Heliopolis
+    - Gaza
+    - Alexandria
+    - Byblos
+    - Cairo
+    - Coptos
+    - Edfu
+    - Pithom
+    - Busiris
+    - Athribis
+    - Mendes
+    - Tanis
+    - Abydos
+
+- id: americans
+  nation: Americans
+  name: American
+  leader: Abe Lincoln
+  color: "#0000ff"
+  personality: {mood: -1, policy: 0, ideology: 1}
+  city_names:
+    - Washington
+    - New York
+    - Boston
+    - Philadelphia
+    - Atlanta
+    - Chicago
+    - Buffalo
+    - St.Louis
+    - Detroit
+    - New Orleans
+    - Baltimore
+    - Denver
+    - Cincinnati
+    - Dallas
+    - Los Angeles
+    - Las Vegas
+
+- id: greeks
+  nation: Greeks
+  name: Greek
+  leader: Alexander
+  color: "#ffffff"
+  personality: {mood: 0, policy: 1, ideology: -1}
+  city_names:
+    - Athens
+    - Sparta
+    - Corinth
+    - Delphi
+    - Eretria
+    - Pharsalos
+    - Argos
+    - Mycenae
+    - Herakleia
+    - Antioch
+    - Ephesos
+    - Rhodes
+    - Knossos
+    - Troy
+    - Pergamon
+    - Miletos
+
+- id: indians
+  nation: Indians
+  name: Indian
+  leader: M.Gandhi
+  color: "#ff8000"
+  personality: {mood: -1, policy: -1, ideology: 0}
+  city_names:
+    - Delhi
+    - Bombay
+    - Madras
+    - Bangalore
+    - Calcutta
+    - Lahore
+    - Karachi
+    - Kolhapur
+    - Jaipur
+    - Hyderabad
+    - Bengal
+    - Chittagong
+    - Punjab
+    - Dacca
+    - Indus
+    - Ganges
+
+- id: russians
+  nation: Russians
+  name: Russian
+  leader: Stalin
+  color: "#ff0000"
+  personality: {mood: 1, policy: 0, ideology: -1}
+  city_names:
+    - Moscow
+    - Leningrad
+    - Kiev
+    - Minsk
+    - Smolensk
+    - Odessa
+    - Sevastopol
+    - Tblisi
+    - Sverdlovsk
+    - Yakutsk
+    - Vladivostok
+    - Novograd
+    - Krasnoyarsk
+    - Riga
+    - Rostov
+    - Astrakhan
+
+- id: zulus
+  nation: Zulus
+  name: Zulu
+  leader: Shaka
+  color: "#800000"
+  personality: {mood: 1, policy: 0, ideology: 0}
+  city_names:
+    - Zimbabwe
+    - Ulundi
+    - Bapedi
+    - Hlobane
+    - Isandhlwana
+    - Intombe
+    - Mpondo
+    - Ngome
+    - Swazi
+    - Tugela
+    - Umtata
+    - Umfolozi
+    - Ibabanago
+    - Isipezi
+    - Amatikulu
+    - Zunguin
+
+- id: french
+  nation: French
+  name: French
+  leader: Napoleon
+  color: "#8080ff"
+  personality: {mood: 1, policy: 1, ideology: 1}
+  city_names:
+    - Paris
+    - Orleans
+    - Lyons
+    - Tours
+    - Chartres
+    - Bordeaux
+    - Rouen
+    - Avignon
+    - Marseilles
+    - Grenoble
+    - Dijon
+    - Amiens
+    - Cherbourg
+    - Poitiers
+    - Toulouse
+    - Bayonne
+
+- id: aztecs
+  nation: Aztecs
+  name: Aztec
+  leader: Montezuma
+  color: "#008000"
+  personality: {mood: 0, policy: -1, ideology: 1}
+  city_names:
+    - Tenochtitlan
+    - Chiauhtia
+    - Chapultepec
+    - Coatepec
+    - Ayotzinco
+    - Itzapalapa
+    - Iztapam
+    - Mitxcoac
+    - Tacubaya
+    - Tecamac
+    - Tepezinco
+    - Ticoman
+    - Tlaxcala
+    - Xaltocan
+    - Xicalango
+    - Zumpanco
+
+- id: chinese
+  nation: Chinese
+  name: Chinese
+  leader: Mao Tse Tung
+  color: "#ff80ff"
+  personality: {mood: 0, policy: 0, ideology: 1}
+  city_names:
+    - Peking
+    - Shanghai
+    - Canton
+    - Nanking
+    - Tsingtao
+    - Hangchow
+    - Tientsin
+    - Tatung
+    - Macao
+    - Anyang
+    - Shantung
+    - Chinan
+    - Kaifeng
+    - Ningpo
+    - Paoting
+    - Yangchow
+
+- id: english
+  nation: English
+  name: English
+  leader: Elizabeth I
+  color: "#ff0080"
+  personality: {mood: 0, policy: 1, ideology: 0}
+  city_names:
+    - London
+    - Coventry
+    - Birmingham
+    - Dover
+    - Nottingham
+    - York
+    - Liverpool
+    - Brighton
+    - Oxford
+    - Reading
+    - Exeter
+    - Cambridge
+    - Hastings
+    - Canterbury
+    - Banbury
+    - Newcastle
+
+- id: mongols
+  nation: Mongols
+  name: Mongol
+  leader: Genghis Khan
+  color: "#804000"
+  personality: {mood: 1, policy: 1, ideology: -1}
+  city_names:
+    - Samarkand
+    - Bokhara
+    - Nishapur
+    - Karakorum
+    - Kashgar
+    - Tabriz
+    - Aleppo
+    - Kabul
+    - Ormuz
+    - Basra
+    - Khanbalyk
+    - Khorasan
+    - Shangtu
+    - Kazan
+    - Quinsay
+    - Kerman
+
+- id: barbarians
+  nation: Barbarians
+  name: Barbarian
+  leader: Attila
+  color: "#c00000"
+  playable: false
+  personality: {mood: 1, policy: 0, ideology: -1}
+  city_names:
+    - Mecca
+    - Naples
+    - Sidon
+    - Tyre
+    - Tarsus
+    - Issus
+    - Cunaxa
+    - Cremona
+    - Cannae
+    - Capua
+    - Turin
+    - Genoa
+    - Utica
+    - Crete
+    - Damascus
+    - Verona

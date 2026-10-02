@@ -1,0 +1,179 @@
+# Weights and thresholds of the AI. Nothing here changes the rules of the game:
+# it only changes how the computer players decide.
+#
+# Personality traits come from civilizations.yaml (each -1, 0 or 1):
+#   mood (aggressive), policy (expansionist), ideology (civilized).
+# Many weights below are multiplied by (1 + trait x factor), with the factor taken from the
+# `personality` section.
+
+strategy:
+  # City sites
+  min_site_score: 10              # a settler never founds a city on a worse site
+  site_distance_ideal: 4          # preferred distance between two cities
+  site_distance_min: 3            # never closer than this to another city
+  site_search_radius: 12          # how far from its cities a civ looks for sites
+  site_distance_penalty: 0.35     # score lost per tile of distance to the nearest own city
+  # Defense
+  defenders_base: 1               # defenders wanted in every city
+  defenders_per_size: 6           # one more defender per this many citizens
+  defenders_threatened: 1         # extra defenders in a threatened city
+  threat_radius: 5                # enemy units this close to a city are a threat
+  # Exploration
+  explorers_per_continent: 1
+  explore_until_turn: 150
+  # War
+  attackers_per_city: 0.5         # attack units wanted per own city when at war
+  attackers_peace: 0.15           # attack units wanted per own city when at peace
+  attackers_excess: 1.5           # idle attackers beyond wanted x this are disbanded
+  target_distance_weight: 0.5     # how much distance reduces the appeal of a target city
+  siege_group_size: 3             # attackers gathered before assaulting a city
+  # Missions
+  mission_stickiness: 1.5         # bonus for keeping last turn's mission
+  mission_distance_scale: 6       # a mission this many steps away is worth half
+  fit_defense_explore: 0.6        # how well a defensive unit does as an explorer
+  fit_attack_defend: 0.5          # how well an attack unit does as a city defender
+  fit_attack_explore: 0.8
+
+overseas:
+  # Seas
+  min_sea_size: 8                 # smaller waters are lakes: no ship is built for them
+  sea_frontier_min: 3             # unknown shores that justify an exploring ship
+  sea_explorers: 1                # ships exploring each sea
+  # Expeditions (colonies and invasions across the sea)
+  max_expeditions: 2              # at the same time; one of each kind at most
+  expedition_cooldown: 5          # turns between the start of two expeditions
+  gather_timeout: 45              # an expedition that cannot leave its port is given up
+  sail_timeout: 40
+  passenger_wait: 6               # turns a ship waits for its missing passengers
+  invade_group: 4                 # attackers wanted aboard for an invasion
+  invade_min_group: 2
+  invade_strength_ratio: 1.2      # own strength / theirs needed to invade
+  invade_distance_weight: 0.3     # how much distance reduces the appeal of a target city
+  # Navy and air force
+  navy_per_port: 0.34             # warships wanted per port when there is an enemy at sea
+  aircraft_per_city: 0.2          # aircraft wanted per city in war time
+  air_min_odds: 0.5               # minimum chance to win before an air strike
+  nuclear_stock: 1                # nuclear weapons kept ready in war time
+
+production:
+  # Base priorities; each is multiplied by an urgency computed from the city's situation.
+  defense: 120
+  settlers: 70
+  workers: 30
+  growth: 35
+  happiness: 60
+  economy: 40
+  science: 45
+  shields: 40
+  attack: 50
+  walls: 45
+  barracks: 25
+  wonder: 30
+  caravan: 12
+  courthouse: 30
+  ferry: 65                       # the ship an expedition waits for
+  sea_explore: 25
+  navy: 40
+  aircraft: 45
+  nuclear: 40
+  pollution: 50                   # buildings that reduce pollution
+  sdi: 30
+  spaceship: 80
+  spaceship_extra_components: 2   # engines built beyond the minimum, for a faster flight
+  # Limits
+  settlers_min_size: 2
+  settlers_food_surplus: 0        # food surplus required before building settlers
+  workers_when_stagnant: 4        # urgency of workers for a city that cannot grow
+  max_settlers_per_city: 1
+  workers_per_city: 0.25          # terraforming settlers wanted per city
+  wonder_min_shields: 5           # shield production required to start a wonder
+  wonder_max_turns: 40
+  caravan_stock: 3                # caravans kept in reserve when nothing else is needed
+  max_build_turns: 45             # items taking longer than this are ignored
+  review_period: 8                # turns between two reviews of an unfinished production
+  buy_reserve: 60                 # gold kept in the treasury before buying anything
+  buy_if_slower_than: 12          # buy what the city would need more turns than this to finish
+  buy_min_score: 1                # nothing is bought for a production scored below this
+  upkeep_share: 0.8               # share of the maximum tax income that maintenance may use
+  over_budget_factor: 0.2         # score of a building the empire cannot maintain
+  citizen_worth: 3                # gold value of one citizen back at work
+  upgrade_urgency: 0.35           # urgency of replacing an outdated defender
+  army_upkeep_limit: 3            # no extra soldier once upkeep exceeds shields / this
+
+personality:
+  # How strongly each trait bends the weights above (see the top of this file).
+  aggressive_attack: 0.5          # mood -> attack units, war declarations
+  aggressive_defense: -0.1
+  expansionist_settlers: 0.25     # policy -> settlers
+  perfectionist_buildings: 0.3    # -policy -> buildings and wonders
+  civilized_science: 0.35         # ideology -> libraries, science rate
+  militarist_attack: 0.3          # -ideology -> attack units, barracks
+
+research:
+  # Value of what an advance unlocks.
+  unit_attack: 6                  # per point of attack gained over the best current unit
+  unit_defense: 8                 # per point of defense gained
+  unit_moves: 3
+  transport: 20                   # a ship that carries more troops than those we have
+  building: 25
+  building_science: 15
+  building_happiness: 12
+  building_economy: 12
+  building_shields: 10
+  wonder: 10
+  government: 70
+  terraform: 20                   # advances that allow new terrain work (bridges, railroad)
+  lookahead: 0.65                 # share of the value of the advances it leads to
+  lookahead_depth: 4
+  obsoletes_wonder_penalty: 8     # per own wonder the advance would make obsolete
+  random: 4                       # random variation, so civilizations differ
+
+diplomacy:
+  peace_base: 0.5                 # base willingness to sign peace, 0..1
+  peace_aggressive: -0.25         # per point of mood
+  peace_when_weaker: 0.3          # added when the other civ looks stronger
+  peace_when_stronger: -0.2
+  peace_war_weariness: 0.01       # added per turn of war
+  peace_min_turns: 8              # turns between two peace proposals to the same civ
+  war_base: 0.02                  # chance per turn to declare war on a weaker neighbour
+  war_aggressive: 0.03            # added per point of mood
+  war_strength_ratio: 1.5         # own strength / theirs needed to consider war
+  war_min_peace_turns: 16         # a treaty is kept at least this long
+  war_max_enemies: 1              # no new war while already fighting this many civs
+  weaker_ratio: 1.2               # they are "stronger" above this power ratio
+  stronger_ratio: 1.5             # we are "stronger" above this power ratio
+  peace_unreachable: 0.2          # added when we know none of their cities
+
+military:
+  attack_min_odds: 0.45           # minimum chance to win before attacking a unit
+  attack_city_min_odds: 0.3       # accepted when assaulting a city in a group
+  defend_min_odds: 0.6            # a defender leaves its city to strike only with these odds
+
+settlers:
+  irrigate: 3.0                   # value of one food gained on a worked tile
+  mine: 2.0                       # value of one shield gained
+  road: 1.5                       # value of one trade gained
+  clean: 2.5                      # value of cleaning a polluted tile
+  max_work_turns: 12              # jobs longer than this are ignored
+
+economy:
+  min_income: 0                   # gold per turn below which taxes are raised
+  gold_reserve: 100               # above this, taxes can be lowered for science
+  luxury_when_disorder: 20        # luxury rate tried when cities riot
+  rates_review_period: 4          # turns between two reviews of the rates
+  deficit_per_gold: 0.05          # deficit tolerated per gold in a rich treasury
+  revolution_cooldown: 50         # turns between two revolutions
+  revolution_min_gain: 20         # a new government must be this much more appealing
+  senate_aggressive_penalty: 25   # aggressive leaders dislike senates
+  senate_war_penalty: 20          # a senate is unwelcome in war time
+  war_weariness_penalty: 10       # per point of military unhappiness, in war time
+  martial_law_bonus: 5            # in war time
+
+government_preference:
+  # Base appeal of each government; war and personality shift it.
+  despotism: 0
+  monarchy: 30
+  communism: 35
+  republic: 45
+  democracy: 50
+  anarchy: -100

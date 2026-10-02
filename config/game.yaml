@@ -1,0 +1,179 @@
+# Global game constants.
+# Sources: OpenCivOne (CityWorker.cs, Segment_1238.cs, Segment_29f3.cs, CheckPlayerTurn.cs,
+# StartGameMenu.cs, MapInitAndIntro.cs). Values marked "own" are not from Civ 1.
+
+map:
+  width: 80
+  height: 50
+  wrap_x: true
+  # World generation parameters, each 0..2 like the original "customize world" menu.
+  land_mass: 1
+  temperature: 1
+  climate: 1
+  age: 1
+
+calendar:
+  start_year: -4000
+  # Years added per turn while the current year is below `until` (null = forever).
+  steps:
+    - {until: 1000, years: 20}
+    - {until: 1500, years: 10}
+    - {until: 1750, years: 5}
+    - {until: 1850, years: 2}
+    - {until: null, years: 1}
+  max_turns: 610          # the game ends in 2060 AD (the "Prince" level of the original)
+
+players:
+  count: 7
+  start_units: [settlers]
+  start_gold: 0
+  start_government: despotism
+  start_rates: {tax: 50, luxury: 0, science: 50}
+  # Start position search (StartGameMenu.cs F5_0000_07c7)
+  start_min_site_score: 12
+  start_min_distance: 10
+  start_min_continent_sites: 32
+
+# Unit domains that can be built. Remove `sea` or `air` for a land-only game.
+enabled_unit_domains: [land, sea, air]
+
+difficulty:
+  # Values of the "Prince" level (2 on a scale of 0 Chieftain .. 4 Emperor).
+  content_base: 4          # citizens born content = 6 - level
+  empire_size_base: 5      # (14 - 2 x level) / 2, see systems/city.py empire_unhappiness
+
+city:
+  min_distance: 2          # cities may not be adjacent
+  food_per_citizen: 2
+  food_box_per_size: 10    # food box = (size + 1) * this
+  disorder_shields: false  # no shield surplus during civil disorder
+  specialist_yield: 2      # each entertainer/taxman/scientist yields 2
+  luxury_per_happy: 2      # 2 luxuries make one content citizen happy
+  max_trade_routes: 3
+  trade_route_min_distance: 10
+  celebration_min_size: 3
+  capture_building_loss: 0.25   # own: chance for each building to be destroyed on capture
+  no_palace_distance: 32
+  # own: how a city places its citizens by itself. Worth of one food / shield / trade.
+  worker_weights:
+    food_starving: 5.0       # while the city does not feed itself (or cannot grow at all)
+    food_low: 2.5            # while the food surplus is small
+    food: 1.2
+    shields_none: 4.0        # while unit upkeep eats all the shields
+    shields_low: 2.2         # shield surplus below 3
+    shields: 1.4
+    trade: 1.0
+
+production:
+  # Cost in gold to finish production, r = remaining shields (CityWorker.cs L4bf7)
+  buy_unit: {quadratic_divisor: 20, linear: 2}   # r*r/20 + 2*r
+  buy_building: 2                                # 2*r
+  buy_wonder: 4                                  # 4*r
+  buy_from_scratch_multiplier: 2
+
+research:
+  cost_factor: 10          # difficulty*2 + 6
+  early_factor_base: 11    # factor = max(cost_factor, early_factor_base - known_techs)
+  doubled_from_year: 1     # cost x2 from 1 AD
+  capture_steals_tech: true
+
+movement:
+  points_per_move: 3
+  road_cost: 1
+  railroad_cost: 0
+  road_turns_factor: 2       # turns = factor * terrain move cost + 1
+  railroad_turns_factor: 4
+  fortress_turns_base: 4     # turns = terrain move cost + base
+  road_trade_bonus: 1
+  railroad_yield_percent: 50   # on food, shields and trade of the tile
+  road_requires_tech_on: {river: bridge_building}
+  railroad_tech: railroad
+  fortress_tech: construction
+  lost_at_sea_chance: 0.5      # a `coastal` ship (Trireme) ending its turn away from land
+  pollution_clean_turns: 4
+
+combat:
+  fortified_multiplier: 1.5
+  fortress_multiplier: 2.0
+  veteran_multiplier: 1.5
+  veteran_promotion_chance: 0.5
+  barbarian_attack_multiplier: 0.5
+  barbarian_vs_capital_multiplier: 0.5
+  barbarians_spare_last_city: true
+  city_shrinks_on_defeat: true   # unless the city has walls
+
+huts:
+  enabled: true
+  gold: 50
+  mercenaries: [legion, cavalry]
+  barbarian_units: {open: cavalry, rough: legion}
+  wisdom_until_year: 1000
+  advanced_tribe_min_site_score: 12   # own: a tribe founds a city only on a good site
+
+barbarians:
+  # They land from the sea near a coastal city, or (own) gather in the wilderness.
+  enabled: true
+  sea_raid_chance: 0.5
+  first_turn: 40
+  spawn_chance_per_turn: 0.06
+  min_distance_from_city: 4
+  max_distance_from_city: 9
+  group_size: [2, 4]
+  march_radius: 14           # they ignore cities farther than this
+  min_attack_odds: 0.2       # they attack a unit only with at least this chance to win
+  units_by_tech_count:
+    - {min_techs: 0, units: [legion, cavalry], ship: sail}
+    - {min_techs: 18, units: [knights, catapult, legion], ship: frigate}
+    - {min_techs: 35, units: [musketeers, cannon, knights], ship: frigate}
+
+government:
+  anarchy_turn_multiple: 4   # anarchy ends on the next turn divisible by this
+
+pollution:
+  # CityWorker.cs around line 3700. Each turn a city computes
+  #   index = shields x pollution_percent / 100 + size x known population_techs / 4 - tolerance
+  # and one tile of its area is polluted when index x 2 > random(roll - advances x roll_per_tech).
+  enabled: true
+  tolerance: 20
+  population_techs: [industrialization, automobile, mass_production, plastics]
+  roll: 256
+  roll_per_tech: 1             # difficulty / 2
+  # Global warming (Segment_1238.cs F0_1238_1767): the level moves by one each turn toward
+  #   polluted tiles x warming_per_tile - past warmings x warming_recovery
+  # and the ice caps melt when it exceeds the threshold.
+  warming_per_tile: 2
+  warming_recovery: 4
+  warming_threshold: 16
+  # What the land becomes: tiles surrounded by sea are flooded, part of the others dry up.
+  warming_coastal: {desert: swamp, plains: swamp, grassland: swamp, forest: jungle}
+  warming_inland: {plains: desert, grassland: plains, forest: plains}
+
+nuclear:
+  # Segment_29f3.cs F0_29f3_0d4d: the target tile and the 8 around it.
+  fallout_chance: 0.667
+  city_loss_percent: 50
+  meltdown_chance: 0.334       # per turn of civil disorder in a city with a Nuclear Plant
+
+spaceship:
+  # own: simplified space race (the original code of the spaceship is not readable).
+  min_parts: {structural: 4, component: 2, module: 3}
+  max_parts: {structural: 16, component: 8, module: 6}
+  flight_years: 15             # flight time of the smallest ship
+  years_per_component: 1.5     # saved by each component beyond the minimum
+  years_per_mass: 0.25         # added by each structural or module beyond the minimum
+  min_flight_years: 6
+
+score:
+  # Civilization score, as in the original (plus `advance`, own, so early games differ).
+  happy_citizen: 2
+  content_citizen: 1
+  wonder: 20
+  advance: 2
+  future_tech: 5
+  polluted_tile: -10
+  spaceship_arrival: 100
+
+victory:
+  conquest: true               # the last civilization standing wins
+  spaceship: true              # the first spaceship to reach Alpha Centauri wins
+  # Otherwise the best score wins when the calendar reaches calendar.max_turns.

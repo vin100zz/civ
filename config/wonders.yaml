@@ -1,0 +1,197 @@
+# Wonders of the World: one of each in the whole world.
+# Source: OpenCivOne GameData.cs (wonderTypes) for cost and techs; CityWorker.cs for effects.
+# A wonder stops working as soon as ANY civilization knows its `obsolete_by` advance.
+#
+# Effects use the same format as buildings.yaml, plus:
+#   happy                - makes `amount` content citizens happy
+#   no_unhappy           - no unhappy citizens at all
+#   tile_trade_bonus     - +amount trade on every worked tile that already yields trade
+#   acts_as_building     - the affected cities count as having `building`
+#   free_government      - no anarchy on revolution, and any government can be chosen
+#   free_techs           - one shot: `count` advances on completion
+#   shared_knowledge     - receive any advance known by `min_civs` other civilizations
+#   military_unhappiness - changes unhappiness caused by each military unit abroad
+#   peace_keeper         - other civilizations always accept peace with the owner
+#   unit_moves           - +amount moves for units of `domain` (several do not add up)
+#   pollution_percent    - industrial pollution of the affected cities is multiplied by percent/100
+#   reveal_map           - one shot: the owner discovers the whole world on completion
+
+- id: pyramids
+  name: Pyramids
+  cost: 300
+  requires: masonry
+  obsolete_by: communism
+  description: Change government without anarchy, to any form of government.
+  effects:
+    - {type: free_government, scope: player}
+
+- id: hanging_gardens
+  name: Hanging Gardens
+  cost: 300
+  requires: pottery
+  obsolete_by: invention
+  description: One extra happy citizen in each of your cities.
+  effects:
+    - {type: happy, amount: 1, scope: player}
+
+- id: colossus
+  name: Colossus
+  cost: 200
+  requires: bronze_working
+  obsolete_by: electricity
+  description: +1 trade on every tile of this city that already produces trade.
+  effects:
+    - {type: tile_trade_bonus, amount: 1}
+
+- id: lighthouse
+  name: Lighthouse
+  cost: 200
+  requires: map_making
+  obsolete_by: magnetism
+  description: +1 movement for your sea units.
+  effects:
+    - {type: unit_moves, domain: sea, amount: 1, scope: player}
+
+- id: great_library
+  name: Great Library
+  cost: 300
+  requires: literacy
+  obsolete_by: university
+  description: You receive any advance already known by two other civilizations.
+  effects:
+    - {type: shared_knowledge, min_civs: 2, scope: player}
+
+- id: oracle
+  name: Oracle
+  cost: 300
+  requires: mysticism
+  obsolete_by: religion
+  description: Doubles the effect of your Temples.
+  effects:
+    - {type: content, amount: 1, scope: player, requires_building: temple}
+    - {type: content, amount: 1, scope: player, requires_building: temple, requires_tech: mysticism}
+
+- id: great_wall
+  name: Great Wall
+  cost: 300
+  requires: masonry
+  obsolete_by: gunpowder
+  description: All your cities are defended as if they had City Walls.
+  effects:
+    - {type: acts_as_building, building: city_walls, scope: player}
+
+- id: magellans_expedition
+  name: Magellan's Expedition
+  cost: 400
+  requires: navigation
+  description: +1 movement for your sea units.
+  effects:
+    - {type: unit_moves, domain: sea, amount: 1, scope: player}
+
+- id: michelangelos_chapel
+  name: Michelangelo's Chapel
+  cost: 300
+  requires: religion
+  obsolete_by: communism
+  description: Each of your Cathedrals makes two more citizens content.
+  effects:
+    - {type: content, amount: 2, scope: player, requires_building: cathedral}
+
+- id: copernicus_observatory
+  name: Copernicus' Observatory
+  cost: 300
+  requires: astronomy
+  obsolete_by: automobile
+  description: Doubles the science of this city.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 100, mode: compound}
+
+- id: shakespeares_theatre
+  name: Shakespeare's Theatre
+  cost: 400
+  requires: medicine
+  obsolete_by: electronics
+  description: No unhappy citizens in this city.
+  effects:
+    - {type: no_unhappy}
+
+- id: isaac_newtons_college
+  name: Isaac Newton's College
+  cost: 400
+  requires: theory_of_gravity
+  obsolete_by: nuclear_fission
+  description: Your Libraries and Universities each produce one third more science.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 33.334, mode: additive, scope: player, requires_building: library}
+    - {type: yield_bonus, yield: science, percent: 33.334, mode: additive, scope: player, requires_building: university}
+
+- id: js_bachs_cathedral
+  name: J.S. Bach's Cathedral
+  cost: 400
+  requires: religion
+  description: Two more content citizens in each of your cities on the same continent.
+  effects:
+    - {type: content, amount: 2, scope: continent}
+
+- id: darwins_voyage
+  name: Darwin's Voyage
+  cost: 300
+  requires: railroad
+  description: Two advances at once.
+  effects:
+    - {type: free_techs, count: 2}
+
+- id: hoover_dam
+  name: Hoover Dam
+  cost: 600
+  requires: electronics
+  description: Acts as a power plant in each of your cities on the same continent.
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive, exclusive_group: power, scope: continent, requires_building: factory}
+    - {type: pollution_percent, percent: 50, scope: continent}
+
+- id: womens_suffrage
+  name: Women's Suffrage
+  cost: 600
+  requires: industrialization
+  description: One less unhappy citizen for each military unit abroad.
+  effects:
+    - {type: military_unhappiness, amount: -1, scope: player}
+
+- id: manhattan_project
+  name: Manhattan Project
+  cost: 600
+  requires: nuclear_fission
+  description: Allows every civilization to build nuclear weapons.
+
+- id: united_nations
+  name: United Nations
+  cost: 600
+  requires: communism
+  description: Other civilizations always accept peace with you.
+  effects:
+    - {type: peace_keeper, scope: player}
+
+- id: apollo_program
+  name: Apollo Program
+  cost: 600
+  requires: space_flight
+  description: Reveals the whole map and allows every civilization to build spaceship parts.
+  effects:
+    - {type: reveal_map, scope: player}
+
+- id: seti_program
+  name: SETI Program
+  cost: 600
+  requires: computers
+  description: +50% science in all your cities.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 50, mode: compound, scope: player}
+
+- id: cure_for_cancer
+  name: Cure for Cancer
+  cost: 600
+  requires: genetic_engineering
+  description: One extra happy citizen in each of your cities.
+  effects:
+    - {type: happy, amount: 1, scope: player}

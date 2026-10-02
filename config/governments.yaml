@@ -1,0 +1,86 @@
+# Forms of government (the six of Civ 1).
+# Source: OpenCivOne CityWorker.cs (corruption, upkeep, unhappiness), Segment_2517.cs (rates).
+#
+# tile_penalty        - a tile yielding more than 2 of something loses 1 (not while celebrating)
+# trade_bonus         - +1 trade on every tile that already yields trade
+# celebration_trade_bonus - same bonus, but only while the city celebrates
+# corruption_divisor  - corruption = trade * distance_to_capital * 3 / divisor (null = none)
+# corruption_distance - fixed distance used instead of the real one (Communism)
+# max_rate            - highest tax / luxury / science rate, in percent
+# free_units          - units a city supports without paying shields: city_size or none
+# settlers_food       - food eaten by each Settlers unit
+# martial_law         - max number of unhappy citizens calmed by military units in the city
+# military_unhappiness - unhappy citizens per military unit outside the city
+# empire_size_factor  - larger = more cities before extra unhappiness appears
+# collects_taxes / does_research - false during Anarchy (no maintenance either)
+# rapture_growth      - a celebrating city grows by one each turn
+# falls_on_disorder   - two consecutive turns of disorder in a city bring Anarchy
+# senate              - the senate forces the acceptance of peace offers
+
+- id: anarchy
+  name: Anarchy
+  tile_penalty: true
+  corruption_divisor: 80
+  max_rate: 60
+  free_units: city_size
+  settlers_food: 1
+  martial_law: 3
+  empire_size_factor: 2
+  collects_taxes: false
+  does_research: false
+
+- id: despotism
+  name: Despotism
+  tile_penalty: true
+  corruption_divisor: 100
+  max_rate: 60
+  free_units: city_size
+  settlers_food: 1
+  martial_law: 3
+  empire_size_factor: 2
+
+- id: monarchy
+  name: Monarchy
+  requires: monarchy
+  celebration_trade_bonus: true
+  corruption_divisor: 120
+  max_rate: 70
+  settlers_food: 2
+  martial_law: 3
+  empire_size_factor: 3
+
+- id: communism
+  name: Communism
+  requires: communism
+  celebration_trade_bonus: true
+  corruption_divisor: 140
+  corruption_distance: 10
+  max_rate: 70
+  settlers_food: 2
+  martial_law: 3
+  empire_size_factor: 3
+
+- id: republic
+  name: Republic
+  requires: republic
+  trade_bonus: true
+  corruption_divisor: 160
+  max_rate: 80
+  settlers_food: 2
+  military_unhappiness: 1
+  empire_size_factor: 4
+  rapture_growth: true
+  senate: true
+
+- id: democracy
+  name: Democracy
+  requires: democracy
+  trade_bonus: true
+  corruption_divisor: null
+  max_rate: 80
+  settlers_food: 2
+  military_unhappiness: 2
+  empire_size_factor: 4
+  rapture_growth: true
+  falls_on_disorder: true
+  senate: true

@@ -1,0 +1,371 @@
+# Unit definitions.
+# Source: OpenCivOne GameData.cs (UnitDefinition array). cost = shields.
+# domain: land | sea | air.   role: what the AI uses the unit for
+#   (settler, defense, attack, sea_attack, air_attack, transport, carrier, neutral).
+# abilities: found_city, terraform (roads, irrigation, mines, fortresses, cleaning pollution),
+#   trade (caravan), ignore_zoc, ignore_walls (attacks as if the city had no walls),
+#   coastal (may be lost at sea when it ends its turn away from land),
+#   attack_air (may attack aircraft in flight), no_shore_attack (cannot attack units on land),
+#   nuclear (destroys everything around its target, and itself).
+# needs_support: false = costs no shield upkeep (diplomat, caravan).
+# fuel: turns an air unit may end away from a city or a carrier before it crashes.
+# capacity / carries: number of units a ship carries, and their kind (land | air).
+# requires_wonder: some civilization must have built this wonder.
+# enabled: false = defined but cannot be built yet.
+
+# ── LAND ──────────────────────────────────────────────────────────────────────
+- id: settlers
+  name: Settlers
+  domain: land
+  role: settler
+  attack: 0
+  defense: 1
+  moves: 1
+  cost: 40
+  abilities: [found_city, terraform]
+  pop_cost: 1
+  sprite: settler
+
+- id: militia
+  name: Militia
+  domain: land
+  role: defense
+  attack: 1
+  defense: 1
+  moves: 1
+  cost: 10
+  obsolete_by: gunpowder
+  sprite: militia
+
+- id: phalanx
+  name: Phalanx
+  domain: land
+  role: defense
+  attack: 1
+  defense: 2
+  moves: 1
+  cost: 20
+  requires: bronze_working
+  obsolete_by: gunpowder
+  sprite: phalanx
+
+- id: legion
+  name: Legion
+  domain: land
+  role: attack
+  attack: 3
+  defense: 1
+  moves: 1
+  cost: 20
+  requires: iron_working
+  obsolete_by: conscription
+  sprite: legion
+
+- id: musketeers
+  name: Musketeers
+  domain: land
+  role: defense
+  attack: 2
+  defense: 3
+  moves: 1
+  cost: 30
+  requires: gunpowder
+  obsolete_by: conscription
+  sprite: musketeer
+
+- id: riflemen
+  name: Riflemen
+  domain: land
+  role: defense
+  attack: 3
+  defense: 5
+  moves: 1
+  cost: 30
+  requires: conscription
+  sprite: riflemen
+
+- id: cavalry
+  name: Cavalry
+  domain: land
+  role: attack
+  attack: 2
+  defense: 1
+  moves: 2
+  cost: 20
+  requires: horseback_riding
+  obsolete_by: conscription
+  sprite: cavalry
+
+- id: chariot
+  name: Chariot
+  domain: land
+  role: attack
+  attack: 4
+  defense: 1
+  moves: 2
+  cost: 40
+  requires: the_wheel
+  obsolete_by: chivalry
+  sprite: chariot
+
+- id: knights
+  name: Knights
+  domain: land
+  role: attack
+  attack: 4
+  defense: 2
+  moves: 2
+  cost: 40
+  requires: chivalry
+  obsolete_by: automobile
+  sprite: knight
+
+- id: catapult
+  name: Catapult
+  domain: land
+  role: attack
+  attack: 6
+  defense: 1
+  moves: 1
+  cost: 40
+  requires: mathematics
+  obsolete_by: metallurgy
+  sprite: catapult
+
+- id: cannon
+  name: Cannon
+  domain: land
+  role: attack
+  attack: 8
+  defense: 1
+  moves: 1
+  cost: 40
+  requires: metallurgy
+  obsolete_by: robotics
+  sprite: cannon
+
+- id: armor
+  name: Armor
+  domain: land
+  role: attack
+  attack: 10
+  defense: 5
+  moves: 3
+  cost: 80
+  requires: automobile
+  sprite: armor
+
+- id: mech_inf
+  name: Mech. Inf.
+  domain: land
+  role: defense
+  attack: 6
+  defense: 6
+  moves: 3
+  cost: 50
+  requires: labor_union
+  sprite: mechinf
+
+- id: artillery
+  name: Artillery
+  domain: land
+  role: attack
+  attack: 12
+  defense: 2
+  moves: 2
+  cost: 60
+  requires: robotics
+  abilities: [ignore_walls]
+  sprite: artillery
+
+- id: diplomat
+  name: Diplomat
+  domain: land
+  role: neutral
+  attack: 0
+  defense: 0
+  moves: 2
+  cost: 30
+  requires: writing
+  abilities: [ignore_zoc]
+  needs_support: false
+  enabled: false   # diplomat actions are not implemented yet
+  sprite: diplomat
+
+- id: caravan
+  name: Caravan
+  domain: land
+  role: neutral
+  attack: 0
+  defense: 1
+  moves: 1
+  cost: 50
+  requires: trade
+  abilities: [trade, ignore_zoc]
+  needs_support: false
+  sprite: caravan
+
+
+# ── AIR ──────────────────────────────────────────────────────────────────────
+- id: fighter
+  name: Fighter
+  domain: air
+  role: air_attack
+  attack: 4
+  defense: 2
+  moves: 10
+  cost: 60
+  requires: flight
+  sight: 2
+  fuel: 1
+  abilities: [attack_air]
+  sprite: fighter
+
+- id: bomber
+  name: Bomber
+  domain: air
+  role: air_attack
+  attack: 12
+  defense: 1
+  moves: 8
+  cost: 120
+  requires: advanced_flight
+  abilities: [ignore_walls]
+  sight: 2
+  fuel: 2
+  sprite: bomber
+
+- id: nuclear
+  name: Nuclear Missile
+  domain: air
+  role: air_attack
+  attack: 99
+  defense: 0
+  moves: 16
+  cost: 160
+  requires: rocketry
+  fuel: 1
+  abilities: [nuclear]
+  requires_wonder: manhattan_project
+  sprite: nuclear
+
+
+# ── SEA ──────────────────────────────────────────────────────────────────────
+- id: trireme
+  name: Trireme
+  domain: sea
+  role: transport
+  attack: 1
+  defense: 0
+  moves: 3
+  cost: 40
+  requires: map_making
+  obsolete_by: navigation
+  abilities: [coastal]
+  capacity: 2
+  carries: land
+  sprite: trireme
+
+- id: sail
+  name: Sail
+  domain: sea
+  role: transport
+  attack: 1
+  defense: 1
+  moves: 3
+  cost: 40
+  requires: navigation
+  obsolete_by: magnetism
+  capacity: 3
+  carries: land
+  sprite: sail
+
+- id: frigate
+  name: Frigate
+  domain: sea
+  role: transport
+  attack: 2
+  defense: 2
+  moves: 3
+  cost: 40
+  requires: magnetism
+  obsolete_by: industrialization
+  capacity: 4
+  carries: land
+  sprite: frigate
+
+- id: ironclad
+  name: Ironclad
+  domain: sea
+  role: sea_attack
+  attack: 4
+  defense: 4
+  moves: 4
+  cost: 60
+  requires: steam_engine
+  obsolete_by: combustion
+  sprite: ironclad
+
+- id: cruiser
+  name: Cruiser
+  domain: sea
+  role: sea_attack
+  attack: 6
+  defense: 6
+  moves: 6
+  cost: 80
+  requires: combustion
+  sight: 2
+  sprite: cruiser
+
+- id: battleship
+  name: Battleship
+  domain: sea
+  role: sea_attack
+  attack: 18
+  defense: 12
+  moves: 4
+  cost: 160
+  requires: steel
+  sight: 2
+  sprite: battleship
+
+- id: submarine
+  name: Submarine
+  domain: sea
+  role: sea_attack
+  attack: 8
+  defense: 2
+  moves: 3
+  cost: 50
+  requires: mass_production
+  sight: 2
+  abilities: [no_shore_attack]
+  sprite: submarine
+
+- id: carrier
+  name: Carrier
+  domain: sea
+  role: carrier
+  attack: 1
+  defense: 12
+  moves: 5
+  cost: 160
+  requires: advanced_flight
+  sight: 2
+  capacity: 8
+  carries: air
+  sprite: carrier
+
+- id: transport
+  name: Transport
+  domain: sea
+  role: transport
+  attack: 0
+  defense: 3
+  moves: 4
+  cost: 50
+  requires: industrialization
+  capacity: 8
+  carries: land
+  sprite: transport

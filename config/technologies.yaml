@@ -1,0 +1,365 @@
+# Civ 1 technology tree
+# Source: OpenCivOne GameData.cs TechnologyAdvanceDefinition array (faithful C# rewrite of DOS binary)
+# At most 2 prerequisites each.
+# repeatable: the advance can be researched any number of times (Future Tech).
+# era is approximate for UI grouping only
+
+# ── ANCIENT (no prerequisites) ────────────────────────────────────────────────
+
+- id: alphabet
+  name: Alphabet
+  era: ancient
+  prerequisites: []
+
+- id: bronze_working
+  name: Bronze Working
+  era: ancient
+  prerequisites: []
+
+- id: ceremonial_burial
+  name: Ceremonial Burial
+  era: ancient
+  prerequisites: []
+
+- id: horseback_riding
+  name: Horseback Riding
+  era: ancient
+  prerequisites: []
+
+- id: masonry
+  name: Masonry
+  era: ancient
+  prerequisites: []
+
+- id: pottery
+  name: Pottery
+  era: ancient
+  prerequisites: []
+
+- id: the_wheel
+  name: The Wheel
+  era: ancient
+  prerequisites: []
+
+# ── ANCIENT (1–2 prerequisites) ───────────────────────────────────────────────
+
+- id: writing
+  name: Writing
+  era: ancient
+  prerequisites: [alphabet]
+
+- id: code_of_laws
+  name: Code of Laws
+  era: ancient
+  prerequisites: [alphabet]
+
+- id: map_making
+  name: Map Making
+  era: ancient
+  prerequisites: [alphabet]
+
+- id: mathematics
+  name: Mathematics
+  era: ancient
+  prerequisites: [alphabet, masonry]
+
+- id: mysticism
+  name: Mysticism
+  era: ancient
+  prerequisites: [ceremonial_burial]
+
+- id: currency
+  name: Currency
+  era: ancient
+  prerequisites: [bronze_working]
+
+- id: iron_working
+  name: Iron Working
+  era: ancient
+  prerequisites: [bronze_working]
+
+- id: trade
+  name: Trade
+  era: ancient
+  prerequisites: [currency, code_of_laws]
+
+- id: literacy
+  name: Literacy
+  era: ancient
+  prerequisites: [writing, code_of_laws]
+
+- id: monarchy
+  name: Monarchy
+  era: ancient
+  prerequisites: [ceremonial_burial, code_of_laws]
+
+# ── CLASSICAL ─────────────────────────────────────────────────────────────────
+
+- id: philosophy
+  name: Philosophy
+  era: classical
+  prerequisites: [mysticism, literacy]
+
+- id: republic
+  name: The Republic
+  era: classical
+  prerequisites: [code_of_laws, literacy]
+
+- id: astronomy
+  name: Astronomy
+  era: classical
+  prerequisites: [mysticism, mathematics]
+
+- id: construction
+  name: Construction
+  era: classical
+  prerequisites: [masonry, currency]
+
+- id: medicine
+  name: Medicine
+  era: classical
+  prerequisites: [philosophy, trade]
+
+- id: navigation
+  name: Navigation
+  era: classical
+  prerequisites: [map_making, astronomy]
+
+- id: bridge_building
+  name: Bridge Building
+  era: classical
+  prerequisites: [iron_working, construction]
+
+# ── MEDIEVAL ──────────────────────────────────────────────────────────────────
+
+- id: feudalism
+  name: Feudalism
+  era: medieval
+  prerequisites: [masonry, monarchy]
+
+- id: chivalry
+  name: Chivalry
+  era: medieval
+  prerequisites: [feudalism, horseback_riding]
+
+- id: religion
+  name: Religion
+  era: medieval
+  prerequisites: [philosophy, writing]
+
+- id: banking
+  name: Banking
+  era: medieval
+  prerequisites: [trade, republic]
+
+- id: university
+  name: University
+  era: medieval
+  prerequisites: [mathematics, philosophy]
+
+- id: physics
+  name: Physics
+  era: medieval
+  prerequisites: [mathematics, navigation]
+
+- id: magnetism
+  name: Magnetism
+  era: medieval
+  prerequisites: [navigation, physics]
+
+- id: engineering
+  name: Engineering
+  era: medieval
+  prerequisites: [the_wheel, construction]
+
+- id: invention
+  name: Invention
+  era: medieval
+  prerequisites: [engineering, literacy]
+
+- id: gunpowder
+  name: Gunpowder
+  era: medieval
+  prerequisites: [invention, iron_working]
+
+- id: democracy
+  name: Democracy
+  era: medieval
+  prerequisites: [philosophy, literacy]
+
+- id: theory_of_gravity
+  name: Theory of Gravity
+  era: medieval
+  prerequisites: [astronomy, university]
+
+# ── INDUSTRIAL ────────────────────────────────────────────────────────────────
+
+- id: steam_engine
+  name: Steam Engine
+  era: industrial
+  prerequisites: [physics, invention]
+
+- id: railroad
+  name: Railroad
+  era: industrial
+  prerequisites: [steam_engine, bridge_building]
+
+- id: chemistry
+  name: Chemistry
+  era: industrial
+  prerequisites: [university, medicine]
+
+- id: metallurgy
+  name: Metallurgy
+  era: industrial
+  prerequisites: [gunpowder, university]
+
+- id: electricity
+  name: Electricity
+  era: industrial
+  prerequisites: [metallurgy, magnetism]
+
+- id: electronics
+  name: Electronics
+  era: industrial
+  prerequisites: [engineering, electricity]
+
+- id: explosives
+  name: Explosives
+  era: industrial
+  prerequisites: [gunpowder, chemistry]
+
+- id: sanitation
+  name: Sanitation
+  era: industrial
+  prerequisites: [engineering, medicine]
+
+- id: conscription
+  name: Conscription
+  era: industrial
+  prerequisites: [republic, explosives]
+
+- id: industrialization
+  name: Industrialization
+  era: industrial
+  prerequisites: [railroad, banking]
+
+- id: the_corporation
+  name: The Corporation
+  era: industrial
+  prerequisites: [banking, industrialization]
+
+- id: communism
+  name: Communism
+  era: industrial
+  prerequisites: [philosophy, industrialization]
+
+- id: refining
+  name: Refining
+  era: industrial
+  prerequisites: [chemistry, the_corporation]
+
+- id: steel
+  name: Steel
+  era: industrial
+  prerequisites: [metallurgy, industrialization]
+
+- id: combustion
+  name: Combustion
+  era: industrial
+  prerequisites: [refining, explosives]
+
+- id: automobile
+  name: Automobile
+  era: industrial
+  prerequisites: [combustion, steel]
+
+- id: mass_production
+  name: Mass Production
+  era: industrial
+  prerequisites: [automobile, the_corporation]
+
+- id: labor_union
+  name: Labor Union
+  era: industrial
+  prerequisites: [mass_production, communism]
+
+- id: recycling
+  name: Recycling
+  era: industrial
+  prerequisites: [mass_production, democracy]
+
+# ── MODERN ────────────────────────────────────────────────────────────────────
+
+- id: flight
+  name: Flight
+  era: modern
+  prerequisites: [combustion, physics]
+
+- id: advanced_flight
+  name: Advanced Flight
+  era: modern
+  prerequisites: [flight, electricity]
+
+- id: atomic_theory
+  name: Atomic Theory
+  era: modern
+  prerequisites: [theory_of_gravity, physics]
+
+- id: nuclear_fission
+  name: Nuclear Fission
+  era: modern
+  prerequisites: [mass_production, atomic_theory]
+
+- id: nuclear_power
+  name: Nuclear Power
+  era: modern
+  prerequisites: [nuclear_fission, electronics]
+
+- id: rocketry
+  name: Rocketry
+  era: modern
+  prerequisites: [advanced_flight, electronics]
+
+- id: computers
+  name: Computers
+  era: modern
+  prerequisites: [mathematics, electronics]
+
+- id: space_flight
+  name: Space Flight
+  era: modern
+  prerequisites: [computers, rocketry]
+
+- id: robotics
+  name: Robotics
+  era: modern
+  prerequisites: [plastics, computers]
+
+- id: plastics
+  name: Plastics
+  era: modern
+  prerequisites: [refining, space_flight]
+
+- id: superconductor
+  name: SuperConductor
+  era: modern
+  prerequisites: [plastics, mass_production]
+
+- id: genetic_engineering
+  name: Genetic Engineering
+  era: modern
+  prerequisites: [medicine, the_corporation]
+
+- id: fusion_power
+  name: Fusion Power
+  era: modern
+  prerequisites: [nuclear_power, superconductor]
+
+# ── FUTURE ────────────────────────────────────────────────────────────────────
+
+- id: future_tech
+  name: Future Tech.
+  era: modern
+  prerequisites: [fusion_power, genetic_engineering]
+  repeatable: true

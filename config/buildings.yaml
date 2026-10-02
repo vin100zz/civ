@@ -1,0 +1,239 @@
+# City improvements.
+# Source: OpenCivOne GameData.cs (ImprovementDefinition array) for cost, upkeep and tech;
+# CityWorker.cs for the effects. cost = shields, upkeep = gold per turn.
+#
+# Effects are typed modifiers read by the rules code (see src/server/engine/effects.py).
+# Common optional fields on every effect:
+#   scope: city (default) | player (all cities of the owner) | continent (owner's cities on
+#          the same continent as the building)
+#   requires_tech: the owner must know this advance
+#   requires_building: the affected city must have this building
+#
+# Effect types used here:
+#   capital              - seat of government: no corruption distance
+#   veteran_units        - units built here start as veterans
+#   food_box_keep        - percent of the food box kept when the city grows
+#   content              - makes `amount` unhappy citizens content
+#   yield_bonus          - +percent on a yield (shields | tax | luxury | science)
+#                          mode additive: each bonus is computed on the base value
+#                          mode compound: bonuses are applied one after the other
+#                          exclusive_group: only one effect of the group counts
+#   corruption_percent   - corruption is multiplied by percent / 100
+#   defense_multiplier   - multiplies the defense of units in the city against `vs` attackers
+#   allow_size_above     - without this effect the city cannot grow past `size`
+#   pollution_percent    - industrial pollution is multiplied by percent / 100 (lowest wins)
+#   no_population_pollution - citizens cause no pollution
+#   meltdown_risk        - may melt down during civil disorder until `safe_tech` is known
+#   nuclear_shield       - protects the city tile from nuclear attacks
+#   spaceship_part       - not a building: adds a `part` (structural | component | module)
+#                          to the owner's spaceship; can be built many times
+# requires_wonder: some civilization must have built this wonder.
+
+- id: palace
+  name: Palace
+  cost: 200
+  upkeep: 0
+  requires: masonry
+  effects:
+    - {type: capital}
+
+- id: barracks
+  name: Barracks
+  cost: 40
+  upkeep: 1
+  upkeep_increase_techs: [gunpowder, combustion]
+  effects:
+    - {type: veteran_units}
+
+- id: granary
+  name: Granary
+  cost: 60
+  upkeep: 1
+  requires: pottery
+  effects:
+    - {type: food_box_keep, percent: 50}
+
+- id: temple
+  name: Temple
+  cost: 40
+  upkeep: 1
+  requires: ceremonial_burial
+  effects:
+    - {type: content, amount: 1}
+    - {type: content, amount: 1, requires_tech: mysticism}
+
+- id: marketplace
+  name: Marketplace
+  cost: 80
+  upkeep: 1
+  requires: currency
+  effects:
+    - {type: yield_bonus, yield: tax, percent: 50, mode: compound}
+    - {type: yield_bonus, yield: luxury, percent: 50, mode: compound}
+
+- id: library
+  name: Library
+  cost: 80
+  upkeep: 1
+  requires: writing
+  effects:
+    - {type: yield_bonus, yield: science, percent: 50, mode: additive}
+
+- id: courthouse
+  name: Courthouse
+  cost: 80
+  upkeep: 1
+  requires: code_of_laws
+  effects:
+    - {type: corruption_percent, percent: 50}
+
+- id: city_walls
+  name: City Walls
+  cost: 120
+  upkeep: 2
+  requires: masonry
+  effects:
+    - {type: defense_multiplier, factor: 3.0, vs: land}
+
+- id: aqueduct
+  name: Aqueduct
+  cost: 120
+  upkeep: 2
+  requires: construction
+  effects:
+    - {type: allow_size_above, size: 10}
+
+- id: bank
+  name: Bank
+  cost: 120
+  upkeep: 3
+  requires: banking
+  requires_building: marketplace
+  effects:
+    - {type: yield_bonus, yield: tax, percent: 50, mode: compound}
+    - {type: yield_bonus, yield: luxury, percent: 50, mode: compound}
+
+- id: cathedral
+  name: Cathedral
+  cost: 160
+  upkeep: 3
+  requires: religion
+  effects:
+    - {type: content, amount: 4}
+
+- id: university
+  name: University
+  cost: 160
+  upkeep: 3
+  requires: university
+  requires_building: library
+  effects:
+    - {type: yield_bonus, yield: science, percent: 50, mode: additive}
+
+- id: colosseum
+  name: Colosseum
+  cost: 100
+  upkeep: 4
+  requires: construction
+  effects:
+    - {type: content, amount: 3}
+
+- id: factory
+  name: Factory
+  cost: 200
+  upkeep: 4
+  requires: industrialization
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive}
+
+- id: mfg_plant
+  name: Mfg. Plant
+  cost: 320
+  upkeep: 6
+  requires: robotics
+  requires_building: factory
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive}
+
+- id: power_plant
+  name: Power Plant
+  cost: 160
+  upkeep: 4
+  requires: refining
+  requires_building: factory
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive, exclusive_group: power}
+
+- id: hydro_plant
+  name: Hydro Plant
+  cost: 240
+  upkeep: 4
+  requires: electronics
+  requires_building: factory
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive, exclusive_group: power}
+    - {type: pollution_percent, percent: 50}
+
+- id: nuclear_plant
+  name: Nuclear Plant
+  cost: 160
+  upkeep: 2
+  requires: nuclear_power
+  requires_building: factory
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive, exclusive_group: power}
+    - {type: pollution_percent, percent: 50}
+    - {type: meltdown_risk, safe_tech: fusion_power}
+
+- id: mass_transit
+  name: Mass Transit
+  cost: 160
+  upkeep: 4
+  requires: mass_production
+  effects:
+    - {type: no_population_pollution}
+
+- id: sdi_defense
+  name: SDI Defense
+  cost: 200
+  upkeep: 4
+  requires: superconductor
+  effects:
+    - {type: nuclear_shield}
+
+- id: recycling_cntr
+  name: Recycling Cntr.
+  cost: 200
+  upkeep: 2
+  requires: recycling
+  effects:
+    - {type: pollution_percent, percent: 34}
+
+# ── Spaceship parts (need the Apollo Program, built by anybody) ───────────────
+
+- id: ss_structural
+  name: SS Structural
+  cost: 80
+  upkeep: 0
+  requires: space_flight
+  requires_wonder: apollo_program
+  effects:
+    - {type: spaceship_part, part: structural}
+
+- id: ss_component
+  name: SS Component
+  cost: 160
+  upkeep: 0
+  requires: plastics
+  requires_wonder: apollo_program
+  effects:
+    - {type: spaceship_part, part: component}
+
+- id: ss_module
+  name: SS Module
+  cost: 320
+  upkeep: 0
+  requires: robotics
+  requires_wonder: apollo_program
+  effects:
+    - {type: spaceship_part, part: module}
