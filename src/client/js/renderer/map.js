@@ -396,36 +396,31 @@ export class MapView {
     if (isRiver) this._drawRiver(ctx, tx, ty, px, py, size);
 
     if (size < 14) return;        // too small for details
+    // Icons sit lightly on the ground: smaller and a little translucent so the terrain still reads.
     if ((flags & F.SPECIAL) && terrain.special) {
-      const icon = sprite('terrain', terrain.special.sprite);
-      if (icon) ctx.drawImage(icon, px, py, size, size);
+      this._overlay(ctx, sprite('terrain', terrain.special.sprite), px, py, size, 0.64, 0.82);
     } else if ((flags & F.PATTERN) && terrain.pattern_sprite) {
-      const icon = sprite('terrain', terrain.pattern_sprite);
-      if (icon) ctx.drawImage(icon, px, py, size, size);
+      this._overlay(ctx, sprite('terrain', terrain.pattern_sprite), px, py, size, 0.4, 0.8);
     }
-    if (flags & F.IRRIGATION) {
-      const icon = sprite('terrain', 'irrigation');
-      if (icon) {
-        ctx.globalAlpha = 0.75;
-        ctx.drawImage(icon, px, py, size, size);
-        ctx.globalAlpha = 1;
-      }
-    }
-    if (flags & F.MINE) {
-      const icon = sprite('terrain', 'mine');
-      if (icon) ctx.drawImage(icon, px, py, size, size);
-    }
+    if (flags & F.IRRIGATION) this._overlay(ctx, sprite('terrain', 'irrigation'), px, py, size, 0.86, 0.3);
+    if (flags & F.MINE) this._overlay(ctx, sprite('terrain', 'mine'), px, py, size, 0.64, 0.8);
     if (flags & (F.ROAD | F.RAILROAD)) this._drawRoad(ctx, tx, ty, px, py, size, flags);
     if (flags & F.FORTRESS) {
       ctx.strokeStyle = '#f2d16b';
       ctx.lineWidth = Math.max(1.5, size / 16);
       ctx.strokeRect(px + size * 0.14, py + size * 0.14, size * 0.72, size * 0.72);
     }
-    if (flags & F.POLLUTION) {
-      const icon = sprite('terrain', 'pollution');
-      if (icon) ctx.drawImage(icon, px, py, size, size);
-    }
+    if (flags & F.POLLUTION) this._overlay(ctx, sprite('terrain', 'pollution'), px, py, size, 0.64, 0.8);
     if (flags & F.HUT) this._drawHut(ctx, px, py, size);
+  }
+
+  /** Draws a centred icon at `scale` of the tile with the given opacity. */
+  _overlay(ctx, icon, px, py, size, scale, alpha) {
+    if (!icon) return;
+    const w = size * scale;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(icon, px + (size - w) / 2, py + (size - w) / 2, w, w);
+    ctx.globalAlpha = 1;
   }
 
   _terrainId(tx, ty) {
@@ -647,7 +642,8 @@ export class MapView {
     ctx.stroke();
     const image = sprite('unit', definition.sprite);
     if (image && size >= 14) {
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       const room = box * 0.82;
       const scale = Math.min(room / image.width, room / image.height);
       const w = image.width * scale;
