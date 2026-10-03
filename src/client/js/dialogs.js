@@ -12,6 +12,47 @@ const VICTORY = {
   score: ['Victory on score', 'have the greatest civilization', 'trophy'],
 };
 let players = 7;
+let mapChoice = null;         // shape, relief and climate of the next new game
+
+// Pictogram of each map shape: [cx, cy, rx, ry] blobs in a 36 x 22 box. A blob drawn inside
+// another one is a hole (a lake, an inner sea).
+const SHAPE_GLYPHS = {
+  continents: [[9, 8, 7, 5], [26, 14, 8, 6], [21, 4, 2.5, 2], [6, 18, 2, 1.5]],
+  small_islands: [[5, 5, 2, 2], [15, 4, 2, 2], [27, 5, 2, 2], [9, 12, 2, 2], [20, 11, 2, 2],
+    [31, 12, 2, 2], [5, 18, 2, 2], [15, 18, 2, 2], [26, 18, 2, 2]],
+  medium_islands: [[7, 6, 4, 3], [20, 5, 4, 3], [31, 9, 3.5, 3], [11, 16, 4, 3], [24, 16, 4, 3]],
+  large_islands: [[8, 7, 6, 4.5], [25, 6, 7, 4.5], [17, 16, 7, 4.5], [32, 17, 3, 2.5]],
+  two_continents: [[9, 11, 7.5, 9], [27, 11, 7.5, 9]],
+  continents_islands: [[10, 8, 7, 5.5], [25, 14, 7, 5.5], [24, 4, 1.8, 1.8], [33, 6, 1.8, 1.8],
+    [5, 18, 1.8, 1.8], [13, 18, 1.8, 1.8]],
+  pangaea: [[18, 11, 16, 9]],
+  pangaea_lakes: [[18, 11, 16, 9], [10, 10, 2.5, 2], [19, 7, 2, 1.6], [24, 13, 3, 2],
+    [15, 15, 2, 1.5]],
+  inner_sea: [[18, 11, 16, 9.5], [18, 11, 9, 4.5]],
+  world_belt: 'M0,6C6,3 11,8 18,6S30,3 36,6V16C30,19 24,14 18,16S6,19 0,16Z',
+};
+
+function shapeGlyph(id) {
+  const blobs = SHAPE_GLYPHS[id];
+  if (!blobs) return '';
+  const path = typeof blobs === 'string' ? blobs : blobs.map(([cx, cy, rx, ry]) =>
+    `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${2 * rx},0a${rx},${ry} 0 1,0 ${-2 * rx},0Z`).join('');
+  return `<svg viewBox="0 0 36 22" aria-hidden="true"><path d="${path}" fill="currentColor" fill-rule="evenodd"/></svg>`;
+}
+
+function refreshMapChoice() {
+  for (const button of $('map-shapes').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.shape === mapChoice.shape));
+  }
+  const shape = store.rules.map_shapes.find((s) => s.id === mapChoice.shape);
+  $('shape-hint').textContent = shape ? shape.description : '';
+  for (const group of document.querySelectorAll('[data-map-level]')) {
+    for (const button of group.children) {
+      button.setAttribute('aria-pressed',
+        String(Number(button.dataset.level) === mapChoice[group.dataset.mapLevel]));
+    }
+  }
+}
 
 function setPlayers(count) {
   const max = store.rules ? store.rules.defaults.max_players : 14;
@@ -38,7 +79,15 @@ export function resetGameDialog() {
   const state = store.state;
   setPlayers(state.players.filter((p) => !p.barbarian).length);
   $('players-hint').textContent = `2 to ${store.rules.defaults.max_players}, plus the barbarians.`;
-  $('map-info').textContent = `Map ${store.map.width} × ${store.map.height}, random continents`;
+  $('map-info').textContent = `Map ${store.map.width} × ${store.map.height}`;
+  // The choices of the observer survive a new game; the defaults only apply the first time.
+  const shapes = store.rules.map_shapes;
+  if (!mapChoice || !shapes.some((s) => s.id === mapChoice.shape)) {
+    mapChoice = { ...store.rules.defaults.map };
+  }
+  $('map-shapes').innerHTML = shapes.map((s) =>
+    `<button data-shape="${s.id}" title="${s.description}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('');
+  refreshMapChoice();
   refreshSaves();
 }
 
@@ -54,7 +103,7 @@ export function openGameDialog(focus) {
 
 function startNewGame() {
   const seed = parseInt($('seed').value, 10);
-  send({ cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null, players });
+  send({ cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null, players, map: mapChoice });
   $('game-dialog').close();
 }
 
@@ -85,6 +134,20 @@ export function initDialogs() {
   $('btn-dice').addEventListener('click', () => {
     $('seed').value = 1 + Math.floor(Math.random() * 99999);
   });
+  $('map-shapes').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-shape]');
+    if (!button) return;
+    mapChoice.shape = button.dataset.shape;
+    refreshMapChoice();
+  });
+  for (const group of document.querySelectorAll('[data-map-level]')) {
+    group.addEventListener('click', (e) => {
+      const button = e.target.closest('[data-level]');
+      if (!button) return;
+      mapChoice[group.dataset.mapLevel] = Number(button.dataset.level);
+      refreshMapChoice();
+    });
+  }
   $('btn-start').addEventListener('click', startNewGame);
   $('seed').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startNewGame();

@@ -3,13 +3,16 @@
 
 import { F, U, store, tileIndex, player, emit, inkOn, swatch } from '../state.js';
 import { sprite } from './sprites.js';
+import { Ground } from './ground.js';
 
 const MIN_TILE = 10;
 const MAX_TILE = 96;
+const PAINT_BUDGET = 12;     // milliseconds a frame may spend painting new ground
 const DIRS8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
 const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const INK = '#0B0E13';
 const GOLD = '#E2B659';
+const RIVER = '#3D8FD6';
 const FONT = 'Geist, "Segoe UI", system-ui, sans-serif';
 export const MISSION_COLORS = {
   found_city: '#7bdc6a', improve: '#c9a25b', defend: '#6ab0ff', attack_city: '#ff5a4a',
@@ -39,6 +42,7 @@ export class MapView {
     this.dirty = false;
     this.hover = null;
     this.marker = null;      // a tile to point at, e.g. the event picked in the chronicle
+    this.ground = new Ground();
     this.onViewChange = () => {};
     this._bind();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
@@ -334,14 +338,20 @@ export class MapView {
     const explored = state.explored || null;
 
     // Terrain and what lies on it.
+    const painted = this._drawGround(ctx, range);
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const index = tileIndex(tx, ty);
-        if (explored && explored[index] === '0') continue;
         const px = this.screenX(tx);
         const py = this.screenY(ty);
         const size = this.screenX(tx + 1) - px;
-        this._drawTerrain(ctx, index, tx, ty, px, py, size);
+        if (explored && explored[index] === '0') {
+          ctx.fillStyle = '#06080B';
+          ctx.fillRect(px, py, size, size);
+          continue;
+        }
+        if (!painted(tx, ty)) this._drawFlat(ctx, index, px, py, size);
+        this._drawFeatures(ctx, index, tx, ty, px, py, size);
       }
     }
     // Territory, on top of the terrain but under cities and units.
@@ -378,22 +388,63 @@ export class MapView {
     this._drawSelection(ctx);
   }
 
-  _drawTerrain(ctx, index, tx, ty, px, py, size) {
-    const { map } = store;
-    const terrain = store.terrains[map.terrain[index]];
-    const flags = map.flags[index];
+  // Pastes the painted ground over the visible tiles. Returns a test telling whether a
+  // tile got its ground: chunks not painted within this frame's budget are left for the
+  // next one, and their tiles are drawn flat meanwhile.
+  _drawGround(ctx, range) {
+    const ground = this.ground;
+    const level = ground.levelFor(Math.round(this.tile * this.ratio));
+    if (!ground.ready(level)) return () => false;
+    ground.sync();
+    const tiles = ground.tilesPerChunk(level);
+    const deadline = performance.now() + PAINT_BUDGET;
+    let paintedNow = 0;
+    const mayPaint = () => paintedNow++ === 0 || performance.now() < deadline;
+    const missing = new Set();
     ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    for (let cy = Math.floor(range.y0 / tiles); cy * tiles <= range.y1; cy++) {
+      for (let cx = Math.floor(range.x0 / tiles); cx * tiles <= range.x1; cx++) {
+        const canvas = ground.chunk(level, cx * tiles, cy * tiles, mayPaint);
+        if (!canvas) {
+          missing.add(`${cx}:${cy}`);
+          continue;
+        }
+        const px = this.screenX(cx * tiles);
+        const py = this.screenY(cy * tiles);
+        ctx.drawImage(canvas, px, py, this.screenX((cx + 1) * tiles) - px, this.screenY((cy + 1) * tiles) - py);
+      }
+    }
+    if (!missing.size) return () => true;
+    this.invalidate();
+    return (tx, ty) => !missing.has(`${Math.floor(tx / tiles)}:${Math.floor(ty / tiles)}`);
+  }
 
+  _drawTerrain(ctx, index, tx, ty, px, py, size) {
+    this._drawFlat(ctx, index, px, py, size);
+    this._drawFeatures(ctx, index, tx, ty, px, py, size);
+  }
+
+  // The plain square tile: what the map shows until its ground is painted.
+  _drawFlat(ctx, index, px, py, size) {
+    const terrain = store.terrains[store.map.terrain[index]];
+    ctx.imageSmoothingEnabled = true;
     const base = terrain.base_sprite ? sprite('terrain', terrain.base_sprite) : null;
-    const isRiver = terrain.id === 'river';
-    const image = isRiver ? null : sprite('terrain', terrain.sprite);
+    const image = terrain.id === 'river' ? null : sprite('terrain', terrain.sprite);
     if (base) ctx.drawImage(base, px, py, size, size);
     if (image) ctx.drawImage(image, px, py, size, size);
     if (!base && !image) {
       ctx.fillStyle = terrain.color;
       ctx.fillRect(px, py, size, size);
     }
-    if (isRiver) this._drawRiver(ctx, tx, ty, px, py, size);
+  }
+
+  _drawFeatures(ctx, index, tx, ty, px, py, size) {
+    const { map } = store;
+    const terrain = store.terrains[map.terrain[index]];
+    const flags = map.flags[index];
+    ctx.imageSmoothingEnabled = true;
+    if (terrain.id === 'river') this._drawRiver(ctx, tx, ty, px, py, size);
 
     if (size < 14) return;        // too small for details
     // Icons sit lightly on the ground: smaller and a little translucent so the terrain still reads.
@@ -429,27 +480,56 @@ export class MapView {
     return store.terrains[map.terrain[tileIndex(tx, ty)]].id;
   }
 
+  // A river runs from edge to edge of its tile in a curve through the centre. Towards the
+  // sea it fades out across the shore instead, since the rounded coast is not on the edge.
   _drawRiver(ctx, tx, ty, px, py, size) {
     const cx = px + size / 2;
     const cy = py + size / 2;
-    ctx.strokeStyle = '#3d8fd6';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(2, size * 0.22);
-    let links = 0;
-    ctx.beginPath();
+    const ends = [];
+    const mouths = [];
     for (const [dx, dy] of DIRS4) {
       const other = this._terrainId(tx + dx, ty + dy);
-      if (other === 'river' || other === 'ocean') {
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + dx * size / 2, cy + dy * size / 2);
-        links++;
+      if (other === 'river') {
+        ends.push([cx + dx * size / 2, cy + dy * size / 2]);
+      } else if (other === 'ocean') {
+        const start = [cx + dx * size * 0.25, cy + dy * size * 0.25];
+        ends.push(start);
+        mouths.push([start, [cx + dx * size * 0.8, cy + dy * size * 0.8]]);
       }
     }
-    if (links) ctx.stroke();
-    ctx.fillStyle = '#3d8fd6';
+    ctx.strokeStyle = RIVER;
+    ctx.fillStyle = RIVER;
+    ctx.lineWidth = Math.max(2, size * 0.22);
+    if (!ends.length) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(1.5, size * 0.2), 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(cx, cy, Math.max(1.5, size * (links ? 0.11 : 0.2)), 0, Math.PI * 2);
-    ctx.fill();
+    if (ends.length === 1) {
+      ctx.moveTo(ends[0][0], ends[0][1]);
+      ctx.lineTo(cx, cy);
+    }
+    for (let i = 0; i < ends.length; i++) {
+      for (let j = i + 1; j < ends.length; j++) {
+        ctx.moveTo(ends[i][0], ends[i][1]);
+        ctx.quadraticCurveTo(cx, cy, ends[j][0], ends[j][1]);
+      }
+    }
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    for (const [from, to] of mouths) {
+      const fade = ctx.createLinearGradient(from[0], from[1], to[0], to[1]);
+      fade.addColorStop(0, RIVER);
+      fade.addColorStop(1, 'rgba(61, 143, 214, 0)');
+      ctx.strokeStyle = fade;
+      ctx.beginPath();
+      ctx.moveTo(from[0], from[1]);
+      ctx.lineTo(to[0], to[1]);
+      ctx.stroke();
+    }
   }
 
   _drawRoad(ctx, tx, ty, px, py, size, flags) {

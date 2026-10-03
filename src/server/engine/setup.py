@@ -9,16 +9,17 @@ from .mapgen.sites import site_scores
 from .model.entities import Player
 from .model.game import Game
 from .model.worldmap import Tile, WorldMap
-from .rules.schema import Rules
+from .rules.schema import MapSettings, Rules
 from .systems import visibility
 
 BARBARIANS = "barbarians"
 
 
 def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
-             player_count: Optional[int] = None) -> Game:
-    """Builds a game ready for turn 0. The same seed always gives the same game."""
-    world = generate_world(rules, seed)
+             player_count: Optional[int] = None,
+             map_settings: Optional[MapSettings] = None) -> Game:
+    """Builds a game ready for turn 0. The same seed and settings always give the same game."""
+    world = generate_world(rules, seed, map_settings)
     game = Game(rules, seed, world)
     rng = game.rng
 

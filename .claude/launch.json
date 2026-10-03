@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["run.py"],
       "port": 8005
+    },
+    {
+      "name": "civ-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["run.py", "--port", "8016"],
+      "port": 8016
     }
   ]
 }

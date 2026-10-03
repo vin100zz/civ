@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import dataclasses
 import time
 from collections import Counter
 from typing import Optional, Sequence
@@ -21,7 +22,7 @@ from ..ai.controller import AIController
 from ..engine import persistence
 from ..engine.model.game import Game
 from ..engine.rules.loader import load_rules
-from ..engine.rules.schema import Rules
+from ..engine.rules.schema import MapSettings, Rules
 from ..engine.setup import new_game
 from ..engine.systems import turn
 from .metrics import Metrics
@@ -34,8 +35,10 @@ def attach_ai(game: Game) -> None:
 
 
 def create_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
-                player_count: Optional[int] = None) -> Game:
-    game = new_game(rules, seed, civ_ids=civ_ids, player_count=player_count)
+                player_count: Optional[int] = None,
+                map_settings: Optional[MapSettings] = None) -> Game:
+    game = new_game(rules, seed, civ_ids=civ_ids, player_count=player_count,
+                    map_settings=map_settings)
     attach_ai(game)
     return game
 
@@ -49,8 +52,9 @@ def restore_game(rules: Rules, data: dict) -> Game:
 
 
 def run_game(rules: Rules, seed: int, turns: int, metrics: Optional[Metrics] = None,
-             every: int = 0, game: Optional[Game] = None) -> Game:
-    game = game or create_game(rules, seed)
+             every: int = 0, game: Optional[Game] = None,
+             map_settings: Optional[MapSettings] = None) -> Game:
+    game = game or create_game(rules, seed, map_settings=map_settings)
     for _ in range(turns):
         if game.finished:
             break
@@ -108,10 +112,19 @@ def main() -> None:
     parser.add_argument("--events", action="store_true", help="count events by type")
     parser.add_argument("--save", type=str, default=None, help="save the game here at the end")
     parser.add_argument("--load", type=str, default=None, help="continue this saved game")
+    parser.add_argument("--shape", type=str, default=None,
+                        help="map shape, one of map.shapes in config/game.yaml")
+    for name in ("relief", "climate", "temperature"):
+        parser.add_argument(f"--{name}", type=int, choices=(0, 1, 2), default=None)
     args = parser.parse_args()
 
     seeds = args.seeds if args.seeds else [args.seed if args.seed is not None else 1]
     rules = load_rules()
+    if args.shape is not None and args.shape not in rules.game.map.shapes:
+        parser.error(f"unknown shape '{args.shape}' (known: {', '.join(rules.game.map.shapes)})")
+    choices = {name: getattr(args, name) for name in ("shape", "relief", "climate", "temperature")}
+    map_settings = dataclasses.replace(
+        rules.game.map, **{name: value for name, value in choices.items() if value is not None})
     loaded = restore_game(rules, persistence.read_save(args.load)) if args.load else None
     if loaded is not None:
         seeds = [loaded.seed]
@@ -120,7 +133,8 @@ def main() -> None:
         metrics = Metrics()
         started = time.time()
         first_turn = loaded.turn if loaded is not None else 0
-        game = run_game(rules, seed, args.turns, metrics, args.every, game=loaded)
+        game = run_game(rules, seed, args.turns, metrics, args.every, game=loaded,
+                        map_settings=map_settings)
         elapsed = time.time() - started
         print(report(game))
         print(f"  {elapsed:.1f}s, {1000 * elapsed / max(1, game.turn - first_turn):.0f} ms/turn")

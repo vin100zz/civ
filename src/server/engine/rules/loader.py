@@ -299,6 +299,19 @@ def _validate(rules: Rules, resources_dir: Optional[Path]) -> None:
         c.error("game.yaml.players.start_rates: must be multiples of 10 that add up to 100")
     for domain in g.enabled_unit_domains:
         c.one_of(domain, schema.DOMAINS, "game.yaml.enabled_unit_domains")
+    c.ref(g.map.shape, g.map.shapes, "game.yaml.map.shape", "map shape")
+    for name in ("temperature", "climate", "relief"):
+        c.one_of(getattr(g.map, name), (0, 1, 2), f"game.yaml.map.{name}")
+    for shape_id, shape in g.map.shapes.items():
+        where = f"game.yaml.map.shapes.{shape_id}"
+        if not 0 <= shape.lakes < 1:
+            c.error(f"{where}.lakes: expected a share between 0 and 1")
+        for masses in shape.masses:
+            if masses.belt and masses.hollow:
+                c.error(f"{where}.masses: a belt cannot be hollow")
+            if masses.count < 1 or not 0 < masses.land < 1 or not 0 <= masses.hollow < 1:
+                c.error(f"{where}.masses: expected count >= 1, and land and hollow between "
+                        f"0 and 1")
     steps = g.calendar.steps
     if not steps or steps[-1].until is not None:
         c.error("game.yaml.calendar.steps: the last step must have 'until: null'")

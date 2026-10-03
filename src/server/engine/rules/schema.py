@@ -240,6 +240,23 @@ class CivDef:
 # ── game.yaml ─────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
+class LandMasses:
+    """A group of land masses of about the same size."""
+    count: int
+    land: float                       # share of the map covered by the whole group
+    hollow: float = 0.0               # 0..1: size of the inner sea in the middle of each mass
+    belt: bool = False                # the mass goes all around the world, from west to east
+
+
+@dataclass(frozen=True)
+class MapShape:
+    name: str
+    description: str
+    masses: tuple[LandMasses, ...] = ()       # empty: random continents of the original game
+    lakes: float = 0.0                        # share of the land turned into lakes
+
+
+@dataclass(frozen=True)
 class MapSettings:
     width: int
     height: int
@@ -248,6 +265,9 @@ class MapSettings:
     temperature: int
     climate: int
     age: int
+    relief: int
+    shape: str
+    shapes: dict[str, MapShape]
 
 
 @dataclass(frozen=True)

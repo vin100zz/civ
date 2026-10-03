@@ -3,14 +3,20 @@
 Source: OpenCivOne MapInitAndIntro.cs F7_0000_0012_GenerateMap, and MapManagement.cs for the
 special resource and hut patterns. The stages are kept in the original order; only the
 continent numbering (stage 6) is our own, because it has no gameplay effect.
+
+Our own additions are the map shapes other than the original continents (islands, a single
+continent, an inner sea...: see shapes.py) and the relief setting. With the default shape and
+relief, a seed gives the world of the original algorithm.
 """
 from __future__ import annotations
 
 import random
+from typing import Optional
 
 from ..model.worldmap import CARDINALS, DIRECTIONS, Tile, WorldMap
 from ..rules.schema import MapSettings, Rules
 from .continents import label_continents
+from .shapes import raise_shaped_land
 
 OCEAN, PLAINS, GRASSLAND, FOREST, HILLS, MOUNTAINS = (
     "ocean", "plains", "grassland", "forest", "hills", "mountains")
@@ -23,15 +29,40 @@ _RIVER_SOURCE_AREA = [(dx, dy) for dy in range(-2, 3) for dx in range(-2, 3)
                       if (dx, dy) != (0, 0) and not (abs(dx) == 2 and abs(dy) == 2)]
 
 
-def generate_world(rules: Rules, seed: int) -> WorldMap:
-    settings = rules.game.map
+# Relief setting (0 flat, 1 normal, 2 mountainous): share of the land raised into mountain
+# ranges before the climate, and share of the heights worn down after the erosion.
+_RANGES = (0.0, 0.0, 0.4)
+_WORN_DOWN = (0.6, 0.0, 0.0)
+# The original continents come with their hills; the other shapes start flat and get these.
+_RANGES_OF_SHAPES = 0.12
+# The rain of the original barely enters a large land mass, which stays covered with desert
+# and plains. On the other shapes, for each climate setting (0 dry, 1 normal, 2 wet): the
+# desert keeps at most this share of the land, and grassland gets at least this share of the
+# open land (plains and grassland).
+_DESERT_OF_SHAPES = (0.12, 0.06, 0.02)
+_GRASSLAND_OF_SHAPES = (0.42, 0.62, 0.78)
+
+
+def generate_world(rules: Rules, seed: int, settings: Optional[MapSettings] = None) -> WorldMap:
+    """The world of a seed. `settings` replaces the map settings of the rules."""
+    settings = settings or rules.game.map
+    shape = settings.shapes[settings.shape]
     rng = random.Random(seed)
     world = WorldMap(settings.width, settings.height, settings.wrap_x, OCEAN)
 
-    _raise_land(world, settings, rng)
+    if shape.masses:
+        raise_shaped_land(world, shape, rng)
+        _raise_ranges(world, _RANGES_OF_SHAPES + _RANGES[settings.relief], rng)
+    else:
+        _raise_land(world, settings, rng)
+        _raise_ranges(world, _RANGES[settings.relief], rng)
     _apply_temperature(world, settings, rng)
     _apply_climate(world, settings, rng)
+    if shape.masses:
+        _water_inland(world, _DESERT_OF_SHAPES[settings.climate],
+                      _GRASSLAND_OF_SHAPES[settings.climate], rng)
     _apply_age(world, settings, rng)
+    _wear_down(world, _WORN_DOWN[settings.relief], rng)
     _carve_rivers(world, settings, rng)
     _add_polar_caps(world, rng)
     label_continents(world, rules)
@@ -72,6 +103,25 @@ def _raise_land(world: WorldMap, settings: MapSettings, rng: random.Random) -> N
             elif tile.terrain == HILLS:
                 tile.terrain = MOUNTAINS
         raised += len(cloud)
+
+
+def _raise_ranges(world: WorldMap, share: float, rng: random.Random) -> None:
+    """Own: raises mountain ranges over that share of the land."""
+    land = [t for t in world.tiles if t.terrain != OCEAN]
+    to_raise = int(share * len(land))
+    while to_raise > 0 and land:
+        tile = land[rng.randrange(len(land))]
+        for _ in range(rng.randrange(12) + 1):          # one range: a short random walk
+            if tile.terrain == PLAINS:
+                tile.terrain = HILLS
+            elif tile.terrain == HILLS:
+                tile.terrain = MOUNTAINS
+            to_raise -= 1
+            dx, dy = DIRECTIONS[rng.randrange(8)]
+            ahead = world.tile(tile.x + dx, tile.y + dy)
+            if ahead is None or ahead.terrain == OCEAN:
+                break
+            tile = ahead
 
 
 # ── Stage 2: temperature ──────────────────────────────────────────────────────
@@ -145,6 +195,40 @@ def _apply_climate(world: WorldMap, settings: MapSettings, rng: random.Random) -
                     tile.terrain = PLAINS
 
 
+def _water_inland(world: WorldMap, desert_share: float, grassland_share: float,
+                  rng: random.Random) -> None:
+    """Own: patches of desert become plains, and patches of plains become grassland."""
+    def count(terrain: str) -> int:
+        return sum(1 for t in world.tiles if t.terrain == terrain)
+
+    land = len(world.tiles) - count(OCEAN)
+    _change_patches(world, DESERT, PLAINS, count(DESERT) - int(desert_share * land), rng)
+    plains, grassland = count(PLAINS), count(GRASSLAND)
+    _change_patches(world, PLAINS, GRASSLAND,
+                    int(grassland_share * (plains + grassland)) - grassland, rng)
+
+
+def _change_patches(world: WorldMap, terrain: str, becomes: str, wanted: int,
+                    rng: random.Random) -> None:
+    """Turns about `wanted` tiles of a terrain into another one, in patches."""
+    tiles = [t for t in world.tiles if t.terrain == terrain]
+    for _ in range(len(tiles) * 4):
+        if wanted <= 0:
+            break
+        tile = tiles[rng.randrange(len(tiles))]
+        for _ in range(rng.randrange(16) + 1):          # one patch: a short random walk
+            for dx, dy in ((0, 0),) + CARDINALS:
+                near = world.tile(tile.x + dx, tile.y + dy)
+                if near is not None and near.terrain == terrain:
+                    near.terrain = becomes
+                    wanted -= 1
+            dx, dy = CARDINALS[rng.randrange(4)]
+            ahead = world.tile(tile.x + dx, tile.y + dy)
+            if ahead is None or ahead.terrain == OCEAN:
+                break
+            tile = ahead
+
+
 # ── Stage 4: age (erosion) ────────────────────────────────────────────────────
 
 _AGING = {
@@ -171,6 +255,15 @@ def _apply_age(world: WorldMap, settings: MapSettings, rng: random.Random) -> No
                 tile.terrain = OCEAN
         elif tile.terrain in _AGING:
             tile.terrain = _AGING[tile.terrain]
+
+
+def _wear_down(world: WorldMap, share: float, rng: random.Random) -> None:
+    """Own: lowers that share of the mountains and hills by one level."""
+    if share <= 0:
+        return
+    for tile in world.tiles:
+        if tile.terrain in (HILLS, MOUNTAINS) and rng.random() < share:
+            tile.terrain = PLAINS if tile.terrain == HILLS else HILLS
 
 
 # ── Stage 5: rivers ───────────────────────────────────────────────────────────

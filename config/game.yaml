@@ -7,10 +7,60 @@ map:
   height: 50
   wrap_x: true
   # World generation parameters, each 0..2 like the original "customize world" menu.
-  land_mass: 1
-  temperature: 1
-  climate: 1
+  land_mass: 1            # only used by the shapes without `masses` (the original algorithm)
+  temperature: 1          # 0 cold, 2 hot
+  climate: 1              # 0 dry, 2 wet
   age: 1
+  relief: 1               # own: 0 flat, 2 mountainous
+  # Defaults of the "new game" dialog; the observer can pick another shape, relief,
+  # climate and temperature for each game.
+  shape: continents
+  # Own. A shape without `masses` uses the random continents of the original game. Otherwise
+  # each entry of `masses` is a group of `count` land masses that covers the share `land` of
+  # the map, kept apart from the others by the sea; `hollow` (0..1) leaves an inner sea in
+  # their middle, `belt` makes a mass go all around the world and `lakes` is the share of
+  # the land turned into lakes.
+  shapes:
+    continents:
+      name: Continents
+      description: Random continents and islands, as in the original game.
+    small_islands:
+      name: Small islands
+      description: About twenty small islands. Ships matter from the start.
+      masses: [{count: 20, land: 0.19}]
+    medium_islands:
+      name: Medium islands
+      description: Ten islands with room for a few cities each.
+      masses: [{count: 10, land: 0.23}]
+    large_islands:
+      name: Large islands
+      description: Five large islands, about one for each great power.
+      masses: [{count: 5, land: 0.26}]
+    two_continents:
+      name: Two continents
+      description: An old world and a new world, apart.
+      masses: [{count: 2, land: 0.28}]
+    continents_islands:
+      name: Continents and islands
+      description: Three continents surrounded by small islands.
+      masses: [{count: 3, land: 0.21}, {count: 9, land: 0.07}]
+    pangaea:
+      name: One continent
+      description: A single huge continent. Everybody meets by land.
+      masses: [{count: 1, land: 0.3}]
+    pangaea_lakes:
+      name: Continent with lakes
+      description: A single huge continent, dotted with lakes.
+      masses: [{count: 1, land: 0.33}]
+      lakes: 0.09
+    world_belt:
+      name: World belt
+      description: A continent that goes all around the world, between two oceans.
+      masses: [{count: 1, land: 0.36, belt: true}]
+    inner_sea:
+      name: Inner sea
+      description: A ring of land around a central sea.
+      masses: [{count: 1, land: 0.27, hollow: 0.5}]
 
 calendar:
   start_year: -4000

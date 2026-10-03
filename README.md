@@ -16,7 +16,7 @@ Puis ouvrir http://127.0.0.1:8005. Sous Windows, `start.bat` fait la même chose
 Dans l'interface :
 
 - **Play / Step / Speed** : lecture continue, tour par tour, vitesse. Espace = lecture/pause, N = un tour.
-- **New game, Save, Saved games** : ouvrent la fenêtre « Game ». Nouvelle partie (la même graine redonne exactement la même partie), enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
+- **New game, Save, Saved games** : ouvrent la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
 - **Sur la carte** : « View as » pour voir le monde comme une civilisation (brouillard compris), les calques Territory / Grid / AI missions, le zoom et la mini-carte. Sous ces boutons : cases polluées, niveau de réchauffement, vaisseaux en vol.
 - **Rail de droite** : World (classement des civilisations), Empire, City, Science, History, Chronicle. Science et History occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.
 - **Clic sur une ville** : production, citoyens, cases exploitées, pollution, et pourquoi l'IA a choisi cette production.
@@ -40,6 +40,12 @@ python simulate.py --seed 7 --turns 300 --save saves/seed7.json
 ```bash
 python simulate.py --load saves/seed7.json --turns 100
 ```
+
+```bash
+python simulate.py --seed 7 --turns 300 --shape small_islands --relief 2 --climate 0
+```
+
+`--shape` prend une des formes de `map.shapes` dans `config/game.yaml` (on peut en ajouter) ; `--relief` et `--climate` vont de 0 à 2.
 
 Une sauvegarde faite ici se charge aussi dans l'interface (et inversement).
 

@@ -18,6 +18,9 @@ from ..engine.systems import production, research
 F_SPECIAL, F_PATTERN, F_HUT, F_ROAD, F_RAILROAD, F_IRRIGATION, F_MINE, F_FORTRESS, F_POLLUTION = (
     1, 2, 4, 8, 16, 32, 64, 128, 256)
 
+# Map settings the observer picks for a new game, each from 0 to 2.
+MAP_LEVELS = ("relief", "climate")
+
 
 def rules_payload(rules: Rules) -> dict[str, Any]:
     """Static data the client needs to draw and label things."""
@@ -51,7 +54,12 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
                              "ideology": c.personality.ideology}}
             for c in rules.civs.values()],
         "defaults": {"players": rules.game.players.count,
-                     "max_players": len(rules.playable_civs)},
+                     "max_players": len(rules.playable_civs),
+                     "map": {"shape": rules.game.map.shape,
+                             **{name: getattr(rules.game.map, name) for name in MAP_LEVELS}}},
+        "map_shapes": [
+            {"id": shape_id, "name": shape.name, "description": shape.description}
+            for shape_id, shape in rules.game.map.shapes.items()],
         "spaceship": {"min_parts": dict(rules.game.spaceship.min_parts),
                       "max_parts": dict(rules.game.spaceship.max_parts)},
         "max_turns": rules.game.calendar.max_turns,

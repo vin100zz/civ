@@ -145,6 +145,29 @@
             <span id="players-hint" class="sub"></span>
           </div>
         </div>
+        <div class="field">
+          <span id="shape-label" class="field-label">World</span>
+          <div id="map-shapes" class="shapes" role="group" aria-labelledby="shape-label"></div>
+          <span id="shape-hint" class="sub"></span>
+        </div>
+        <div class="fields">
+          <div class="field">
+            <span id="relief-label" class="field-label">Relief</span>
+            <div class="seg fill" data-map-level="relief" role="group" aria-labelledby="relief-label">
+              <button data-level="0">Flat</button>
+              <button data-level="1">Normal</button>
+              <button data-level="2">Mountainous</button>
+            </div>
+          </div>
+          <div class="field">
+            <span id="climate-label" class="field-label">Climate</span>
+            <div class="seg fill" data-map-level="climate" role="group" aria-labelledby="climate-label">
+              <button data-level="0">Dry</button>
+              <button data-level="1">Normal</button>
+              <button data-level="2">Wet</button>
+            </div>
+          </div>
+        </div>
         <div class="dialog-foot">
           <span id="map-info" class="sub"></span>
           <button class="btn ghost tall" data-close>Cancel</button>

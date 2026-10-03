@@ -21,6 +21,8 @@ def test_static_files_and_rules(client):
     rules = client.get("/api/rules").json()
     assert len(rules["units"]) == 28 and len(rules["terrains"]) == 12
     assert {"id", "name", "color"} <= set(rules["civs"][0])
+    assert rules["defaults"]["map"] == {"shape": "continents", "relief": 1, "climate": 1}
+    assert {"continents", "small_islands", "pangaea"} <= {s["id"] for s in rules["map_shapes"]}
 
 
 def test_observer_session(client):
@@ -96,3 +98,22 @@ def test_save_and_load(client):
 
         socket.send_json({"cmd": "load", "name": "unknown"})
         assert socket.receive_json()["ok"] is False
+
+
+def test_new_game_with_a_chosen_map(client):
+    def land_masses(init):
+        return len({c for c in init["map"]["continent"] if c > 0})
+
+    with client.websocket_connect("/ws") as socket:
+        socket.receive_json()
+        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3})
+        default = socket.receive_json()
+        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+                          "map": {"shape": "small_islands", "relief": 2, "climate": 0}})
+        islands = socket.receive_json()
+        assert islands["state"]["seed"] == 5
+        assert islands["map"]["terrain"] != default["map"]["terrain"]
+        # Invalid choices fall back on the defaults of the rules.
+        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+                          "map": {"shape": ["atlantis"], "relief": 9, "climate": 1.0}})
+        assert socket.receive_json()["map"]["terrain"] == default["map"]["terrain"]

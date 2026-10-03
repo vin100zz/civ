@@ -7,6 +7,7 @@ the `saves` folder and loads it back.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import random
 import re
 from collections import deque
@@ -18,7 +19,7 @@ from fastapi import WebSocket
 from ..engine import persistence
 from ..engine.model.game import Game
 from ..engine.rules.loader import PROJECT_ROOT
-from ..engine.rules.schema import Rules
+from ..engine.rules.schema import MapSettings, Rules
 from ..engine.systems import turn
 from ..sim.runner import create_game, restore_game
 from . import serialize
@@ -44,14 +45,31 @@ class Session:
 
     # ── Game control ──────────────────────────────────────────────────────────
 
-    def new_game(self, seed: int, players: Optional[int] = None) -> None:
+    def new_game(self, seed: int, players: Optional[int] = None,
+                 map_settings: Optional[MapSettings] = None) -> None:
         self.playing = False
-        self.game = create_game(self.rules, seed, player_count=players)
+        self.game = create_game(self.rules, seed, player_count=players,
+                                map_settings=map_settings)
         self.game.changed_tiles.clear()
         self.history = [self._history_row()]
         self.log.clear()
         for client in self.clients:
             self.clients[client] = None
+
+    def _map_settings(self, choices: Any) -> MapSettings:
+        """The map settings of the rules, with the valid choices of the observer."""
+        settings = self.rules.game.map
+        if not isinstance(choices, dict):
+            return settings
+        changes: dict[str, Any] = {}
+        shape = choices.get("shape")
+        if isinstance(shape, str) and shape in settings.shapes:
+            changes["shape"] = shape
+        for name in serialize.MAP_LEVELS:
+            level = choices.get(name)
+            if type(level) is int and 0 <= level <= 2:
+                changes[name] = level
+        return dataclasses.replace(settings, **changes)
 
     def _history_row(self) -> dict:
         game = self.game
@@ -179,8 +197,9 @@ class Session:
             players = message.get("players")
             if not isinstance(players, int) or not 2 <= players <= len(self.rules.playable_civs):
                 players = None
+            map_settings = self._map_settings(message.get("map"))
             async with self._busy:
-                self.new_game(seed, players)
+                self.new_game(seed, players, map_settings)
             await self.broadcast_init()
         elif command == "save":
             name = message.get("name")
