@@ -18,7 +18,11 @@ export const play = {
   later: [],            // units sent to the back of the queue (W)
   endAsked: 0,          // when Enter was first pressed while units still waited
   disbandAsked: 0,
+  queued: 0,            // units that were waiting for orders after the last order
+  ending: false,        // the last unit has its orders: the turn is about to end by itself
+  carry: null,          // events of the order that ended the turn, told again at the next one
 };
+const AUTO_END_MS = 450;        // time to see the last move before the others play
 
 const WORK = ['road', 'railroad', 'irrigate', 'mine', 'fortress', 'clean'];
 // Key -> the orders it gives, the first one the unit can take wins.
@@ -108,6 +112,38 @@ export function skip() {
   if (play.unit === null) return;
   play.skipped.add(play.unit);
   next();
+  settle();
+}
+
+// What still asks for the person's decision: idle cities, research to choose, peace proposals.
+export function pendingDecisions() {
+  const me = store.state.me;
+  if (leader() === null || !me) return 0;
+  return store.state.cities.filter((city) => city.owner === me.id && city.idle).length
+    + (me.researching === null && me.research_options.length ? 1 : 0) + me.proposals.length;
+}
+
+// As in the original game, the turn ends by itself once the last unit has its orders,
+// unless a decision is still waiting. A turn with no unit to move is ended by the person:
+// only an order that empties the queue ends the turn.
+function settle(events = []) {
+  const before = play.queued;
+  play.queued = queue().length;
+  if (before === 0 || play.queued > 0 || play.waiting || play.ending || pendingDecisions()) return;
+  const turn = `${store.state.seed}:${store.state.turn}`;
+  play.ending = true;
+  play.carry = events;
+  emit('play');
+  setTimeout(() => {
+    play.ending = false;
+    const same = store.state && `${store.state.seed}:${store.state.turn}` === turn;
+    if (leader() !== null && same && !play.waiting && !queue().length && !pendingDecisions()) {
+      finishTurn();
+    } else {
+      play.carry = null;
+      emit('play');
+    }
+  }, AUTO_END_MS);
 }
 
 // ── Orders ──────────────────────────────────────────────────────────────────
@@ -181,6 +217,11 @@ export function endTurn() {
     return;
   }
   play.endAsked = 0;
+  play.carry = null;
+  finishTurn();
+}
+
+function finishTurn() {
   play.waiting = true;
   play.mode = null;
   play.preview = null;
@@ -321,13 +362,16 @@ function reset() {
 
 on('init', () => {
   reset();
+  play.carry = null;
   if (leader() !== null) next();
+  play.queued = queue().length;
 });
 
 on('turn', () => {
   if (leader() === null) return;
   reset();
   next();
+  play.queued = queue().length;
 });
 
 on('update', (message) => {
@@ -340,16 +384,15 @@ on('update', (message) => {
   // The active unit is gone, spent, or busy with what it was just told: on to the next one.
   if (play.unit !== null && (!unit || (message.unit === play.unit && message.ok && !awaitsOrders(unit)))) {
     next();
-    return;
-  }
-  if (play.unit === null && queue().length) {
+  } else if (play.unit === null && queue().length) {
     next();
-    return;
+  } else {
+    play.preview = null;
+    play.hovered = null;
+    syncHud();
+    emit('play');
   }
-  play.preview = null;
-  play.hovered = null;
-  syncHud();
-  emit('play');
+  settle(message.events);
 });
 
 on('unit', (detail) => {

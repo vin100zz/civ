@@ -223,7 +223,7 @@ Une IA qui propose la paix au joueur n'obtient pas de réponse immédiate : la p
 
 ### Interface
 
-Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran, celles des autres civilisations comprises quand elles sont en vue.
+Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Le tour se termine de lui-même quand la dernière unité a reçu son ordre, sauf décision en attente ; sans unité à déplacer, c'est au joueur de le finir. L'unité active clignote, comme dans l'original (pas de clignotement si le système demande de réduire les animations). Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran, celles des autres civilisations comprises quand elles sont en vue.
 
 ## 6. Jalons
 

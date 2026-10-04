@@ -18,6 +18,7 @@ import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
 import {
   play, activate, endTurn, handleKey, clickTile, sendTo, hoverTile, queue, activeUnit, setMode,
+  pendingDecisions,
 } from './play.js';
 import {
   initDialogs, openGameDialog, resetGameDialog, refreshSaves, setDialogStatus, showGameOver,
@@ -189,17 +190,17 @@ function refreshPlayBar() {
 
   // What still asks for the person before the turn can end with a clear conscience.
   const left = queue().length;
-  const pending = store.state.cities.filter((city) => city.owner === me.id && city.idle).length
-    + (me.researching === null && me.research_options.length ? 1 : 0) + me.proposals.length;
+  const pending = pendingDecisions();
   const button = $('btn-end-turn');
-  const ready = !left && !pending && !play.waiting;
+  const ready = !left && !pending && !play.waiting && !play.ending;
   button.classList.toggle('primary', ready);
-  button.disabled = play.waiting;
+  button.disabled = play.waiting || play.ending;
   const status = $('turn-status');
   status.className = `turn-status play-only${ready ? ' ready' : ''}`;
   status.innerHTML = `<i></i>${play.waiting ? 'The others are playing…'
-    : left ? `${plural(left, 'unit')} waiting`
-      : pending ? `${plural(pending, 'decision')} to make` : 'Nothing left to do'}`;
+    : play.ending ? 'Ending the turn…'
+      : left ? `${plural(left, 'unit')} waiting`
+        : pending ? `${plural(pending, 'decision')} to make` : 'End the turn when ready'}`;
 }
 
 function refreshBanner() {
@@ -285,10 +286,14 @@ function announce(events, lasting) {
 // Start of the person's turn: what happened, then the questions waiting for an answer.
 function openTurn(message) {
   const state = store.state;
+  // What the order that ended the last turn by itself brought is told again: it had no time to be read.
+  const carried = play.carry || [];
+  play.carry = null;
   clearToasts();
-  setTurnMessages(message.events);
+  setTurnMessages([...carried, ...message.events]);
   for (const alert of state.alerts || []) toast({ text: alert.text, tone: 'bad', x: alert.x, y: alert.y });
   for (const note of state.notes || []) toast({ text: note.text, tone: 'info', x: note.x, y: note.y });
+  announce(carried, true);
   announce(message.events, true);
   const found = message.events.find((e) => e.type === 'tech' && e.player === leader() && e.how === 'discover');
   prompted.discovered = found ? found.tech : null;

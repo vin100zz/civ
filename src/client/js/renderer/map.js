@@ -27,6 +27,8 @@ const ORDER_MARK = {
 const TASK_MARK = { goto: 'G', explore: 'X', work: 'A' };
 const BAD = '#F2756A';
 const SLIDE_MS = 160;         // a unit sliding to the next tile after an order
+const BLINK_ON_MS = 520;      // the unit waiting for orders shows this long...
+const BLINK_OFF_MS = 280;     // ...then hides this long, as in the original game
 
 function roundRect(ctx, x, y, w, h, radius) {
   ctx.beginPath();
@@ -55,6 +57,8 @@ export class MapView {
     // Html about sending the active unit to a tile: null for the usual tooltip, '' for none.
     this.describeMove = () => null;
     this.slides = new Map();            // unit id -> {x0, y0, x1, y1, start, duration}
+    this.blink = { key: null, since: 0, timer: null };
+    this.still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this._bind();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     this.resize();
@@ -415,6 +419,7 @@ export class MapView {
     if (store.options.grid && ts >= 16) this._drawGrid(ctx, range);
 
     const sliding = this._advanceSlides();
+    const hidden = this._blinkedOut();      // the active unit, while its blink hides it
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const index = tileIndex(tx, ty);
@@ -424,9 +429,19 @@ export class MapView {
         const size = this.screenX(tx + 1) - px;
         const city = store.cityAt.get(index);
         const all = store.unitsAt.get(index);
-        const units = all && sliding ? all.filter((unit) => !this.slides.has(unit[U.ID])) : all;
-        if (city) this._drawCity(ctx, city, all, px, py, size);
-        else if (units && units.length) this._drawUnits(ctx, units, px, py, size);
+        const units = all && (sliding || hidden !== null)
+          ? all.filter((unit) => !this.slides.has(unit[U.ID]) && unit[U.ID] !== hidden) : all;
+        if (city) {
+          this._drawCity(ctx, city, all, px, py, size);
+          // In a city the unit waiting for orders shows over it, and blinks there.
+          const active = store.hud.unit;
+          if (active && active[U.ID] !== hidden && all && all.includes(active)
+              && !this.slides.has(active[U.ID])) {
+            this._drawUnits(ctx, [active], px, py, size);
+          }
+        } else if (units && units.length) {
+          this._drawUnits(ctx, units, px, py, size);
+        }
         if (explored && explored[index] === '1') {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
           ctx.fillRect(px, py, size, size);
@@ -464,6 +479,25 @@ export class MapView {
       this.slides.set(id, { x0: x1 - dx, y0, x1, y1, start: now, duration });
     }
     if (this.slides.size) this.invalidate();
+  }
+
+  // The id of the active unit while its blink hides it, else null. The blink starts over,
+  // unit showing, each time the active unit changes or moves; a timer keeps it going.
+  _blinkedOut() {
+    const unit = store.hud.unit;
+    const blink = this.blink;
+    const key = unit ? `${unit[U.ID]}:${unit[U.X]}:${unit[U.Y]}` : null;
+    if (key !== blink.key) {
+      blink.key = key;
+      blink.since = performance.now();
+    }
+    clearTimeout(blink.timer);
+    if (!unit || this.still || this.slides.has(unit[U.ID])) return null;
+    const phase = (performance.now() - blink.since) % (BLINK_ON_MS + BLINK_OFF_MS);
+    const showing = phase < BLINK_ON_MS;
+    blink.timer = setTimeout(() => this.invalidate(),
+      (showing ? BLINK_ON_MS : BLINK_ON_MS + BLINK_OFF_MS) - phase + 1);
+    return showing ? null : unit[U.ID];
   }
 
   // Drops the slides that are over. Returns true while some unit is still sliding.

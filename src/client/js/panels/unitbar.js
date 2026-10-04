@@ -3,7 +3,7 @@
 
 import { store, U, player, leader, plural } from '../state.js';
 import { icon } from '../icons.js';
-import { play, activeUnit, queue, give, keyOf, wait, skip, activate, endTurn } from '../play.js';
+import { play, activeUnit, queue, give, keyOf, wait, skip, activate, endTurn, pendingDecisions } from '../play.js';
 
 // Order id -> [label, icon].
 const LOOK = {
@@ -76,12 +76,16 @@ function idle(container) {
   const note = waiting ? '' : next.length
     ? `${next.map((city) => city.name).slice(0, 3).join(', ')} ${next.length === 1 ? 'finishes' : 'finish'} building next turn.`
     : '';
+  const pending = pendingDecisions();
+  const title = waiting ? 'The other civilizations are playing…'
+    : play.ending ? 'Every unit has its orders: the turn ends'
+      : pending ? `No unit to move · ${plural(pending, 'decision')} to make first` : 'No unit to move';
   container.className = 'glass play-only idle';
   container.innerHTML = `
-    <span class="mark ${waiting ? '' : 'good'}">${icon(waiting ? 'hourglass' : 'check', 20, 2)}</span>
-    <b>${waiting ? 'The other civilizations are playing…' : 'Every unit has its orders'}</b>
-    <span class="sub">${note}</span>
-    ${waiting ? '' : `<button class="btn primary" data-end>${icon('arrow', 16, 2.2)}<span>End turn</span><span class="kbd">Enter</span></button>`}`;
+    <span class="mark ${waiting || pending ? '' : 'good'}">${icon(waiting || play.ending ? 'hourglass' : 'check', 20, 2)}</span>
+    <b>${title}</b>
+    <span class="sub">${play.ending ? '' : note}</span>
+    ${waiting || play.ending ? '' : `<button class="btn${pending ? '' : ' primary'}" data-end>${icon('arrow', 16, 2.2)}<span>End turn</span><span class="kbd">Enter</span></button>`}`;
   const end = container.querySelector('[data-end]');
   if (end) end.addEventListener('click', endTurn);
 }
