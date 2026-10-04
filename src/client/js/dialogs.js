@@ -1,7 +1,8 @@
-// The "Game" dialog (new game, saved games) and the end-of-game screen.
+// The dialogs: "Game" (new game, saved games), the choice of an advance, the messages that
+// ask the person for an answer, and the end-of-game screen.
 
 import { send } from './net.js';
-import { store, emit, player, yearLabel, inkOn, swatch } from './state.js';
+import { store, emit, player, yearLabel, inkOn, swatch, civColor, plural, turnsFor } from './state.js';
 import { icon } from './icons.js';
 import { governmentName } from './panels/civs.js';
 
@@ -11,8 +12,8 @@ const VICTORY = {
   spaceship: ['Spaceship victory', 'reach Alpha Centauri', 'rocket'],
   score: ['Victory on score', 'have the greatest civilization', 'trophy'],
 };
-let players = 7;
-let mapChoice = null;         // shape, relief and climate of the next new game
+// The choices of the next new game. They survive from one game to the next.
+const choice = { mode: 'play', civ: null, level: null, players: 7, map: null, tab: 'new' };
 
 // Pictogram of each map shape: [cx, cy, rx, ry] blobs in a 36 x 22 box. A blob drawn inside
 // another one is a hole (a lake, an inner sea).
@@ -40,24 +41,59 @@ function shapeGlyph(id) {
   return `<svg viewBox="0 0 36 22" aria-hidden="true"><path d="${path}" fill="currentColor" fill-rule="evenodd"/></svg>`;
 }
 
-function refreshMapChoice() {
-  for (const button of $('map-shapes').children) {
-    button.setAttribute('aria-pressed', String(button.dataset.shape === mapChoice.shape));
+function show(dialog) {
+  if (!dialog.open) dialog.showModal();
+}
+
+// ── "Game": new game and saved games ─────────────────────────────────────────
+
+function playableCivs() {
+  return store.rules.civs.filter((civ) => civ.playable);
+}
+
+function refreshChoices() {
+  const playing = choice.mode === 'play';
+  for (const button of $('game-mode').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.mode === choice.mode));
   }
-  const shape = store.rules.map_shapes.find((s) => s.id === mapChoice.shape);
+  document.querySelectorAll('[data-play-field]').forEach((field) => { field.hidden = !playing; });
+  for (const button of $('civ-grid').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.civ === choice.civ));
+  }
+  for (const button of $('levels').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.level === choice.level));
+  }
+  for (const button of $('map-shapes').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.shape === choice.map.shape));
+  }
+  const shape = store.rules.map_shapes.find((s) => s.id === choice.map.shape);
   $('shape-hint').textContent = shape ? shape.description : '';
   for (const group of document.querySelectorAll('[data-map-level]')) {
     for (const button of group.children) {
       button.setAttribute('aria-pressed',
-        String(Number(button.dataset.level) === mapChoice[group.dataset.mapLevel]));
+        String(Number(button.dataset.level) === choice.map[group.dataset.mapLevel]));
     }
   }
+  $('players').textContent = choice.players;
+  const max = store.rules.defaults.max_players;
+  $('players-hint').textContent = playing
+    ? `You and ${plural(choice.players - 1, 'opponent')}, plus the barbarians.`
+    : `2 to ${max}, plus the barbarians.`;
+  const civ = playableCivs().find((c) => c.id === choice.civ);
+  $('btn-start').textContent = !playing ? 'Start new game'
+    : civ ? `Play as the ${civ.nation}` : 'Play a civilization drawn at random';
+
+  for (const button of $('game-tabs').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.gameTab === choice.tab));
+  }
+  $('game-new').hidden = choice.tab !== 'new';
+  $('game-saves').hidden = choice.tab !== 'saves';
+  $('btn-start').hidden = choice.tab !== 'new';
 }
 
 function setPlayers(count) {
-  const max = store.rules ? store.rules.defaults.max_players : 14;
-  players = Math.min(max, Math.max(2, count));
-  $('players').textContent = players;
+  choice.players = Math.min(store.rules ? store.rules.defaults.max_players : 14, Math.max(2, count));
+  refreshChoices();
 }
 
 export function setDialogStatus(text, tone = '') {
@@ -74,28 +110,33 @@ export function refreshSaves() {
     || '<div class="save-none">No saved game yet. Saves appear here, most recent first.</div>';
 }
 
-// Called for each new set of rules and game: defaults of the form.
+// Called for each new set of rules and game: fills the form, keeps the person's choices.
 export function resetGameDialog() {
-  const state = store.state;
-  setPlayers(state.players.filter((p) => !p.barbarian).length);
-  $('players-hint').textContent = `2 to ${store.rules.defaults.max_players}, plus the barbarians.`;
-  $('map-info').textContent = `Map ${store.map.width} × ${store.map.height}`;
-  // The choices of the observer survive a new game; the defaults only apply the first time.
-  const shapes = store.rules.map_shapes;
-  if (!mapChoice || !shapes.some((s) => s.id === mapChoice.shape)) {
-    mapChoice = { ...store.rules.defaults.map };
+  const rules = store.rules;
+  if (!choice.map || !rules.map_shapes.some((s) => s.id === choice.map.shape)) {
+    choice.map = { ...rules.defaults.map };
+    choice.players = rules.defaults.players;
   }
-  $('map-shapes').innerHTML = shapes.map((s) =>
+  if (!rules.levels.some((level) => level.id === choice.level)) choice.level = rules.defaults.level;
+  if (!playableCivs().some((civ) => civ.id === choice.civ)) choice.civ = null;
+  $('civ-grid').innerHTML = playableCivs().map((civ) => `
+    <button data-civ="${civ.id}">${swatch(civColor(civ.id, civ.color))}
+      <span class="who"><b>${civ.nation}</b><small>${civ.leader}</small></span>${icon('check', 16, 2.4)}</button>`).join('');
+  $('levels').innerHTML = rules.levels.map((level) =>
+    `<button data-level="${level.id}">${level.name}</button>`).join('');
+  $('map-shapes').innerHTML = rules.map_shapes.map((s) =>
     `<button data-shape="${s.id}" title="${s.description}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('');
-  refreshMapChoice();
+  refreshChoices();
   refreshSaves();
 }
 
 export function openGameDialog(focus) {
   const dialog = $('game-dialog');
+  choice.tab = focus === 'save' ? 'saves' : 'new';
   if (store.state) $('save-name').value = `seed${store.state.seed}-turn${store.state.turn}`;
-  setDialogStatus('Loading a save replaces the current game for every connected observer.');
-  if (!dialog.open) dialog.showModal();
+  setDialogStatus(`Map ${store.map.width} × ${store.map.height} · a new or loaded game replaces the current one.`);
+  refreshChoices();
+  show(dialog);
   const field = $(focus === 'save' ? 'save-name' : 'seed');
   field.focus();
   field.select();
@@ -103,7 +144,15 @@ export function openGameDialog(focus) {
 
 function startNewGame() {
   const seed = parseInt($('seed').value, 10);
-  send({ cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null, players, map: mapChoice });
+  const message = { cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null,
+    players: choice.players, map: choice.map };
+  if (choice.mode === 'play') {
+    const civs = playableCivs();
+    message.mode = 'play';
+    message.civ = choice.civ || civs[Math.floor(Math.random() * civs.length)].id;
+    message.level = choice.level;
+  }
+  send(message);
   $('game-dialog').close();
 }
 
@@ -116,6 +165,16 @@ function save() {
   send({ cmd: 'save', name });
 }
 
+// Makes `handler(button)` answer the clicks on the buttons of a group carrying `attribute`.
+function pick(group, attribute, handler) {
+  group.addEventListener('click', (e) => {
+    const button = e.target.closest(`[${attribute}]`);
+    if (!button) return;
+    handler(button);
+    refreshChoices();
+  });
+}
+
 export function initDialogs() {
   const dialog = $('game-dialog');
   document.querySelectorAll('dialog [data-close]').forEach((button) => {
@@ -126,28 +185,30 @@ export function initDialogs() {
     let pressed = false;
     element.addEventListener('mousedown', (e) => { pressed = e.target === element; });
     element.addEventListener('click', (e) => {
-      if (pressed && e.target === element) element.close();
+      if (pressed && e.target === element && !element.dataset.modal) element.close();
     });
   }
-  $('players-less').addEventListener('click', () => setPlayers(players - 1));
-  $('players-more').addEventListener('click', () => setPlayers(players + 1));
+  pick($('game-tabs'), 'data-game-tab', (button) => { choice.tab = button.dataset.gameTab; });
+  pick($('game-mode'), 'data-mode', (button) => { choice.mode = button.dataset.mode; });
+  pick($('civ-grid'), 'data-civ', (button) => {
+    choice.civ = choice.civ === button.dataset.civ ? null : button.dataset.civ;
+  });
+  pick($('levels'), 'data-level', (button) => { choice.level = button.dataset.level; });
+  pick($('map-shapes'), 'data-shape', (button) => { choice.map.shape = button.dataset.shape; });
+  for (const group of document.querySelectorAll('[data-map-level]')) {
+    pick(group, 'data-level', (button) => {
+      choice.map[group.dataset.mapLevel] = Number(button.dataset.level);
+    });
+  }
+  $('civ-random').addEventListener('click', () => {
+    choice.civ = null;
+    refreshChoices();
+  });
+  $('players-less').addEventListener('click', () => setPlayers(choice.players - 1));
+  $('players-more').addEventListener('click', () => setPlayers(choice.players + 1));
   $('btn-dice').addEventListener('click', () => {
     $('seed').value = 1 + Math.floor(Math.random() * 99999);
   });
-  $('map-shapes').addEventListener('click', (e) => {
-    const button = e.target.closest('[data-shape]');
-    if (!button) return;
-    mapChoice.shape = button.dataset.shape;
-    refreshMapChoice();
-  });
-  for (const group of document.querySelectorAll('[data-map-level]')) {
-    group.addEventListener('click', (e) => {
-      const button = e.target.closest('[data-level]');
-      if (!button) return;
-      mapChoice[group.dataset.mapLevel] = Number(button.dataset.level);
-      refreshMapChoice();
-    });
-  }
   $('btn-start').addEventListener('click', startNewGame);
   $('seed').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startNewGame();
@@ -161,6 +222,154 @@ export function initDialogs() {
     if (!button) return;
     send({ cmd: 'load', name: button.dataset.load });
     dialog.close();
+  });
+}
+
+// ── Research: the person chooses the next advance ────────────────────────────
+
+function unlocks(techId) {
+  const items = [];
+  for (const unit of store.rules.units) if (unit.requires === techId) items.push(['Unit', unit.name]);
+  for (const building of store.rules.buildings) {
+    if (building.requires === techId) items.push([building.wonder ? 'Wonder' : 'Building', building.name]);
+  }
+  for (const government of store.rules.governments) {
+    if (government.requires === techId) items.push(['Government', government.name]);
+  }
+  return items;
+}
+
+// `discovered`: the advance just found, when the dialog opens because of it.
+export function openResearchDialog(discovered = null) {
+  const me = store.state.me;
+  if (!me) return;
+  const dialog = $('research-dialog');
+  let selected = me.researching && me.research_options.includes(me.researching)
+    ? me.researching : me.research_options[0];
+  const science = me.forecast.science;
+  const turns = turnsFor(me.research_cost + 1 - (me.researching ? me.research_progress : 0), science);
+  const found = discovered ? store.techDefs[discovered] : null;
+  const gains = found ? unlocks(found.id).map(([, name]) => name) : [];
+
+  const render = () => {
+    const rows = me.research_options.map((id) => {
+      const tech = store.techDefs[id];
+      const leads = store.rules.techs.filter((t) => t.prerequisites.includes(id)).map((t) => t.name);
+      const chips = unlocks(id).map(([kind, name]) =>
+        `<span class="chip big"><span class="muted">${kind}</span><b>${name}</b></span>`).join('');
+      const on = id === selected;
+      return `<button class="advance${on ? ' on' : ''}" role="radio" aria-checked="${on}" data-tech="${id}">
+        <span class="radio"></span>
+        <span class="body"><b>${tech.name}</b>
+          <span>${leads.length ? `Leads to ${leads.join(', ')}` : 'No later advance needs it'}</span></span>
+        <span class="chips">${chips}</span></button>`;
+    }).join('');
+    const name = selected ? store.techDefs[selected].name : '';
+    dialog.innerHTML = `
+      <div class="message-head">
+        <span class="message-mark sci-mark">${icon('flask', 28, 1.6)}</span>
+        <div class="titles">
+          <span class="eyebrow">${found ? `Advance discovered · ${yearLabel(store.state.year)}` : `Research · ${me.techs} advances known`}</span>
+          <h1>${found ? found.name : me.researching ? `Researching ${store.techDefs[me.researching].name}` : 'Nothing is being researched'}</h1>
+          <p>${found ? (gains.length ? `You can now build: ${gains.join(', ')}.` : 'A step towards greater things.')
+    : 'The science already gathered is kept when you change your mind.'}</p>
+        </div>
+        <button class="btn ghost icon" data-close aria-label="Close">${icon('close', 18, 2)}</button>
+      </div>
+      <div class="message-body">
+        <div><h2>What should your scientists study next?</h2>
+          <span class="sub">The next advance needs ${me.research_cost} science${turns !== null ? `: about ${plural(turns, 'turn')} at your ${science} per turn` : ''}.</span></div>
+        <div class="advances" role="radiogroup" aria-label="Advances you can research">${rows}</div>
+      </div>
+      <div class="message-foot">
+        <button class="link" data-tree>See the whole science tree</button>
+        <button class="btn primary tall" data-research ${selected ? '' : 'disabled'}>Research ${name}</button>
+      </div>`;
+    dialog.querySelectorAll('[data-tech]').forEach((row) => {
+      row.addEventListener('click', () => {
+        selected = row.dataset.tech;
+        render();
+      });
+      row.addEventListener('dblclick', () => dialog.querySelector('[data-research]').click());
+    });
+    dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+    dialog.querySelector('[data-tree]').addEventListener('click', () => {
+      dialog.close();
+      emit('show-tab', 'tech');
+    });
+    dialog.querySelector('[data-research]').addEventListener('click', () => {
+      send({ cmd: 'action', action: 'research', tech: selected });
+      dialog.close();
+    });
+  };
+  render();
+  show(dialog);
+}
+
+// ── Messages that wait for an answer ─────────────────────────────────────────
+
+function message({ color, glyph, eyebrow, title, text, note = '', buttons }) {
+  const dialog = $('message-dialog');
+  dialog.dataset.modal = 'true';         // closed by an answer, not by a click beside it
+  dialog.innerHTML = `
+    <div class="message-head">
+      <span class="message-mark" style="background:${color};color:${inkOn(color)}">${icon(glyph, 28, 1.6)}</span>
+      <div class="titles"><span class="eyebrow">${eyebrow}</span><h1>${title}</h1><p>${text}</p></div>
+    </div>
+    <div class="message-foot"><span class="sub">${note}</span>
+      ${buttons.map(([label, tone], i) => `<button class="btn tall ${tone}" data-answer="${i}">${label}</button>`).join('')}
+    </div>`;
+  dialog.querySelectorAll('[data-answer]').forEach((button) => {
+    button.addEventListener('click', () => {
+      dialog.close();
+      const action = buttons[Number(button.dataset.answer)][2];
+      if (action) action();
+    });
+  });
+  show(dialog);
+}
+
+function yearOf(turn) {
+  const row = store.history.find((entry) => entry.turn === turn);
+  return row ? yearLabel(row.year) : `turn ${turn}`;
+}
+
+export function openProposal(id) {
+  const other = player(id);
+  const relation = store.state.me.relations.find((r) => r.player === id);
+  const answer = (accept) => () => send({ cmd: 'action', action: 'answer_peace', player: id, accept });
+  message({
+    color: other.color, glyph: 'scroll',
+    eyebrow: `Message from the ${other.nation}`,
+    title: `${other.leader} proposes a peace treaty`,
+    text: `You have been at war since ${relation ? yearOf(relation.since) : 'you met'}. Under a treaty neither
+      side may attack the other or enter its cities.`,
+    note: 'Left unanswered, the proposal is refused when you end your turn.',
+    buttons: [['Refuse', '', answer(false)], ['Accept peace', 'primary', answer(true)]],
+  });
+}
+
+export function openWarConfirm(id) {
+  const other = player(id);
+  message({
+    color: other.color, glyph: 'sword',
+    eyebrow: 'Foreign affairs',
+    title: `Declare war on the ${other.nation}?`,
+    text: 'The treaty ends at once: your units may attack theirs and enter their cities, and theirs yours.',
+    buttons: [['Keep the peace', '', null],
+      ['Declare war', 'danger', () => send({ cmd: 'action', action: 'war', player: id })]],
+  });
+}
+
+export function openDefeat() {
+  const me = player(store.state.play.human);
+  message({
+    color: me.color, glyph: 'crown',
+    eyebrow: `${yearLabel(store.state.year)} · turn ${store.state.turn}`,
+    title: `The ${me.nation} are no more`,
+    text: 'Your last city has fallen and no settlers remain to found another. The world goes on without you: '
+      + 'you can watch how it ends, or start again.',
+    buttons: [['Watch the rest of the game', '', null], ['New game', 'primary', () => openGameDialog('seed')]],
   });
 }
 
@@ -203,6 +412,9 @@ export function showGameOver() {
   const civs = state.players.filter((p) => !p.barbarian).sort((a, b) => b.score - a.score);
   const best = Math.max(1, civs[0] ? civs[0].score : 1);
   const alive = civs.filter((p) => p.alive).length;
+  // The person who led a civilization is told how it ended for it.
+  const you = state.play ? state.play.human : null;
+  const verdict = you === null || !winner ? '' : winner.id === you ? 'You win · ' : 'You lose · ';
   let story = winner ? `Led by ${winner.leader}.` : 'Nobody wins this game.';
   if (winner && state.victory === 'spaceship' && winner.spaceship && winner.spaceship.launched_turn !== null) {
     story += ` Launched on turn ${winner.spaceship.launched_turn}, landed on turn ${winner.spaceship.arrival_turn}.`;
@@ -213,7 +425,7 @@ export function showGameOver() {
   const rows = civs.map((p, i) => `
     <div class="standing${winner && p.id === winner.id ? ' winner' : ''}${p.alive ? '' : ' dead'}">
       <span class="rank">${i + 1}</span>
-      <span class="who">${swatch(p.color)}<b>${p.nation}</b>
+      <span class="who">${swatch(p.color)}<b>${p.nation}${p.id === you ? ' (you)' : ''}</b>
         <span class="sub">${p.leader} · ${p.alive ? governmentName(p.government) : 'destroyed'}</span></span>
       <span class="n">${p.cities}</span><span class="n">${p.population}</span><span class="n">${p.techs}</span>
       <span class="total"><span class="bar thin"><span style="width:${100 * p.score / best}%;background:${p.color}"></span></span>
@@ -224,7 +436,7 @@ export function showGameOver() {
     <div class="over-head">
       <span class="over-mark" style="background:${color};color:${inkOn(color)}">${icon(mark, 44, 1.5)}</span>
       <div class="titles">
-        <span class="eyebrow">${label} · ${yearLabel(state.year)} · turn ${state.turn}</span>
+        <span class="eyebrow">${verdict}${label} · ${yearLabel(state.year)} · turn ${state.turn}</span>
         <h1>${winner ? `The ${winner.nation} ${deed}.` : 'Game over.'}</h1>
         <p>${story}</p>
       </div>
@@ -260,5 +472,6 @@ export function showGameOver() {
       if (button.dataset.over === 'history') emit('show-tab', 'chart');
     });
   });
-  if (!dialog.open) dialog.showModal();
+  show(dialog);
 }
+

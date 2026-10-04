@@ -23,6 +23,7 @@ class Game:
         self.turn = 0
         self.year = rules.game.calendar.start_year
         self.current_player: Optional[int] = None     # whose turn is being played
+        self.round_position = 0                       # next player of the round (turn.advance)
         self.events: list[dict] = []                  # events of the current turn
         self.finished = False
         self.winner: Optional[int] = None
@@ -48,6 +49,12 @@ class Game:
 
     def building(self, building_id: str) -> BuildingDef:
         return self.rules.buildings[building_id]
+
+    def difficulty(self, player: Player):
+        """The difficulty figures of a player: those of the level it chose (a person),
+        else the base ones every AI plays with."""
+        settings = self.rules.game.difficulty
+        return settings.levels.get(player.level, settings)
 
     def tile_of(self, entity) -> Tile:
         tile = self.map.tile(entity.x, entity.y)

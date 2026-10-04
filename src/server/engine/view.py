@@ -18,6 +18,10 @@ from .rules.schema import Effect, Rules, Yields
 from .systems import city as city_rules, combat, diplomacy, government, movement
 from .systems import production, research, spaceship, trade
 
+# Events every civilization hears of, wherever they happen.
+WORLD_NEWS = ("wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
+              "global_warming", "game_over")
+
 
 class PlayerView:
     def __init__(self, game: Game, player: Player) -> None:
@@ -125,11 +129,38 @@ class PlayerView:
     def item_cost(self, item: Item) -> int:
         return production.item_cost(self._game, item)
 
+    def item_name(self, item: Item) -> str:
+        return production.item_name(self._game, item)
+
     def buy_cost(self, city: City) -> Optional[int]:
         return production.buy_cost(self._game, city)
 
     def can_buy(self, city: City) -> bool:
         return production.can_buy(self._game, city)
+
+    def can_build(self, city: City, item: Item) -> bool:
+        return production.can_build(self._game, city, item)
+
+    def can_sell(self, city: City, building_id: str) -> bool:
+        return production.can_sell(self._game, city, building_id)
+
+    def workable_offsets(self, city: City) -> set[tuple[int, int]]:
+        """Offsets of the tiles around the city its citizens may work."""
+        return {offset for offset, _ in city_rules.workable_tiles(self._game, city)}
+
+    def can_join_city(self, unit: Unit) -> bool:
+        """Could this unit add itself to the population of the city it stands in?"""
+        city = self.my_city_at(unit.x, unit.y)
+        cost = self.rules.units[unit.type].pop_cost
+        if city is None or not cost:
+            return False
+        limit = city_rules.max_size(self._game, city)
+        return limit is None or city.size + cost <= limit
+
+    def wonder_in_progress(self, city: City) -> bool:
+        item = city.production
+        return (item is not None and item.kind == "building"
+                and self.rules.buildings[item.id].wonder)
 
     def capital(self) -> Optional[City]:
         if self.player.capital_id is None:
@@ -197,6 +228,20 @@ class PlayerView:
         if not self.visible(tile) or not self.enemy_units_at(tile):
             return None
         return combat.odds(self._game, unit, tile)
+
+    def attack_details(self, unit: Unit, tile: Tile) -> Optional[dict]:
+        """The odds against the enemy seen on a tile, with what makes them (combat.explain)."""
+        if not self.visible(tile) or not self.enemy_units_at(tile):
+            return None
+        return combat.explain(self._game, unit, tile)
+
+    def why_cannot_enter(self, unit: Unit, tile: Tile) -> Optional[str]:
+        """None if the unit may step, attack or board into the tile, else the reason."""
+        return movement.why_cannot_enter(self._game, unit, tile)
+
+    def transport_at(self, unit: Unit, tile: Tile) -> Optional[Unit]:
+        """One of the player's ships on the tile with room for the unit."""
+        return movement.transport_at(self._game, unit, tile)
 
     def can_attack(self, unit: Unit, tile: Tile) -> bool:
         """Could this kind of unit fight the enemy seen on the tile (from anywhere)?"""
@@ -269,8 +314,35 @@ class PlayerView:
     def player_name(self, other: int) -> str:
         return self._game.players[other].civ.nation
 
+    def civ_name(self, other: int) -> str:
+        """The adjective: "German", as in "German Chariot"."""
+        return self._game.players[other].civ.name
+
     def can_declare_war(self, other: int) -> bool:
         return diplomacy.can_declare_war(self._game, self.player.id, other)
+
+    def in_contact(self, other: int) -> bool:
+        return self._game.in_contact(self.player.id, other)
+
+    def peace_proposals(self) -> list[int]:
+        """Civilizations waiting for the player's answer to their peace proposal."""
+        return diplomacy.pending_proposals(self._game, self.player.id)
+
+    def knows_event(self, event: dict) -> bool:
+        """Would the player hear of this event? Its own affairs, what happens under its
+        eyes, and the news the whole world learns."""
+        me = self.player.id
+        if event.get("player") == me or event.get("other") == me:
+            return True
+        if event["type"] in WORLD_NEWS:
+            return True
+        if event["type"] in ("war", "peace"):
+            return all(self.in_contact(p) for p in (event.get("player"), event.get("other"))
+                       if p is not None)
+        if "x" in event:
+            tile = self._game.map.tile(event["x"], event["y"])
+            return tile is not None and self.visible(tile)
+        return False
 
     def known_strength(self, other: int) -> int:
         """Rough power of another civilization from what is known: size of its known cities."""

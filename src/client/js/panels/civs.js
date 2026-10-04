@@ -1,7 +1,7 @@
 // "World" panel: every player at a glance. "Empire" panel: one civilization in detail,
 // including what its AI wants and why.
 
-import { store, emit, player, yearLabel, swatch, inkOn } from '../state.js';
+import { store, emit, player, leader, yearLabel, swatch, inkOn, plural } from '../state.js';
 import { icon } from '../icons.js';
 import { MISSION_COLORS } from '../renderer/map.js';
 import { latestEvents } from './log.js';
@@ -53,8 +53,67 @@ function spaceshipLabel(p) {
 
 // ── World ────────────────────────────────────────────────────────────────────
 
+// What a person knows of the world: its own figures, and of the civilizations it has met
+// their name, their government and how they stand with it. The others are only counted.
+function renderKnownWorld(container) {
+  const state = store.state;
+  const me = state.me;
+  const others = state.players.filter((p) => !p.barbarian && p.id !== me.id);
+  const met = others.filter((p) => p.met);
+  const unknown = others.filter((p) => !p.met && p.alive).length;
+  const relation = (p) => (me.relations.find((r) => r.player === p.id) || {}).state;
+  const rows = met.map((p) => {
+    const state_ = relation(p);
+    const seen = store.state.cities.filter((city) => city.owner === p.id).length;
+    const pill = !p.alive ? '<span class="pill">Destroyed</span>'
+      : state_ === 'war' ? '<span class="pill war">War</span>'
+        : state_ === 'peace' ? '<span class="pill peace">Peace</span>' : '';
+    return `<button class="civ-row${p.id === store.selectedPlayer ? ' selected' : ''}" data-player="${p.id}">
+      <span class="civ-line"><span class="name">${swatch(p.color)}<span>${p.nation}</span></span>${pill}</span>
+      <span class="civ-meta" style="padding-left:20px"><span class="who">${p.leader}${p.government ? ` · ${governmentName(p.government)}` : ''}
+        · ${plural(seen, 'city')} seen${p.wonders ? ` · ${plural(p.wonders, 'wonder')}` : ''}</span></span></button>`;
+  });
+  const events = latestEvents(5).map((event) => {
+    const who = event.player !== undefined ? player(event.player) : null;
+    const where = event.x !== undefined ? ` data-x="${event.x}" data-y="${event.y}"` : '';
+    return `<button class="event-row"${where}>
+      <span class="when">${yearLabel(event.year)}</span>
+      <span class="dot" style="background:${who ? who.color : '#8A95A5'}"></span>
+      <span class="what">${event.text}</span></button>`;
+  });
+  container.dataset.mode = 'play';
+  container.innerHTML = `
+    <div class="panel-head">
+      <div class="titles"><h1>The known world</h1>
+        <span class="sub">${met.length} met · ${unknown} still unknown</span></div>
+    </div>
+    <div id="civs-body">
+      <button class="civ-row${me.id === store.selectedPlayer ? ' selected' : ''}" data-player="${me.id}">
+        <span class="civ-line"><span class="name">${swatch(me.color)}<span>${me.nation} · you</span></span>
+          <span class="score">${me.score}</span></span>
+        <span class="civ-meta" style="padding-left:20px"><span class="who">${plural(me.cities, 'city')} · ${plural(me.population, 'citizen')}
+          · ${plural(me.techs, 'advance')} · ${plural(me.units, 'unit')} · ${me.gold} gold</span></span></button>
+      ${rows.join('') || '<p class="empty"><b>Nobody in sight</b>Explore: other civilizations share this world.</p>'}
+      ${events.length ? `
+        <div class="between" style="margin-top:14px;border-top:1px solid var(--line);padding:14px 20px 6px">
+          <span class="label">Latest news</span>
+          <button class="link" data-chronicle>Open chronicle</button>
+        </div>${events.join('')}` : ''}
+    </div>
+    <div class="panel-foot">You only know of the others what you have seen and what the whole world is told.</div>`;
+  container.querySelector('#civs-body').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-player]');
+    if (row) return emit('select-player', Number(row.dataset.player));
+    const event = e.target.closest('[data-x]');
+    if (event) return emit('locate', { x: Number(event.dataset.x), y: Number(event.dataset.y) });
+    if (e.target.closest('[data-chronicle]')) emit('show-tab', 'log');
+    return undefined;
+  });
+}
+
 function buildWorld(container) {
   const options = SORTS.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+  container.dataset.mode = 'observer';
   container.innerHTML = `
     <div class="panel-head">
       <div class="titles"><h1>Civilizations</h1><span class="sub" id="civs-count"></span></div>
@@ -81,7 +140,11 @@ function buildWorld(container) {
 export function renderCivs(container) {
   const state = store.state;
   if (!state) return;
-  if (!container.querySelector('#civs-body')) buildWorld(container);
+  if (leader() !== null && state.me) {
+    renderKnownWorld(container);
+    return;
+  }
+  if (container.dataset.mode !== 'observer') buildWorld(container);
   const civs = state.players.filter((p) => !p.barbarian);
   const alive = civs.filter((p) => p.alive).sort((a, b) => b[sortBy] - a[sortBy] || b.score - a.score);
   const dead = civs.filter((p) => !p.alive);

@@ -5,16 +5,20 @@ played, the year advances. Source of the order: OpenCivOne Segment_1238.cs GameT
 """
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import Callable, Optional, Protocol
 
 from ..model.entities import Player
 from ..model.game import Game
-from . import barbarians, calendar, cities, government, movement, pollution, research
-from . import spaceship, visibility
+from . import barbarians, calendar, cities, diplomacy, government, movement, pollution
+from . import research, spaceship, visibility
 
 
 class Controller(Protocol):
-    """Whoever decides for a player (an AI today, a human later).
+    """Whoever decides for a player: an AI, or a person.
+
+    An AI plays its whole turn in `play_turn`. A controller with `interactive = True` stands
+    for a person: `advance` stops when its turn begins, calls `begin_turn` and waits for the
+    person's actions (engine/actions.py).
 
     A controller that remembers things from turn to turn may also define `save_state()` and
     `load_state(state)` (plain JSON data) to be part of saved games.
@@ -23,8 +27,9 @@ class Controller(Protocol):
     def play_turn(self, game: Game, player: Player) -> None:
         """Called once per turn, after the player's cities have been processed."""
 
-    def accepts_peace(self, game: Game, player: Player, proposer: int) -> bool:
-        """Answer to a peace proposal from another civilization."""
+    def accepts_peace(self, game: Game, player: Player, proposer: int) -> Optional[bool]:
+        """Answer to a peace proposal from another civilization; None to answer later,
+        during the player's own turn."""
 
 
 def begin_player_turn(game: Game, player: Player) -> None:
@@ -45,6 +50,7 @@ def begin_player_turn(game: Game, player: Player) -> None:
 def end_player_turn(game: Game, player: Player) -> None:
     if player.alive:
         movement.end_turn(game, player)
+    diplomacy.expire_proposals(game, player.id)
     game.current_player = None
 
 
@@ -116,8 +122,60 @@ def play_turn(game: Game, after_player: Callable[[Player], None] | None = None) 
         end_player_turn(game, player)
         if after_player is not None:
             after_player(player)
+    end_round(game)
+
+
+def end_round(game: Game) -> None:
+    """Everybody has played: barbarians may appear, the planet warms, the year advances."""
     barbarians.maybe_spawn(game)
     pollution.global_warming(game)
     advance_calendar(game)
     update_scores(game)
     check_end(game)
+    game.round_position = 0
+
+
+# ── With a person at the table ────────────────────────────────────────────────
+
+def is_interactive(game: Game, player: Player) -> bool:
+    """True if a person gives this player's orders, during its turn."""
+    return bool(getattr(game.controllers.get(player.id), "interactive", False))
+
+
+def advance(game: Game) -> Optional[Player]:
+    """Plays the game until a person has to give orders.
+
+    Returns that player, whose turn has begun (cities processed, units ready): the caller
+    applies the person's actions, then calls `advance` again, which ends that turn and goes
+    on with the other players. The same sequence as `play_turn`, cut where a person plays.
+
+    Returns None when the game is over, or at the end of a round once nobody plays in person
+    any more (the last person's civilization was destroyed).
+    """
+    if game.current_player is not None:               # the person has finished
+        end_player_turn(game, game.players[game.current_player])
+    while not game.finished:
+        player = _next_in_round(game)
+        if player is None:
+            end_round(game)
+            if not any(is_interactive(game, p) for p in game.players if p.alive):
+                return None
+            continue
+        begin_player_turn(game, player)
+        controller = game.controllers.get(player.id)
+        if player.alive and is_interactive(game, player):
+            controller.begin_turn(game, player)
+            return player
+        if controller is not None and player.alive:
+            controller.play_turn(game, player)
+        end_player_turn(game, player)
+    return None
+
+
+def _next_in_round(game: Game) -> Optional[Player]:
+    while game.round_position < len(game.players):
+        player = game.players[game.round_position]
+        game.round_position += 1
+        if player.alive:
+            return player
+    return None

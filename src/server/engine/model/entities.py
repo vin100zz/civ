@@ -101,6 +101,7 @@ class City:
     base_trade: int = 0                 # copy of stats.base_trade from the last turn
     stats: CityStats = field(default_factory=CityStats)
     bought_this_turn: bool = False
+    sold_this_turn: bool = False            # one building may be sold per turn
     last_completed: Optional[Item] = None   # what the city finished on its last turn
 
     @property
@@ -131,6 +132,7 @@ class Relation:
     state: str = NO_CONTACT
     since_turn: int = 0
     last_proposal_turn: int = -99
+    pending_from: Optional[int] = None      # who waits for an answer to a peace proposal
 
 
 @dataclass
@@ -170,6 +172,7 @@ class Player:
     score: int = 0
     destroyed_turn: Optional[int] = None
     spaceship: Spaceship = field(default_factory=Spaceship)
+    level: Optional[str] = None             # difficulty level of a human player (game.yaml)
     # last turn totals, for display and for the AI
     income: int = 0
     expenses: int = 0

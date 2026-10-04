@@ -147,6 +147,46 @@ def odds(game: Game, attacker: Unit, tile: Tile, defender: Optional[Unit] = None
                 defense_strength(game, defender, tile, attacker))
 
 
+def explain(game: Game, attacker: Unit, tile: Tile) -> Optional[dict]:
+    """The odds of an attack and what makes them, for a player weighing it: strengths in
+    unit points, chance to win, and the multipliers at work on each side."""
+    defender = best_defender(game, tile, attacker)
+    if defender is None:
+        return None
+    settings = game.rules.game.combat
+    strengths = odds(game, attacker, tile, defender)
+    attacking = game.rules.units[attacker.type]
+    defending = game.rules.units[defender.type]
+    terrain = game.terrain(tile)
+
+    attack_factors = []
+    if attacker.veteran:
+        attack_factors.append(f"veteran x{settings.veteran_multiplier:g}")
+    if attacker.moves_left < game.rules.game.movement.points_per_move:
+        attack_factors.append("tired")
+    defense_factors = []
+    if defending.domain == "land":
+        walls = city_wall_factor(game, tile, attacker)
+        if terrain.defense != 1:
+            defense_factors.append(f"{terrain.name.lower()} x{terrain.defense:g}")
+        if walls is not None:
+            defense_factors.append(f"city walls x{walls:g}")
+        elif tile.fortress:
+            defense_factors.append(f"fortress x{settings.fortress_multiplier:g}")
+        elif defender.fortified:
+            defense_factors.append(f"fortified x{settings.fortified_multiplier:g}")
+    if defender.veteran:
+        defense_factors.append(f"veteran x{settings.veteran_multiplier:g}")
+    return {
+        "attacker": attacking.name, "attack_base": attacking.attack,
+        "attack": round(strengths.attack / SCALE, 1), "attack_factors": attack_factors,
+        "defender": defending.name, "defender_owner": defender.owner,
+        "defense_base": defending.defense,
+        "defense": round(strengths.defense / SCALE, 1), "defense_factors": defense_factors,
+        "win": round(strengths.win_chance, 3), "stack": len(defenders(game, tile, attacker)),
+    }
+
+
 def attack(game: Game, attacker: Unit, tile: Tile) -> bool:
     """Resolves an attack on a tile. Returns True if the attacker wins."""
     settings = game.rules.game.combat

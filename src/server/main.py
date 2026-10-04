@@ -12,7 +12,7 @@ from .engine.rules.loader import ConfigError
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Civilization server (observer mode)")
+    parser = argparse.ArgumentParser(description="Civilization server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8005)
     args = parser.parse_args()

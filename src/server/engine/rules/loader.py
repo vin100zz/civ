@@ -299,6 +299,8 @@ def _validate(rules: Rules, resources_dir: Optional[Path]) -> None:
         c.error("game.yaml.players.start_rates: must be multiples of 10 that add up to 100")
     for domain in g.enabled_unit_domains:
         c.one_of(domain, schema.DOMAINS, "game.yaml.enabled_unit_domains")
+    c.ref(g.difficulty.default_level, g.difficulty.levels, "game.yaml.difficulty.default_level",
+          "difficulty level")
     c.ref(g.map.shape, g.map.shapes, "game.yaml.map.shape", "map shape")
     for name in ("temperature", "climate", "relief"):
         c.one_of(getattr(g.map, name), (0, 1, 2), f"game.yaml.map.{name}")

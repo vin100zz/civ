@@ -16,7 +16,8 @@ def client(tmp_path_factory):
 
 def test_static_files_and_rules(client):
     assert "Civilization" in client.get("/").text
-    assert client.get("/js/main.js").status_code == 200
+    script = client.get("/js/main.js")
+    assert script.status_code == 200 and script.headers["cache-control"] == "no-cache"
     assert client.get("/resources/terrain/grassland.png").status_code == 200
     rules = client.get("/api/rules").json()
     assert len(rules["units"]) == 28 and len(rules["terrains"]) == 12
@@ -117,3 +118,160 @@ def test_new_game_with_a_chosen_map(client):
         socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
                           "map": {"shape": ["atlantis"], "relief": 9, "climate": 1.0}})
         assert socket.receive_json()["map"]["terrain"] == default["map"]["terrain"]
+
+
+# ── A person leads a civilization ─────────────────────────────────────────────
+
+WORLD_NEWS = {"wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
+              "global_warming", "game_over", "war", "peace"}
+
+
+def receive(socket, kind):
+    """The next message of this kind (others, like the list of saves, may come in between)."""
+    message = socket.receive_json()
+    while message["type"] != kind:
+        message = socket.receive_json()
+    return message
+
+
+def order(socket, **message):
+    socket.send_json({"cmd": "action", **message})
+    return receive(socket, "update")
+
+
+def start_playing(socket, **options):
+    socket.receive_json()
+    socket.send_json({"cmd": "new_game", "seed": 42, "players": 4, "mode": "play",
+                      "civ": "romans", **options})
+    return socket.receive_json()
+
+
+def test_play_session(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket, level="king")
+        state = init["state"]
+        assert init["type"] == "init" and state["play"] == {"human": 1, "active": True}
+        assert state["pov"] == 1 and state["players"][1]["civ"] == "romans"
+        assert state["me"]["level"] == "king" and state["me"]["research_options"]
+
+        # Nothing is known of the civilizations not met yet.
+        others = [p for p in state["players"] if p["id"] > 1]
+        assert len(others) == 3
+        assert all(not p["met"] and p["nation"] == "Unknown" and p["gold"] is None for p in others)
+        # The browser only holds the land the person has explored.
+        sea = next(i for i, t in enumerate(init["rules"]["terrains"]) if not t["land"])
+        hidden = [i for i, mark in enumerate(state["explored"]) if mark == "0"]
+        assert hidden and all(init["map"]["terrain"][i] == sea and init["map"]["flags"][i] == 0
+                              for i in hidden)
+        assert state["units"] and all(u[2] == 1 and len(u) == 10 for u in state["units"])
+
+        settlers = next(u for u in state["units"] if u[1] == "settlers")
+        socket.send_json({"cmd": "unit", "id": settlers[0]})
+        detail = socket.receive_json()
+        assert detail["type"] == "unit" and detail["unit"]["moves_left"] > 0
+        assert "found_city" in {o["id"] for o in detail["unit"]["orders"]}
+
+        update = order(socket, action="found_city", unit=settlers[0])
+        assert update["type"] == "update" and update["ok"] and update["unit_detail"] is None
+        city = update["state"]["cities"][0]
+        assert city["owner"] == 1 and city["idle"] and city["capital"]
+        assert update["events"] and update["events"][0]["type"] == "city_founded"
+
+        update = order(socket, action="production", city=city["id"], kind="unit", id="militia")
+        assert update["ok"] and update["city_detail"]["manage"]["current"] == ["unit", "militia"]
+        assert not update["state"]["cities"][0]["idle"]
+        refused = order(socket, action="production", city=city["id"], kind="unit", id="battleship")
+        assert not refused["ok"] and refused["reason"]
+        assert not order(socket, action="teleport")["ok"]
+        assert not order(socket, action="move", unit="1", x=0, y=0)["ok"]
+
+        # The observer's controls do nothing while a person plays; its view is the person's.
+        socket.send_json({"cmd": "step"})
+        assert socket.receive_json()["type"] == "status"
+        socket.send_json({"cmd": "pov", "player": 2})
+        assert socket.receive_json()["state"]["pov"] == 1
+
+        socket.send_json({"cmd": "end_turn"})
+        message = socket.receive_json()
+        assert message["type"] == "turn" and message["state"]["turn"] == 1
+        assert list(message["history"]["players"]) == ["1"]
+        assert message["state"]["cities"][0]["shields"] > 0
+
+
+def test_a_person_only_hears_what_it_may_know(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket)
+        width = init["map"]["width"]
+        settlers = next(u for u in init["state"]["units"] if u[1] == "settlers")
+        city = order(socket, action="found_city", unit=settlers[0])["state"]["cities"][0]
+        order(socket, action="production", city=city["id"], kind="unit", id="militia")
+        exploring = set()
+
+        for _ in range(40):
+            socket.send_json({"cmd": "end_turn"})
+            message = receive(socket, "turn")
+            # Every militia the city delivers is sent exploring by itself.
+            for unit in message["state"]["units"]:
+                if unit[2] == 1 and unit[1] == "militia" and unit[0] not in exploring:
+                    exploring.add(unit[0])
+                    socket.send_json({"cmd": "automate", "unit": unit[0], "mode": "explore"})
+                    assert receive(socket, "update")["ok"]
+            state = message["state"]
+            explored = state["explored"]
+            for unit in state["units"]:
+                assert unit[2] == 1 or explored[unit[4] * width + unit[3]] == "2"
+            for other in state["cities"]:
+                assert other["owner"] == 1 or other["foreign"]
+            for index, _, _ in message["tile_changes"]:
+                assert explored[index] != "0"
+            for event in message["events"]:
+                mine = event.get("player") == 1 or event.get("other") == 1
+                assert mine or event["type"] in WORLD_NEWS or "x" in event, event
+            for player in state["players"]:
+                if player["id"] != 1:
+                    assert player["gold"] is None and player["researching"] is None
+                    assert player["met"] or player["nation"] == "Unknown"
+        assert state["turn"] == 40 and exploring
+        assert sum(mark != "0" for mark in explored) > 80, "the explorers uncovered the land"
+
+
+def test_play_save_and_load(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket)
+        settlers = next(u for u in init["state"]["units"] if u[1] == "settlers")
+        order(socket, action="found_city", unit=settlers[0])
+        for _ in range(5):
+            socket.send_json({"cmd": "end_turn"})
+            message = socket.receive_json()
+        # Turn 5: the game was saved by itself, in the middle of the person's turn.
+        assert message["state"]["turn"] == 5
+        assert "autosave" in socket.receive_json()["saves"]
+        cities = message["state"]["cities"]
+
+        socket.send_json({"cmd": "new_game", "seed": 10, "players": 3})
+        observed = socket.receive_json()
+        assert observed["state"]["play"] is None and observed["state"]["pov"] is None
+
+        socket.send_json({"cmd": "load", "name": "autosave"})
+        loaded = socket.receive_json()
+        assert loaded["type"] == "init" and loaded["state"]["turn"] == 5
+        assert loaded["state"]["play"] == {"human": 1, "active": True}
+        assert loaded["state"]["cities"] == cities
+        assert socket.receive_json()["ok"] is True
+        socket.send_json({"cmd": "end_turn"})
+        assert socket.receive_json()["state"]["turn"] == 6
+
+
+def test_a_destroyed_person_becomes_an_observer(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket)
+        units = init["state"]["units"]
+        for unit in units[:-1]:
+            assert order(socket, action="disband", unit=unit[0])["type"] == "update"
+        socket.send_json({"cmd": "action", "action": "disband", "unit": units[-1][0]})
+        over = socket.receive_json()
+        assert over["type"] == "init" and over["state"]["play"] == {"human": 1, "active": False}
+        assert over["state"]["pov"] is None and not over["state"]["players"][1]["alive"]
+        assert over["state"]["players"][2]["gold"] is not None, "nothing is hidden any more"
+        socket.send_json({"cmd": "step"})
+        assert socket.receive_json()["type"] == "turn"

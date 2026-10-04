@@ -88,9 +88,19 @@ players:
 enabled_unit_domains: [land, sea, air]
 
 difficulty:
-  # Values of the "Prince" level (2 on a scale of 0 Chieftain .. 4 Emperor).
+  # Values of the "Prince" level (2 on a scale of 0 Chieftain .. 4 Emperor): what every AI
+  # civilization plays with.
   content_base: 4          # citizens born content = 6 - level
   empire_size_base: 5      # (14 - 2 x level) / 2, see systems/city.py empire_unhappiness
+  # Levels a person may choose for the civilization they lead. Only that civilization is
+  # affected: the AI neither gains nor loses anything.
+  default_level: prince
+  levels:
+    chieftain: {name: Chieftain, content_base: 6, empire_size_base: 7, research_cost_factor: 6}
+    warlord: {name: Warlord, content_base: 5, empire_size_base: 6, research_cost_factor: 8}
+    prince: {name: Prince, content_base: 4, empire_size_base: 5, research_cost_factor: 10}
+    king: {name: King, content_base: 3, empire_size_base: 4, research_cost_factor: 12}
+    emperor: {name: Emperor, content_base: 2, empire_size_base: 3, research_cost_factor: 14}
 
 city:
   min_distance: 2          # cities may not be adjacent
@@ -98,6 +108,7 @@ city:
   food_box_per_size: 10    # food box = (size + 1) * this
   disorder_shields: false  # no shield surplus during civil disorder
   specialist_yield: 2      # each entertainer/taxman/scientist yields 2
+  specialist_min_size: 5   # taxmen and scientists need a city of this size (Civ 1)
   luxury_per_happy: 2      # 2 luxuries make one content citizen happy
   max_trade_routes: 3
   trade_route_min_distance: 10

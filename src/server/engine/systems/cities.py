@@ -83,6 +83,7 @@ def process_city(game: Game, city: City) -> None:
     government_def = game.government(player)
     settings = game.rules.game.city
     city.bought_this_turn = False
+    city.sold_this_turn = False
 
     city_rules.ensure_valid_assignment(game, city)
     stats = city_rules.compute_city(game, city)

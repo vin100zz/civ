@@ -25,28 +25,36 @@ from ..engine.rules.loader import load_rules
 from ..engine.rules.schema import MapSettings, Rules
 from ..engine.setup import new_game
 from ..engine.systems import turn
+from ..human.controller import HumanController
 from .metrics import Metrics
 
 
-def attach_ai(game: Game) -> None:
-    """Gives every player its controller."""
+def attach_controllers(game: Game, humans: Sequence[int] = ()) -> None:
+    """Gives every player its controller: the AI, except for the players led by a person."""
     for player in game.players:
-        game.controllers[player.id] = BarbarianController() if player.is_barbarian else AIController()
+        if player.id in humans:
+            game.controllers[player.id] = HumanController()
+        elif player.is_barbarian:
+            game.controllers[player.id] = BarbarianController()
+        else:
+            game.controllers[player.id] = AIController()
 
 
 def create_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
                 player_count: Optional[int] = None,
-                map_settings: Optional[MapSettings] = None) -> Game:
+                map_settings: Optional[MapSettings] = None,
+                human_civ: Optional[str] = None, level: Optional[str] = None) -> Game:
+    """A new game with its controllers. `human_civ` is the civilization a person leads."""
     game = new_game(rules, seed, civ_ids=civ_ids, player_count=player_count,
-                    map_settings=map_settings)
-    attach_ai(game)
+                    map_settings=map_settings, human_civ=human_civ, level=level)
+    attach_controllers(game, [p.id for p in game.players if p.civ.id == human_civ])
     return game
 
 
 def restore_game(rules: Rules, data: dict) -> Game:
-    """A saved game, with its AI players and what they remembered."""
+    """A saved game, with its controllers and what they remembered."""
     game = persistence.game_from_data(rules, data)
-    attach_ai(game)
+    attach_controllers(game, data.get("humans", ()))
     persistence.restore_controllers(game, data)
     return game
 

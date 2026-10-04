@@ -1,7 +1,7 @@
 // The main map: terrain, improvements, territory, cities and units on a canvas,
 // with drag to pan and wheel to zoom. The world wraps horizontally.
 
-import { F, U, store, tileIndex, player, emit, inkOn, swatch } from '../state.js';
+import { F, U, store, tileIndex, player, leader, emit, inkOn, swatch } from '../state.js';
 import { sprite } from './sprites.js';
 import { Ground } from './ground.js';
 
@@ -23,6 +23,10 @@ const ORDER_MARK = {
   fortified: 'F', fortify: 'F', sentry: 'S', road: 'R', railroad: 'R', irrigate: 'I', mine: 'M',
   fortress: 'O', clean: 'P',
 };
+// What a unit of the person was left to do by itself.
+const TASK_MARK = { goto: 'G', explore: 'X', work: 'A' };
+const BAD = '#F2756A';
+const SLIDE_MS = 160;         // a unit sliding to the next tile after an order
 
 function roundRect(ctx, x, y, w, h, radius) {
   ctx.beginPath();
@@ -44,6 +48,13 @@ export class MapView {
     this.marker = null;      // a tile to point at, e.g. the event picked in the chronicle
     this.ground = new Ground();
     this.onViewChange = () => {};
+    // Hooks for the person playing (main.js): each returns true when it handled the event.
+    this.onTileClick = () => false;
+    this.onTileContext = () => false;
+    this.onTileHover = () => {};
+    // Html about sending the active unit to a tile: null for the usual tooltip, '' for none.
+    this.describeMove = () => null;
+    this.slides = new Map();            // unit id -> {x0, y0, x1, y1, start, duration}
     this._bind();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     this.resize();
@@ -99,6 +110,22 @@ export class MapView {
     this._clamp();
     this.invalidate();
     this.onViewChange();
+  }
+
+  // Brings a tile into view if it is off screen or too close to the edges (the bottom edge
+  // counts double: the unit bar lies over it).
+  reveal(x, y) {
+    if (!store.map) return;
+    const w = store.map.width;
+    let dx = x + 0.5 - this.cx;
+    if (dx > w / 2) dx -= w;
+    if (dx < -w / 2) dx += w;
+    const px = this.width / 2 + dx * this.tile;
+    const py = this.height / 2 + (y + 0.5 - this.cy) * this.tile;
+    const margin = Math.min(160, this.width / 5);
+    if (px < margin || px > this.width - margin || py < margin || py > this.height - 2 * margin) {
+      this.centerOn(x, y);
+    }
   }
 
   zoomBy(factor) {
@@ -202,7 +229,12 @@ export class MapView {
     canvas.addEventListener('mouseleave', () => {
       this.tooltip.hidden = true;
       this.hover = null;
+      this.onTileHover(null);
       this.invalidate();
+    });
+    canvas.addEventListener('contextmenu', (e) => {
+      const tile = this._eventTile(e);
+      if (tile && this.onTileContext(tile)) e.preventDefault();
     });
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -228,13 +260,15 @@ export class MapView {
 
   _click(e) {
     const tile = this._eventTile(e);
-    if (!tile) return;
+    if (!tile || e.button !== 0) return;
+    if (this.onTileClick(tile)) return;
     const index = tileIndex(tile.x, tile.y);
     const city = store.cityAt.get(index);
     if (city) {
       emit('select-city', city.id);
       return;
     }
+    if (leader() !== null) return;              // a person playing has nothing else to pick
     const units = store.unitsAt.get(index);
     if (units && units.length) {
       emit('select-player', units[0][U.OWNER]);
@@ -252,8 +286,23 @@ export class MapView {
     }
     const changed = !this.hover || this.hover.x !== tile.x || this.hover.y !== tile.y;
     this.hover = tile;
-    if (changed) this.invalidate();
-    const html = this._describe(tile);
+    if (changed) {
+      this.invalidate();
+      this.onTileHover(tile);
+    }
+    this._showTip(e);
+  }
+
+  // Shows (or refreshes) the tooltip of the hovered tile at the pointer's last position.
+  refreshTip() {
+    if (this.hover && this._pointer) this._showTip(this._pointer);
+  }
+
+  _showTip(e) {
+    this._pointer = { clientX: e.clientX, clientY: e.clientY };
+    const tile = this.hover;
+    const move = this.describeMove(tile);
+    const html = move === null ? this._describe(tile) : move;
     if (!html) {
       this.tooltip.hidden = true;
       return;
@@ -294,15 +343,21 @@ export class MapView {
     const rows = [];
     let title = `<span>${ground}</span>`;
     let hint = '';
+    const me = leader();
     if (city) {
       const civ = player(city.owner);
       title = `${swatch(civ.color)}<span>${city.name}</span>`;
       rows.push(['Owner', `${civ.nation} · size ${city.size}${city.capital ? ' · capital' : ''}`]);
       rows.push(['Terrain', [ground, ...works].join(' · ')]);
-      rows.push(['Building', city.production || '<span class="bad">nothing</span>']);
-      if (city.disorder) rows.push(['Status', '<span class="bad">Civil disorder</span>']);
-      else if (city.celebrating) rows.push(['Status', '<span class="good">Celebrating</span>']);
-      hint = 'Click to open the city';
+      if (city.foreign) {
+        // A person only knows of a foreign city what it saw last.
+        rows.push(['Last seen', `turn ${city.seen}`]);
+      } else {
+        rows.push(['Building', city.production || '<span class="bad">nothing</span>']);
+        if (city.disorder) rows.push(['Status', '<span class="bad">Civil disorder</span>']);
+        else if (city.celebrating) rows.push(['Status', '<span class="good">Celebrating</span>']);
+        hint = 'Click to open the city';
+      }
     } else {
       if (works.length) rows.push(['Works', works.join(' · ')]);
       if (owner >= 0) rows.push(['Territory', player(owner).nation]);
@@ -316,7 +371,8 @@ export class MapView {
       }
       const list = [...counts].map(([key, count]) => (count > 1 ? `${key} ×${count}` : key));
       rows.push([city ? 'Garrison' : 'Units', list.join(', ')]);
-      if (!city) hint = 'Click to select its civilization';
+      if (!city && me === null) hint = 'Click to select its civilization';
+      else if (!city && units.some((unit) => unit[U.OWNER] === me)) hint = 'Click to give orders';
     }
     const body = rows.length
       ? `<dl class="tip-rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';
@@ -358,6 +414,7 @@ export class MapView {
     if (store.options.territory && store.owner) this._drawTerritory(ctx, range, explored);
     if (store.options.grid && ts >= 16) this._drawGrid(ctx, range);
 
+    const sliding = this._advanceSlides();
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const index = tileIndex(tx, ty);
@@ -366,9 +423,10 @@ export class MapView {
         const py = this.screenY(ty);
         const size = this.screenX(tx + 1) - px;
         const city = store.cityAt.get(index);
-        const units = store.unitsAt.get(index);
-        if (city) this._drawCity(ctx, city, units, px, py, size);
-        else if (units) this._drawUnits(ctx, units, px, py, size);
+        const all = store.unitsAt.get(index);
+        const units = all && sliding ? all.filter((unit) => !this.slides.has(unit[U.ID])) : all;
+        if (city) this._drawCity(ctx, city, all, px, py, size);
+        else if (units && units.length) this._drawUnits(ctx, units, px, py, size);
         if (explored && explored[index] === '1') {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
           ctx.fillRect(px, py, size, size);
@@ -384,8 +442,56 @@ export class MapView {
         }
       }
     }
+    if (sliding) this._drawSlides(ctx, ts);
     if (store.options.missions) this._drawMissions(ctx);
     this._drawSelection(ctx);
+    this._drawOrders(ctx);
+    if (sliding) this.invalidate();
+  }
+
+  // ── Units on the move ───────────────────────────────────────────────────
+
+  // Slides the units that changed tile with the last message: [id, x0, y0, x1, y1].
+  // Longer jumps (a journey, several turns of an observed game) are not animated.
+  slide(moves, duration = SLIDE_MS) {
+    const w = store.map.width;
+    const now = performance.now();
+    for (const [id, x0, y0, x1, y1] of moves) {
+      let dx = x1 - x0;
+      if (dx > w / 2) dx -= w;
+      if (dx < -w / 2) dx += w;
+      if (Math.abs(dx) > 2 || Math.abs(y1 - y0) > 2) continue;
+      this.slides.set(id, { x0: x1 - dx, y0, x1, y1, start: now, duration });
+    }
+    if (this.slides.size) this.invalidate();
+  }
+
+  // Drops the slides that are over. Returns true while some unit is still sliding.
+  _advanceSlides() {
+    const now = performance.now();
+    for (const [id, slide] of this.slides) {
+      if (now - slide.start >= slide.duration) this.slides.delete(id);
+    }
+    return this.slides.size > 0;
+  }
+
+  _drawSlides(ctx, ts) {
+    const now = performance.now();
+    const explored = store.state.explored || null;
+    for (const unit of store.state.units) {
+      const slide = this.slides.get(unit[U.ID]);
+      if (!slide) continue;
+      // Someone watching through a civilization's eyes only sees the arrival tile.
+      if (explored && explored[tileIndex(slide.x1, slide.y1)] !== '2') continue;
+      const t = Math.min(1, (now - slide.start) / slide.duration);
+      const ease = t * (2 - t);
+      const x = slide.x0 + (slide.x1 - slide.x0) * ease;
+      const y = slide.y0 + (slide.y1 - slide.y0) * ease;
+      for (const tx of this._wrapped(Math.round(x))) {
+        const px = this.screenX(tx) + (x - Math.round(x)) * ts;
+        this._drawUnits(ctx, [unit], px, this.screenY(0) + y * ts, ts);
+      }
+    }
   }
 
   // Pastes the painted ground over the visible tiles. Returns a test telling whether a
@@ -477,7 +583,7 @@ export class MapView {
   _terrainId(tx, ty) {
     const { map } = store;
     if (ty < 0 || ty >= map.height) return null;
-    return store.terrains[map.terrain[tileIndex(tx, ty)]].id;
+    return store.terrains[(map.ground || map.terrain)[tileIndex(tx, ty)]].id;
   }
 
   // A river runs from edge to edge of its tile in a curve through the centre. Towards the
@@ -693,12 +799,15 @@ export class MapView {
 
   _drawUnits(ctx, units, px, py, size) {
     // Show the unit that would defend the tile: never a passenger while its ship is there.
+    // The unit the person is giving orders to comes first.
     const crew = units.filter((unit) => !unit[U.ABOARD]);
     const shown = crew.length ? crew : units;
     let top = shown[0];
     for (const unit of shown) {
       if (store.unitDefs[unit[U.TYPE]].defense > store.unitDefs[top[U.TYPE]].defense) top = unit;
     }
+    const active = store.hud.unit;
+    if (active) top = units.find((unit) => unit[U.ID] === active[U.ID]) || top;
     const definition = store.unitDefs[top[U.TYPE]];
     const color = player(top[U.OWNER]).color;
     const inset = Math.max(1, Math.round(size * 0.14));
@@ -734,7 +843,7 @@ export class MapView {
       if (units.length > 1) {
         this._badge(ctx, px + size - inset + size * 0.12, py + inset - size * 0.12, String(units.length), size);
       }
-      const mark = ORDER_MARK[top[U.ORDER]];
+      const mark = TASK_MARK[top[U.TASK]] || ORDER_MARK[top[U.ORDER]];
       if (mark) {
         ctx.font = `700 ${Math.round(size * 0.26)}px ${FONT}`;
         ctx.textAlign = 'left';
@@ -825,6 +934,91 @@ export class MapView {
     const result = [];
     for (let tx = x + Math.ceil((range.x0 - x) / w) * w; tx <= range.x1; tx += w) result.push(tx);
     return result;
+  }
+
+  // What the person is doing: the active unit, the way a go-to would take, the enemy or the
+  // destination pointed at.
+  _drawOrders(ctx) {
+    const { unit, route, target } = store.hud;
+    if (!unit) return;
+    const ts = this.tile;
+    const ring = (x, y, color, halo) => {
+      for (const tx of this._wrapped(x)) {
+        const px = this.screenX(tx);
+        const py = this.screenY(y);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = halo;
+        roundRect(ctx, px - 2, py - 2, ts + 4, ts + 4, Math.min(10, ts * 0.2));
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = color;
+        roundRect(ctx, px + 1, py + 1, ts - 2, ts - 2, Math.min(8, ts * 0.16));
+        ctx.stroke();
+      }
+    };
+    if (route && route.length) {
+      // Unwrap the columns so that the line never jumps across the world.
+      const w = store.map.width;
+      let column = this._wrapped(unit[U.X])[0];
+      if (column === undefined) column = unit[U.X];
+      const points = [[column, unit[U.Y], 0]];
+      let last = unit[U.X];
+      for (const [x, y, turn] of route) {
+        let dx = x - last;
+        if (dx > w / 2) dx -= w;
+        if (dx < -w / 2) dx += w;
+        column += dx;
+        last = x;
+        points.push([column, y, turn]);
+      }
+      const at = ([x, y]) => [this.screenX(x) + ts / 2, this.screenY(y) + ts / 2];
+      const trace = () => {
+        ctx.beginPath();
+        points.forEach((point, i) => {
+          const [px, py] = at(point);
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        ctx.stroke();
+      };
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(11, 14, 19, 0.75)';
+      ctx.lineWidth = 7;
+      trace();
+      ctx.strokeStyle = GOLD;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([2, 9]);
+      trace();
+      ctx.setLineDash([]);
+      ctx.lineCap = 'butt';
+      // Where each turn of the journey ends.
+      ctx.font = `700 12px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      points.forEach((point, i) => {
+        const final = i === points.length - 1;
+        if (!i || (!final && points[i + 1][2] === point[2])) return;
+        const [px, py] = at(point);
+        const radius = final ? 13 : 11;
+        ctx.beginPath();
+        ctx.arc(px, final ? py - ts * 0.72 : py, radius, 0, Math.PI * 2);
+        ctx.fillStyle = final ? GOLD : INK;
+        ctx.fill();
+        ctx.lineWidth = final ? 2 : 1.5;
+        ctx.strokeStyle = final ? INK : GOLD;
+        ctx.stroke();
+        ctx.fillStyle = final ? '#1B1405' : GOLD;
+        ctx.fillText(String(point[2]), px, (final ? py - ts * 0.72 : py) + 0.5);
+      });
+      const [gx, gy] = route[route.length - 1];
+      ring(gx, gy, '#FFFFFF', 'rgba(255, 255, 255, 0.18)');
+    }
+    if (target) {
+      if (target.goal) ring(target.x, target.y, '#FFFFFF', 'rgba(255, 255, 255, 0.18)');
+      else ring(target.x, target.y, BAD, 'rgba(242, 117, 106, 0.28)');
+    }
+    if (!this.slides.has(unit[U.ID])) ring(unit[U.X], unit[U.Y], GOLD, 'rgba(226, 182, 89, 0.28)');
   }
 
   _drawSelection(ctx) {

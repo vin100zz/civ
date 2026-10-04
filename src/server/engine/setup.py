@@ -17,8 +17,13 @@ BARBARIANS = "barbarians"
 
 def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
              player_count: Optional[int] = None,
-             map_settings: Optional[MapSettings] = None) -> Game:
-    """Builds a game ready for turn 0. The same seed and settings always give the same game."""
+             map_settings: Optional[MapSettings] = None,
+             human_civ: Optional[str] = None, level: Optional[str] = None) -> Game:
+    """Builds a game ready for turn 0. The same seed and settings always give the same game.
+
+    `human_civ` is the civilization a person will lead, at the difficulty `level`: it takes
+    the first seat (and the first start position), the other civilizations are drawn.
+    """
     world = generate_world(rules, seed, map_settings)
     game = Game(rules, seed, world)
     rng = game.rng
@@ -27,6 +32,9 @@ def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
         count = player_count or rules.game.players.count
         playable = [c.id for c in rules.playable_civs]
         civ_ids = rng.sample(playable, min(count, len(playable)))
+        if human_civ is not None:
+            others = [c for c in civ_ids if c != human_civ]
+            civ_ids = [human_civ] + others[:len(civ_ids) - 1]
 
     settings = rules.game.players
     # Player 0 is always the barbarians, as in the original.
@@ -37,6 +45,8 @@ def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
                         tax_rate=settings.start_rates.tax,
                         luxury_rate=settings.start_rates.luxury,
                         science_rate=settings.start_rates.science)
+        if civ_id == human_civ:
+            player.level = level or rules.game.difficulty.default_level
         visibility.init_player(game, player)
         game.players.append(player)
 

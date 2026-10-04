@@ -28,7 +28,9 @@ def research_cost(game: Game, player: Player) -> int:
     """Science needed for the next advance: grows with the number of advances known."""
     settings = game.rules.game.research
     known = player.tech_count + 1
-    factor = max(settings.cost_factor, settings.early_factor_base - known)
+    level = game.rules.game.difficulty.levels.get(player.level)
+    base = level.research_cost_factor if level is not None else settings.cost_factor
+    factor = max(base, settings.early_factor_base - known)
     cost = known * factor
     if game.year >= settings.doubled_from_year:
         cost *= 2

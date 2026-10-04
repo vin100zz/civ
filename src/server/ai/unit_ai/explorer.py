@@ -35,6 +35,11 @@ def act(ctx: Context, unit: Unit, mission: Mission | None) -> None:
             return
 
 
+def has_frontier(ctx: Context, unit: Unit) -> bool:
+    """Is there still unknown ground this unit knows a way to?"""
+    return _next_step_to_frontier(ctx, unit) is not None
+
+
 def _adjacent_hut(ctx: Context, unit: Unit, here: Tile) -> Optional[Tile]:
     if ctx.rules.units[unit.type].domain != "land":
         return None

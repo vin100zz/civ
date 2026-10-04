@@ -15,6 +15,16 @@ from .session import Session
 CLIENT_DIR = PROJECT_ROOT / "src" / "client"
 
 
+class ClientFiles(StaticFiles):
+    """The client's own files. The browser checks them again on every load, so it never
+    runs yesterday's scripts against today's server."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(config_dir: Path | None = None, saves_dir: Path | None = None) -> FastAPI:
     rules = load_rules(config_dir)          # fails here, with a clear message, on a bad config
 
@@ -48,5 +58,5 @@ def create_app(config_dir: Path | None = None, saves_dir: Path | None = None) ->
             session.clients.pop(socket, None)
 
     app.mount("/resources", StaticFiles(directory=DEFAULT_RESOURCES_DIR), name="resources")
-    app.mount("/", StaticFiles(directory=CLIENT_DIR, html=True), name="client")
+    app.mount("/", ClientFiles(directory=CLIENT_DIR, html=True), name="client")
     return app

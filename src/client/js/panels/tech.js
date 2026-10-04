@@ -1,6 +1,7 @@
 // "Science" workspace: the technology tree of the selected civilization, over the whole width.
 
-import { store, emit } from '../state.js';
+import { store, emit, leader } from '../state.js';
+import { send } from '../net.js';
 import { ranking } from './civs.js';
 
 const BOX_W = 176;
@@ -55,7 +56,7 @@ function computeLayout() {
   for (const tech of techs) {
     for (const pre of tech.prerequisites) (leads[pre] = leads[pre] || []).push(tech.name);
   }
-  for (const item of [...store.rules.units, ...store.rules.buildings]) {
+  for (const item of [...store.rules.units, ...store.rules.buildings, ...store.rules.governments]) {
     if (item.requires) (unlocks[item.requires] = unlocks[item.requires] || []).push(item.name);
   }
   return {
@@ -143,7 +144,8 @@ export function renderTech(container) {
   const head = (selected) => `
     <div class="work-head">
       <h1>Science</h1>
-      ${store.state ? civPicker(selected) : ''}
+      ${store.state && leader() === null ? civPicker(selected) : ''}
+      ${leader() !== null ? '<span class="sub">Click an advance within reach to research it.</span>' : ''}
       <div class="right">
         <div class="keys"${selected !== null && detail ? ` style="--civ:${detail.color}"` : ''}>
           <span><i class="known"></i>Known</span><span><i class="researching"></i>Researching</span>
@@ -166,6 +168,7 @@ export function renderTech(container) {
   const scrollLeft = previous ? previous.scrollLeft : 0;
   const scrollTop = previous ? previous.scrollTop : 0;
 
+  const choosing = leader() === detail.id;
   const left = Math.max(0, detail.research_cost - detail.research_progress);
   const turns = detail.science > 0 && current ? Math.ceil(left / detail.science) : null;
   const progress = detail.research_cost
@@ -184,7 +187,10 @@ export function renderTech(container) {
     if (state === 'researching') {
       sub = `${detail.research_progress} / ${detail.research_cost}${turns !== null ? ` · ${turnsLabel(turns)}` : ''}`;
     }
-    boxes.push(`<div class="tech ${state}" style="left:${at.x}px;top:${at.y}px" title="${tech.name} — ${sub}">
+    // The person leading this civilization picks its research by clicking an advance.
+    const pickable = choosing && state === 'available';
+    boxes.push(`<div class="tech ${state}${pickable ? ' pickable' : ''}" style="left:${at.x}px;top:${at.y}px"
+      title="${tech.name} — ${sub}"${pickable ? ` data-tech="${tech.id}" role="button" tabindex="0"` : ''}>
       <b>${tech.name}</b><small>${sub}</small></div>`);
     const fill = state === 'known' ? detail.color : state === 'researching' ? '#E2B659'
       : state === 'available' ? '#8A95A5' : '#2F3948';
@@ -259,6 +265,13 @@ export function renderTech(container) {
   wire(container);
   const sync = wireOverview(container);
   const tree = container.querySelector('#tech-tree');
+  tree.querySelectorAll('[data-tech]').forEach((box) => {
+    const research = () => send({ cmd: 'action', action: 'research', tech: box.dataset.tech });
+    box.addEventListener('click', research);
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') research();
+    });
+  });
   if (centredOn !== detail.id && tree.clientWidth > 0) {
     // First look at this civilization: bring its research front into view.
     const focus = layout.position[current] || layout.position[detail.tech_list[detail.tech_list.length - 1]];

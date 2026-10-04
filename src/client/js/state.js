@@ -5,13 +5,17 @@ export const F = {
   FORTRESS: 128, POLLUTION: 256,
 };
 
-// Fields of a unit as sent by the server: [id, type, owner, x, y, order, veteran, aboard]
-export const U = { ID: 0, TYPE: 1, OWNER: 2, X: 3, Y: 4, ORDER: 5, VETERAN: 6, ABOARD: 7 };
+// Fields of a unit as sent by the server: [id, type, owner, x, y, order, veteran, aboard].
+// The units of the civilization a person leads carry two more: the movement points left
+// (see rules.points_per_move) and what the unit was left to do by itself.
+export const U = {
+  ID: 0, TYPE: 1, OWNER: 2, X: 3, Y: 4, ORDER: 5, VETERAN: 6, ABOARD: 7, MOVES: 8, TASK: 9,
+};
 
 export const store = {
   rules: null,
-  map: null,            // {width, height, terrain[], flags[], continent[]}
-  state: null,          // {turn, year, players[], cities[], units[], explored?, pov}
+  map: null,            // {width, height, terrain[], flags[], continent[], ground[]}
+  state: null,          // {turn, year, players[], cities[], units[], explored?, pov, play?, me?}
   history: [],
   historyFields: [],
   log: [],
@@ -23,6 +27,9 @@ export const store = {
   cityDetail: null,
   playerDetail: null,
   options: { territory: true, grid: false, missions: false },
+  // What the map draws for the person playing (see play.js).
+  hud: { unit: null, route: null, target: null },
+  moves: [],            // units that changed tile with the last message: [id, x0, y0, x1, y1]
   // indexes rebuilt from the data above
   terrains: [],
   unitDefs: {},
@@ -53,8 +60,26 @@ export function player(id) {
   return store.state ? store.state.players[id] : null;
 }
 
+// The civilization the person leads while it plays, or null (observer, game over).
+export function leader() {
+  const play = store.state && store.state.play;
+  return play && play.active ? play.human : null;
+}
+
 export function yearLabel(year) {
   return year < 0 ? `${-year} BC` : `${year} AD`;
+}
+
+// "1 city", "3 cities", "2 turns".
+export function plural(count, word) {
+  if (count === 1) return `${count} ${word}`;
+  return `${count} ${/[^aeiou]y$/.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`}`;
+}
+
+// Whole turns needed to gather `missing` at `perTurn`, or null if it never happens.
+export function turnsFor(missing, perTurn) {
+  if (missing <= 0) return 0;
+  return perTurn > 0 ? Math.ceil(missing / perTurn) : null;
 }
 
 // Colors of the civilizations, tuned for the dark interface: the rules give the classic,
@@ -65,6 +90,10 @@ const PALETTE = {
   zulus: '#C25B8E', french: '#8C8CF5', aztecs: '#2F9E6B', chinese: '#F29AD8',
   english: '#F0508C', mongols: '#B07A45', barbarians: '#C8402F',
 };
+
+export function civColor(civ, fallback = '#8A95A5') {
+  return PALETTE[civ] || fallback;
+}
 
 function recolor(players) {
   for (const p of players) p.color = PALETTE[p.civ] || p.color;
@@ -86,12 +115,39 @@ const CITY_OFFSETS = [
   [0, -2], [2, 0], [0, 2], [-2, 0], [-1, -2], [1, -2], [2, -1], [2, 1], [1, 2], [-1, 2],
   [-2, 1], [-2, -1],
 ];
+const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+
+// The terrain the ground is painted from. The server sends plain sea for the tiles a person
+// has not explored; painted as such, the edge of the known world would look like a coast.
+// Unknown tiles next to known ones borrow a neighbour's terrain instead (they stay hidden).
+function groundTerrain() {
+  const { map, state } = store;
+  const explored = state.explored;
+  if (!explored || leader() === null) return map.terrain;
+  const ground = map.terrain.slice();
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      const index = y * map.width + x;
+      if (explored[index] !== '0') continue;
+      for (const [dx, dy] of AROUND) {
+        if (y + dy < 0 || y + dy >= map.height) continue;
+        const other = tileIndex(x + dx, y + dy);
+        if (explored[other] !== '0') {
+          ground[index] = map.terrain[other];
+          break;
+        }
+      }
+    }
+  }
+  return ground;
+}
 
 function rebuildIndexes() {
   const { map, state } = store;
   store.cityAt = new Map();
   store.unitsAt = new Map();
   if (!map || !state) return;
+  map.ground = groundTerrain();
   for (const city of state.cities) store.cityAt.set(tileIndex(city.x, city.y), city);
   for (const unit of state.units) {
     const index = tileIndex(unit[U.X], unit[U.Y]);
@@ -112,12 +168,48 @@ function rebuildIndexes() {
   store.owner = owner;
 }
 
+// Replaces the state and notes which units changed tile, for the map to slide them.
+function setState(state) {
+  const before = new Map();
+  if (store.state && store.state.seed === state.seed) {
+    for (const unit of store.state.units) before.set(unit[U.ID], unit);
+  }
+  store.state = state;
+  if (state.me) {
+    // A person's own civilization is always at hand, selected unless it looks at another.
+    recolor([state.me]);
+    if (store.selectedPlayer === null || store.selectedPlayer === state.me.id) {
+      store.selectedPlayer = state.me.id;
+      store.playerDetail = state.me;
+    }
+  }
+  store.moves = [];
+  for (const unit of state.units) {
+    const old = before.get(unit[U.ID]);
+    if (old && (old[U.X] !== unit[U.X] || old[U.Y] !== unit[U.Y])) {
+      store.moves.push([unit[U.ID], old[U.X], old[U.Y], unit[U.X], unit[U.Y]]);
+    }
+  }
+}
+
+function applyTiles(changes) {
+  for (const [index, terrain, flags] of changes) {
+    store.map.terrain[index] = terrain;
+    store.map.flags[index] = flags;
+  }
+}
+
 function setRules(rules) {
   store.rules = rules;
   store.terrains = rules.terrains;
   store.unitDefs = Object.fromEntries(rules.units.map((u) => [u.id, u]));
   store.buildingDefs = Object.fromEntries(rules.buildings.map((b) => [b.id, b]));
   store.techDefs = Object.fromEntries(rules.techs.map((t) => [t.id, t]));
+}
+
+function pushLog(events) {
+  store.log.push(...events);
+  if (store.log.length > 800) store.log.splice(0, store.log.length - 800);
 }
 
 export function handleMessage(message) {
@@ -127,7 +219,8 @@ export function handleMessage(message) {
     case 'init':
       setRules(message.rules);
       store.map = message.map;
-      store.state = message.state;
+      store.state = null;
+      setState(message.state);
       store.history = message.history;
       store.historyFields = message.history_fields;
       store.log = message.log;
@@ -137,6 +230,7 @@ export function handleMessage(message) {
       store.selectedCity = null;
       store.cityDetail = null;
       store.playerDetail = null;
+      store.hud = { unit: null, route: null, target: null };
       if (store.selectedPlayer !== null && !store.state.players[store.selectedPlayer]) {
         store.selectedPlayer = null;
       }
@@ -145,21 +239,28 @@ export function handleMessage(message) {
       emit('status');
       break;
     case 'turn':
-      store.state = message.state;
-      for (const [index, terrain, flags] of message.tile_changes) {
-        store.map.terrain[index] = terrain;
-        store.map.flags[index] = flags;
-      }
-      store.history.push(message.history);
-      store.log.push(...message.events);
-      if (store.log.length > 800) store.log.splice(0, store.log.length - 800);
+      setState(message.state);
+      applyTiles(message.tile_changes);
+      if (message.history) store.history.push(message.history);
+      pushLog(message.events);
       store.playing = message.playing;
       rebuildIndexes();
       emit('turn', message);
       emit('status');
       break;
+    case 'update':
+      // One order of the person was applied (or refused).
+      setState(message.state);
+      applyTiles(message.tile_changes);
+      pushLog(message.events);
+      if (message.city_detail && message.city_detail.id === store.selectedCity) {
+        store.cityDetail = message.city_detail;
+      }
+      rebuildIndexes();
+      emit('update', message);
+      break;
     case 'state':
-      store.state = message.state;
+      setState(message.state);
       rebuildIndexes();
       emit('state');
       break;
@@ -175,6 +276,12 @@ export function handleMessage(message) {
     case 'player':
       store.playerDetail = message.player;
       emit('player');
+      break;
+    case 'unit':
+      emit('unit', message.unit);
+      break;
+    case 'preview':
+      emit('preview', message);
       break;
     case 'saves':
       store.saves = message.saves;

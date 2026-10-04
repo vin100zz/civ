@@ -181,6 +181,37 @@ def auto_arrange(game: Game, city: City) -> None:
         city.specialists["entertainer"] += 1
 
 
+def toggle_tile(game: Game, city: City, offset: tuple[int, int]) -> bool:
+    """The player moves one citizen by hand: off a worked tile (it becomes an entertainer),
+    or from the specialists onto a tile the city may work. The mayor takes over again when
+    the city grows or shrinks (see `auto_arrange`)."""
+    if offset in city.worked:
+        set_worked(game, city, [o for o in city.worked if o != offset])
+        city.specialists["entertainer"] += 1
+    else:
+        allowed = {o for o, _ in workable_tiles(game, city)}
+        idle = next((kind for kind in SPECIALISTS if city.specialists[kind] > 0), None)
+        if offset not in allowed or idle is None:
+            return False
+        city.specialists[idle] -= 1
+        set_worked(game, city, city.worked + [offset])
+    city.stats = compute_city(game, city)
+    return True
+
+
+def change_specialist(game: Game, city: City, kind: str) -> bool:
+    """Turns one specialist into the next kind: entertainer, taxman, scientist, and round."""
+    if kind not in SPECIALISTS or city.specialists[kind] <= 0:
+        return False
+    if city.size < game.rules.game.city.specialist_min_size:
+        return False
+    following = SPECIALISTS[(SPECIALISTS.index(kind) + 1) % len(SPECIALISTS)]
+    city.specialists[kind] -= 1
+    city.specialists[following] += 1
+    city.stats = compute_city(game, city)
+    return True
+
+
 def _tile_worth(game: Game, city: City, offset: tuple[int, int], effects: list[Effect]) -> int:
     tile = game.map.tile(city.x + offset[0], city.y + offset[1])
     if tile is None:
@@ -283,7 +314,7 @@ def empire_unhappiness(game: Game, city: City) -> int:
     """Extra unhappy citizens caused by the number of cities of the empire."""
     player = game.players[city.owner]
     government = game.government(player)
-    span = government.empire_size_factor * game.rules.game.difficulty.empire_size_base
+    span = government.empire_size_factor * game.difficulty(player).empire_size_base
     count = sum(1 for c in game.cities.values() if c.owner == city.owner)
     return max(0, (city.id % span + count - span) // span)
 
@@ -350,7 +381,7 @@ def compute_city(game: Game, city: City) -> CityStats:
 
     # Mood.
     workers = city.size - city.specialist_count
-    unhappy = city.size - rules.game.difficulty.content_base + empire_unhappiness(game, city)
+    unhappy = city.size - game.difficulty(player).content_base + empire_unhappiness(game, city)
     if player.is_barbarian:
         unhappy = 0
     excess = max(0, unhappy - city.size)

@@ -55,7 +55,7 @@ def make_plan(view: PlayerView, know: Knowledge, previous: dict[int, tuple],
     _intercept_missions(view, know, plan)
     _attack_missions(view, know, plan)
     plan.local_sites = _settle_missions(view, know, plan)
-    jobs = _improve_missions(view, know, plan)
+    jobs = improve_missions(view, know, plan)
     explore_capacity = _explore_missions(view, know, plan)
     _caravan_missions(view, know, plan)
     overseas.sea_missions(view, know, plan)
@@ -207,7 +207,7 @@ def _settle_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
     return total
 
 
-def _improve_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
+def improve_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
     """Terrain work around our cities, most profitable first. Returns the number of jobs."""
     rules = view.rules
     get = lambda name: rules.ai.get("settlers", name)

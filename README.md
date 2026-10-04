@@ -1,6 +1,6 @@
-# Civilization — mode observateur
+# Civilization
 
-Clone de Civilization I : l'IA joue toutes les civilisations, vous regardez, de l'âge de pierre à la course vers Alpha du Centaure.
+Clone de Civilization I, de l'âge de pierre à la course vers Alpha du Centaure. Deux façons de s'en servir : diriger une civilisation contre l'IA, ou regarder l'IA les jouer toutes.
 Le plan, l'architecture et les écarts par rapport au jeu d'origine sont dans [PLAN.md](PLAN.md).
 
 ## Lancer
@@ -13,7 +13,43 @@ python run.py
 
 Puis ouvrir http://127.0.0.1:8005. Sous Windows, `start.bat` fait la même chose. `--port 9000` change le port.
 
-Dans l'interface :
+Au démarrage, le serveur lance une partie observée. Le bouton **New game** (ou **Game** en cours de partie jouée) ouvre la fenêtre où l'on choisit le mode.
+
+## Jouer une civilisation
+
+Dans la fenêtre « Game » : mode **Play a civilization**, votre civilisation (ou « Pick at random »), le nombre de civilisations, la difficulté et le monde. La difficulté ne change que votre civilisation (mécontentement, coût de la recherche) : l'IA ne reçoit ni bonus ni malus.
+
+Vous ne voyez que ce que votre civilisation connaît : les terres explorées, les unités en vue, les villes étrangères telles que vous les avez vues la dernière fois.
+
+- **Barre du haut** : trésor et gain par tour, recherche en cours, taux d'impôts, puis **End turn** (Entrée). S'il reste des unités sans ordre, il faut confirmer une seconde fois.
+- **Panneau Turn** : les décisions à prendre (recherche, ville sans production, proposition de paix), les alertes, les unités qui attendent un ordre, vos villes et ce qui s'est passé depuis votre dernier tour.
+- **Unité active** (cerclée d'or) : ses ordres possibles sont dans la barre du bas, avec leur raccourci et leur durée. Le jeu passe à l'unité suivante dès qu'elle a reçu un ordre ou n'a plus de mouvement.
+- **Sur la carte** : clic sur une de vos unités pour la prendre en main (clics répétés pour parcourir une pile), clic sur une case voisine pour y aller ou attaquer, clic droit n'importe où pour y envoyer l'unité. Au survol d'un ennemi voisin, l'infobulle donne les forces en présence et vos chances.
+- **Clic sur une de vos villes** : choix de la production, achat, clic sur une case pour y mettre un citoyen au travail ou l'en retirer, clic sur un spécialiste pour changer son métier (villes de taille 5 et plus), clic sur un bâtiment pour le vendre, interrupteur **Governor** pour laisser la ville choisir seule ce qu'elle construit.
+- **Empire** : taux d'impôts, luxe et science, révolution, guerre et paix avec les civilisations rencontrées, recherche, lancement du vaisseau.
+- **Science** : clic sur une technologie accessible pour la rechercher.
+
+| Touche | Ordre |
+|---|---|
+| Flèches, pavé numérique | Déplacer l'unité (les diagonales au pavé numérique, ou Début, Fin, Page préc., Page suiv.) |
+| B | Fonder une ville, ou rejoindre la ville où se trouve le colon |
+| R, I, M, P | Route (puis voie ferrée), irrigation, mine, dépollution |
+| F | Fortifier (forteresse pour un colon qui ne peut pas se fortifier davantage) |
+| S, V | Sentinelle ; réveiller ou reprendre en main |
+| G | Aller à : choisir la destination sur la carte (Échap pour annuler) |
+| X, A | Explorer tout seul ; colons automatiques |
+| H, U | Changer de ville d'attache ; embarquer ou débarquer dans un port |
+| K, T | Caravane : aider la merveille ; ouvrir une route commerciale |
+| W, Espace | Attendre (revenir à l'unité plus tard) ; ne rien faire ce tour |
+| C | Centrer la carte sur l'unité |
+| Maj + D | Dissoudre l'unité (à confirmer) |
+| Entrée | Finir le tour |
+
+La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. Si votre civilisation est détruite, la partie continue et vous pouvez la regarder jusqu'au bout.
+
+## Observer
+
+Mode **Watch the AI play them all** de la fenêtre « Game ».
 
 - **Play / Step / Speed** : lecture continue, tour par tour, vitesse. Espace = lecture/pause, N = un tour.
 - **New game, Save, Saved games** : ouvrent la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.

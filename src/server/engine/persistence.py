@@ -4,8 +4,9 @@ Everything that decides the future of a game is saved, including the state of th
 generator: a loaded game continues exactly as the original would have. What can be derived
 (which tile holds which city, the figures of each city) is rebuilt on load.
 
-The players' controllers (the AI) keep their own memory; they save and restore it through
-`save_state()` / `load_state()` and the result travels in the same file.
+The players' controllers (the AI, or what a person delegated) keep their own memory; they
+save and restore it through `save_state()` / `load_state()` and the result travels in the
+same file, with the list of the players led by a person (`humans`).
 """
 from __future__ import annotations
 
@@ -57,8 +58,13 @@ def game_to_data(game: Game) -> dict[str, Any]:
         "cities": [_city_to_data(c) for c in game.cities.values()],
         "units": [dataclasses.asdict(u) for u in game.units.values()],
         "wonders": [[wonder_id, city_id] for wonder_id, city_id in game.wonders.items()],
-        "relations": [[a, b, r.state, r.since_turn, r.last_proposal_turn]
+        "relations": [[a, b, r.state, r.since_turn, r.last_proposal_turn, r.pending_from]
                       for (a, b), r in game.relations.items()],
+        # A game led by a person is saved in the middle of that person's turn.
+        "current_player": game.current_player,
+        "round_position": game.round_position,
+        "humans": [player_id for player_id, controller in game.controllers.items()
+                   if getattr(controller, "interactive", False)],
         "controllers": {
             str(player_id): controller.save_state()
             for player_id, controller in game.controllers.items()
@@ -152,8 +158,10 @@ def _build_game(rules: Rules, data: dict[str, Any]) -> Game:
     for index, unit_ids in saved_map["units"]:
         world.tiles[index].unit_ids = list(unit_ids)
     game.wonders = {wonder_id: city_id for wonder_id, city_id in data["wonders"]}
-    for a, b, state, since, proposal in data["relations"]:
-        game.relations[(a, b)] = Relation(state, since, proposal)
+    for a, b, state, since, proposal, *pending in data["relations"]:
+        game.relations[(a, b)] = Relation(state, since, proposal, pending[0] if pending else None)
+    game.current_player = data.get("current_player")
+    game.round_position = data.get("round_position", 0)
 
     # Derived state.
     for city in game.cities.values():

@@ -83,7 +83,9 @@ export function renderChart(container) {
   if (!fields.includes(metric)) metric = fields[0];
   const field = fields.indexOf(metric);
   const cities = fields.indexOf('cities');
-  const players = state.players.filter((p) => !p.barbarian);
+  // A person only follows its own figures: the others have no history to draw.
+  const followed = all[all.length - 1].players;
+  const players = state.players.filter((p) => !p.barbarian && followed[p.id] !== undefined);
 
   container.querySelectorAll('[data-metric]').forEach((b) =>
     b.setAttribute('aria-pressed', String(b.dataset.metric === metric)));

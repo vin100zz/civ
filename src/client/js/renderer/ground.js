@@ -153,7 +153,7 @@ function paintChunk(level, look, startX, startY, tiles) {
   const kindAt = (x, y) => {
     const row = Math.min(map.height - 1, Math.max(0, y));
     const column = ((x % map.width) + map.width) % map.width;
-    return kindOf[map.terrain[row * map.width + column]];
+    return kindOf[(map.ground || map.terrain)[row * map.width + column]];
   };
   const corner = (x, y, seed) => lattice(((x % map.width) + map.width) % map.width, y, seed);
 
@@ -360,16 +360,17 @@ export class Ground {
   // Forgets the chunks that show a tile whose terrain changed since they were painted.
   sync() {
     const { map } = store;
+    const terrain = map.ground || map.terrain;       // see state.js groundTerrain
     const size = map.width * map.height;
     if (!this.terrain || this.terrain.length !== size || this.width !== map.width) {
       this.chunks.clear();
-      this.terrain = Uint8Array.from(map.terrain);
+      this.terrain = Uint8Array.from(terrain);
       this.width = map.width;
       return;
     }
     for (let index = 0; index < size; index++) {
-      if (this.terrain[index] === map.terrain[index]) continue;
-      this.terrain[index] = map.terrain[index];
+      if (this.terrain[index] === terrain[index]) continue;
+      this.terrain[index] = terrain[index];
       const x = index % map.width;
       const y = (index - x) / map.width;
       for (const [key, chunk] of this.chunks) {

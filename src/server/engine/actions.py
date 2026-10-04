@@ -1,6 +1,6 @@
 """Everything a player can do, as commands validated and applied by the engine.
 
-An AI today, a human tomorrow: both change the game only through `apply`. A refused action
+An AI or a person: both change the game only through `apply`. A refused action
 leaves the game untouched and says why.
 """
 from __future__ import annotations
@@ -98,6 +98,28 @@ class ArrangeWorkers:
 
 
 @dataclass(frozen=True)
+class ToggleTile:
+    """A citizen leaves the tile it works (and becomes an entertainer), or a specialist goes
+    to work a free tile of the city area. Offsets are relative to the city."""
+    city_id: int
+    dx: int
+    dy: int
+
+
+@dataclass(frozen=True)
+class ChangeSpecialist:
+    """One specialist of this kind takes the next job: entertainer, taxman, scientist."""
+    city_id: int
+    kind: str
+
+
+@dataclass(frozen=True)
+class SellBuilding:
+    city_id: int
+    building: str
+
+
+@dataclass(frozen=True)
 class SetResearch:
     tech_id: str
 
@@ -125,13 +147,21 @@ class ProposePeace:
 
 
 @dataclass(frozen=True)
+class AnswerPeace:
+    """Answer to the peace proposal another civilization left on the table."""
+    other: int
+    accept: bool
+
+
+@dataclass(frozen=True)
 class LaunchSpaceship:
     """Sends the spaceship to Alpha Centauri with the parts built so far."""
 
 
 Action = Union[MoveUnit, Board, Disembark, FoundCity, JoinCity, SetOrder, Disband, Rehome,
                HelpBuildWonder, EstablishTradeRoute, SetProduction, Buy, ArrangeWorkers,
-               SetResearch, SetRates, Revolution, DeclareWar, ProposePeace, LaunchSpaceship]
+               ToggleTile, ChangeSpecialist, SellBuilding, SetResearch, SetRates, Revolution,
+               DeclareWar, ProposePeace, AnswerPeace, LaunchSpaceship]
 
 
 @dataclass(frozen=True)
@@ -289,6 +319,31 @@ def _arrange(game: Game, player, action: ArrangeWorkers) -> Result:
     return OK
 
 
+def _toggle_tile(game: Game, player, action: ToggleTile) -> Result:
+    city = _own_city(game, player, action.city_id)
+    if city is None:
+        return _refuse("no such city")
+    if city_rules.toggle_tile(game, city, (action.dx, action.dy)):
+        return OK
+    return _refuse("no free citizen for this tile")
+
+
+def _change_specialist(game: Game, player, action: ChangeSpecialist) -> Result:
+    city = _own_city(game, player, action.city_id)
+    if city is None:
+        return _refuse("no such city")
+    if city_rules.change_specialist(game, city, action.kind):
+        return OK
+    return _refuse("the city is too small for taxmen and scientists")
+
+
+def _sell_building(game: Game, player, action: SellBuilding) -> Result:
+    city = _own_city(game, player, action.city_id)
+    if city is None:
+        return _refuse("no such city")
+    return OK if production.sell(game, city, action.building) else _refuse("cannot sell that")
+
+
 def _set_research(game: Game, player, action: SetResearch) -> Result:
     if action.tech_id not in game.rules.techs:
         return _refuse("no such advance")
@@ -322,12 +377,20 @@ def _propose_peace(game: Game, player, action: ProposePeace) -> Result:
     target = game.players[action.target]
     controller = game.controllers.get(target.id)
 
-    def accepts() -> bool:
-        return controller is not None and controller.accepts_peace(game, target, player.id)
+    def accepts():
+        if controller is None:
+            return False
+        return controller.accepts_peace(game, target, player.id)
 
     if diplomacy.propose_peace(game, player.id, target.id, accepts):
         return OK
     return _refuse("peace refused")
+
+
+def _answer_peace(game: Game, player, action: AnswerPeace) -> Result:
+    if diplomacy.answer_peace(game, player.id, action.other, action.accept):
+        return OK
+    return _refuse("no proposal to answer")
 
 
 def _launch(game: Game, player, action: LaunchSpaceship) -> Result:
@@ -341,4 +404,6 @@ _HANDLERS = {
     EstablishTradeRoute: _trade_route, SetProduction: _set_production, Buy: _buy,
     ArrangeWorkers: _arrange, SetResearch: _set_research, SetRates: _set_rates,
     Revolution: _revolution, DeclareWar: _declare_war, ProposePeace: _propose_peace,
+    ToggleTile: _toggle_tile, ChangeSpecialist: _change_specialist,
+    SellBuilding: _sell_building, AnswerPeace: _answer_peace,
 }

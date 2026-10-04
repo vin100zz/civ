@@ -303,9 +303,20 @@ class PlayerSettings:
 
 
 @dataclass(frozen=True)
+class DifficultyLevel:
+    """What a level changes for the person who chose it. The AI keeps the base figures."""
+    name: str
+    content_base: int
+    empire_size_base: int
+    research_cost_factor: int
+
+
+@dataclass(frozen=True)
 class DifficultySettings:
     content_base: int
     empire_size_base: int
+    default_level: str
+    levels: dict[str, DifficultyLevel]
 
 
 @dataclass(frozen=True)
@@ -326,6 +337,7 @@ class CitySettings:
     food_box_per_size: int
     disorder_shields: bool
     specialist_yield: int
+    specialist_min_size: int        # smaller cities only have entertainers
     luxury_per_happy: int
     max_trade_routes: int
     trade_route_min_distance: int

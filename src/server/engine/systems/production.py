@@ -127,6 +127,28 @@ def buy(game: Game, city: City) -> bool:
     return True
 
 
+def can_sell(game: Game, city: City, building_id: str) -> bool:
+    """One building per turn, never a wonder nor the palace."""
+    building = game.rules.buildings.get(building_id)
+    return (building is not None and building_id in city.buildings and not building.wonder
+            and not building.has_effect("capital") and not city.sold_this_turn)
+
+
+def sell(game: Game, city: City, building_id: str) -> bool:
+    """Sells a building for one gold per shield it cost (as a forced sale does)."""
+    if not can_sell(game, city, building_id):
+        return False
+    building = game.rules.buildings[building_id]
+    player = game.players[city.owner]
+    player.gold += building.cost
+    city.buildings.discard(building_id)
+    city.sold_this_turn = True
+    city.stats = city_rules.compute_city(game, city)
+    game.emit("sold", f"{city.name} sells its {building.name} for {building.cost} gold.",
+              player=player.id, x=city.x, y=city.y, city=city.id)
+    return True
+
+
 def complete_if_ready(game: Game, city: City) -> Optional[Item]:
     """Delivers the current production if the city has gathered enough shields."""
     item = city.production
