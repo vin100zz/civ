@@ -115,12 +115,40 @@ export function skip() {
   settle();
 }
 
-// What still asks for the person's decision: idle cities, research to choose, peace proposals.
+// What the person must decide before its turn can end: peace proposals to answer, research
+// to choose, cities with nothing to build. One list for the Turn panel, the End turn
+// buttons and the automatic end of turn.
+export function decisions() {
+  const me = store.state && store.state.me;
+  if (leader() === null || !me) return [];
+  const list = [];
+  for (const id of me.proposals) {
+    list.push({ kind: 'proposal', id, glyph: 'scroll',
+      text: `The ${store.state.players[id].nation} propose peace`,
+      detail: 'Accept or refuse their treaty' });
+  }
+  if (me.researching === null && me.research_options.length) {
+    list.push({ kind: 'research', glyph: 'flask', text: 'Choose what to research',
+      detail: `${plural(me.research_options.length, 'advance')} within reach` });
+  }
+  for (const city of store.state.cities) {
+    if (city.owner !== me.id || !city.idle) continue;
+    list.push({ kind: 'city', id: city.id, glyph: 'city',
+      text: `${city.name} needs something to build`,
+      detail: city.completed ? `${city.completed} is finished` : 'Nothing in production' });
+  }
+  return list;
+}
+
 export function pendingDecisions() {
-  const me = store.state.me;
-  if (leader() === null || !me) return 0;
-  return store.state.cities.filter((city) => city.owner === me.id && city.idle).length
-    + (me.researching === null && me.research_options.length ? 1 : 0) + me.proposals.length;
+  return decisions().length;
+}
+
+// Why the turn cannot be ended yet, for the tooltip of the End turn buttons ('' when it can).
+export function whyNotEnd() {
+  const waiting = decisions();
+  if (!waiting.length) return '';
+  return `Decide first:\n${waiting.map((decision) => `• ${decision.text}`).join('\n')}`;
 }
 
 // As in the original game, the turn ends by itself once the last unit has its orders,
@@ -208,6 +236,12 @@ function step(dx, dy) {
 
 export function endTurn() {
   if (leader() === null || play.waiting) return;
+  const waiting = decisions();
+  if (waiting.length) {
+    const others = waiting.length > 1 ? `, and ${plural(waiting.length - 1, 'other decision')}` : '';
+    emit('notice', { text: `${waiting[0].text}${others}: decide before ending the turn.`, ok: false });
+    return;
+  }
   const left = queue().length;
   if (left && Date.now() - play.endAsked > 4000) {
     play.endAsked = Date.now();
@@ -226,7 +260,8 @@ function finishTurn() {
   play.mode = null;
   play.preview = null;
   syncHud();
-  send({ cmd: 'end_turn' });
+  // The turn is named: a second window on the same game cannot end the next one by accident.
+  send({ cmd: 'end_turn', turn: store.state.turn });
   emit('play');
 }
 

@@ -240,12 +240,19 @@ class Session:
                 "tile_changes": changes, "events": events, "history": self.history[-1],
                 "playing": self.playing})
 
-    async def end_turn(self) -> None:
-        """The person has finished: the others play, then its next turn begins."""
+    async def end_turn(self, turn_number: Any = None) -> None:
+        """The person has finished: the others play, then its next turn begins.
+
+        A browser says which turn it is ending. Two browsers open on the same game may both
+        ask (the turn ends by itself after the last unit's order): the second request names
+        a turn that is already over and is ignored.
+        """
         async with self._busy:
             if not self.in_play():
                 return
             game = self.game
+            if turn_number is not None and turn_number != game.turn:
+                return
             before = game.turn
             await asyncio.to_thread(self._advance)
             if not self.in_play():
@@ -428,7 +435,7 @@ class Session:
             await self.broadcast_init()
             await self._notice(client, f"Game {name} loaded.", True)
         elif command == "end_turn":
-            await self.end_turn()
+            await self.end_turn(message.get("turn"))
         elif command == "action":
             await self.act(message)
         elif command in ("goto", "automate", "govern"):

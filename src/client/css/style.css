@@ -95,6 +95,9 @@ body.play .observer-only { display: none !important; }
 .btn.danger { border-color: rgba(242, 117, 106, 0.5); color: var(--bad); }
 .btn.danger:hover { background: rgba(242, 117, 106, 0.12); border-color: var(--bad); }
 .btn:disabled { opacity: 0.5; cursor: default; }
+/* Out of reach for now, but still hoverable: its tooltip says why. */
+.btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.btn[aria-disabled="true"]:hover { background: var(--raise); border-color: var(--line); }
 
 .kbd {
   font-family: var(--mono);
@@ -658,6 +661,9 @@ body.play #notice { bottom: auto; top: 72px; }
 }
 .alert { border-color: rgba(242, 117, 106, 0.35); background: rgba(242, 117, 106, 0.07); }
 .todo:hover { background: rgba(226, 182, 89, 0.14); }
+.todo.advice { border-color: var(--line); background: var(--raise); }
+.todo.advice:hover { background: var(--hover); }
+.todo.advice .mark { color: var(--soft); }
 .alert:hover { background: rgba(242, 117, 106, 0.12); }
 .todo .mark, .alert .mark { display: flex; color: var(--gold); }
 .alert .mark { color: var(--bad); }

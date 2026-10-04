@@ -18,7 +18,7 @@ import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
 import {
   play, activate, endTurn, handleKey, clickTile, sendTo, hoverTile, queue, activeUnit, setMode,
-  pendingDecisions,
+  pendingDecisions, whyNotEnd,
 } from './play.js';
 import {
   initDialogs, openGameDialog, resetGameDialog, refreshSaves, setDialogStatus, showGameOver,
@@ -193,8 +193,12 @@ function refreshPlayBar() {
   const pending = pendingDecisions();
   const button = $('btn-end-turn');
   const ready = !left && !pending && !play.waiting && !play.ending;
+  const why = whyNotEnd();
   button.classList.toggle('primary', ready);
   button.disabled = play.waiting || play.ending;
+  // Greyed out while a decision waits, but still hoverable: its tooltip says which one.
+  button.setAttribute('aria-disabled', String(Boolean(why)));
+  button.title = why || 'End your turn (Enter)';
   const status = $('turn-status');
   status.className = `turn-status play-only${ready ? ' ready' : ''}`;
   status.innerHTML = `<i></i>${play.waiting ? 'The others are playing…'

@@ -3,7 +3,7 @@
 
 import { store, U, emit, player, leader, yearLabel, plural, turnsFor } from '../state.js';
 import { icon } from '../icons.js';
-import { play, queue, activate } from '../play.js';
+import { play, queue, activate, decisions } from '../play.js';
 import { governmentName, techName } from './civs.js';
 import { movesText } from './unitbar.js';
 import { groupOf } from './log.js';
@@ -25,26 +25,28 @@ function nearestCity(unit, cities) {
   return best;
 }
 
-function decisions(me, cities) {
+function todo(text, detail, attributes, glyph, advice = false) {
+  return `<button class="todo${advice ? ' advice' : ''}" ${attributes}><span class="mark">${icon(glyph, 18)}</span>
+    <span class="body"><b>${text}</b><span>${detail}</span></span>${icon('right', 16, 2)}</button>`;
+}
+
+// What must be decided before the turn can end (play.js decisions).
+function decisionRows() {
+  const target = { proposal: (d) => `data-proposal="${d.id}"`, research: () => 'data-research',
+    city: (d) => `data-city="${d.id}"` };
+  return decisions().map((d) => todo(d.text, d.detail, target[d.kind](d), d.glyph));
+}
+
+// What is worth a look but does not hold the turn.
+function adviceRows(me) {
   const rows = [];
-  const add = (text, detail, attributes, glyph = 'arrow') => rows.push(`
-    <button class="todo" ${attributes}><span class="mark">${icon(glyph, 18)}</span>
-      <span class="body"><b>${text}</b><span>${detail}</span></span>${icon('right', 16, 2)}</button>`);
-  for (const id of me.proposals) {
-    add(`The ${player(id).nation} propose peace`, 'Answer before you end your turn', `data-proposal="${id}"`, 'scroll');
-  }
-  if (me.researching === null && me.research_options.length) {
-    add('Choose what to research', `${me.research_options.length} advances within reach`, 'data-research', 'flask');
-  }
-  for (const city of cities.filter((c) => c.idle)) {
-    add(`${city.name} needs something to build`,
-      city.completed ? `${city.completed} is finished` : 'Nothing in production', `data-city="${city.id}"`, 'city');
-  }
   if (me.cities && me.forecast.science === 0 && me.government !== 'anarchy') {
-    add('Your scientists have nothing to work with', 'Raise the science rate, or let your cities grow', 'data-empire', 'flask');
+    rows.push(todo('Your scientists have nothing to work with',
+      'Raise the science rate, or let your cities grow', 'data-empire', 'flask', true));
   }
   if (me.can_launch) {
-    add('Your spaceship can be launched', `${me.flight_years} years to Alpha Centauri`, 'data-empire', 'rocket');
+    rows.push(todo('Your spaceship can be launched', `${me.flight_years} years to Alpha Centauri`,
+      'data-empire', 'rocket', true));
   }
   return rows;
 }
@@ -63,7 +65,8 @@ export function renderTurn(container) {
   const waiting = queue();
   const scroll = container.scrollTop;
 
-  const todo = decisions(me, cities);
+  const toDecide = decisionRows();
+  const advice = adviceRows(me);
   const alerts = (state.alerts || []).map((alert) => `
     <button class="alert" data-x="${alert.x}" data-y="${alert.y}">
       <span class="mark">${icon('alert', 18)}</span><span class="body"><b>${alert.text}</b></span>
@@ -130,7 +133,8 @@ export function renderTurn(container) {
         <div class="stat"><b>${me.score}</b><span>Score</span></div>
       </div>
     </div>
-    ${todo.length ? `${heading('To decide', todo.length)}<div class="turn-list">${todo.join('')}</div>` : ''}
+    ${toDecide.length ? `${heading('To decide before ending the turn', toDecide.length)}<div class="turn-list">${toDecide.join('')}</div>` : ''}
+    ${advice.length ? `${heading('Worth a look', advice.length)}<div class="turn-list">${advice.join('')}</div>` : ''}
     ${alerts.length ? `${heading('Alerts', alerts.length)}<div class="turn-list">${alerts.join('')}</div>` : ''}
     ${heading('Units awaiting orders', waiting.length)}
     <div class="turn-list tight">${units.join('') || '<span class="sub quiet">Every unit has its orders.</span>'}</div>
@@ -160,6 +164,7 @@ export function renderTurn(container) {
   });
   const research = container.querySelector('[data-research]');
   if (research) research.addEventListener('click', () => emit('open-research'));
-  const empire = container.querySelector('[data-empire]');
-  if (empire) empire.addEventListener('click', () => emit('show-tab', 'civ'));
+  container.querySelectorAll('[data-empire]').forEach((row) => {
+    row.addEventListener('click', () => emit('show-tab', 'civ'));
+  });
 }

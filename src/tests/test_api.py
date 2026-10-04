@@ -197,6 +197,13 @@ def test_play_session(client):
         assert list(message["history"]["players"]) == ["1"]
         assert message["state"]["cities"][0]["shields"] > 0
 
+        # A second request to end the turn that is already over (another window) changes nothing.
+        socket.send_json({"cmd": "end_turn", "turn": 0})
+        socket.send_json({"cmd": "pov", "player": 1})
+        assert socket.receive_json()["state"]["turn"] == 1
+        socket.send_json({"cmd": "end_turn", "turn": 1})
+        assert receive(socket, "turn")["state"]["turn"] == 2
+
 
 def test_a_person_only_hears_what_it_may_know(client):
     with client.websocket_connect("/ws") as socket:
