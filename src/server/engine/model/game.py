@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import random
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 from ..rules.schema import BuildingDef, GovernmentDef, Rules, TerrainDef, UnitDef
 from .entities import NO_CONTACT, PEACE, WAR, City, Player, Relation, Unit
@@ -32,6 +32,8 @@ class Game:
         self.warming_count = 0                        # global warmings so far
         self.changed_tiles: set[int] = set()          # tile indexes modified since last sync
         self.controllers: dict = {}                   # player id -> Controller (systems/turn.py)
+        # Whoever shows the game is told of every step: watcher(unit, origin, target, outcome).
+        self.watcher: Optional[Callable[[Unit, Tile, Tile, str], None]] = None
         self._next_unit_id = 1
         self._next_city_id = 1
         self._home_index: Optional[dict[int, list[Unit]]] = None   # city id -> supported units
@@ -195,6 +197,12 @@ class Game:
             event["x"], event["y"] = x, y
         event.update(data)
         self.events.append(event)
+
+    def report_step(self, unit: Unit, origin: Tile, target: Tile, outcome: str) -> None:
+        """A unit has just moved, attacked or captured from one tile into the next (the
+        outcome is one of systems/movement.py). The unit may have died doing so."""
+        if self.watcher is not None:
+            self.watcher(unit, origin, target, outcome)
 
     def living(self, players: Iterable[Player]) -> list[Player]:
         return [p for p in players if p.alive]

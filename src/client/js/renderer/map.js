@@ -27,6 +27,10 @@ const ORDER_MARK = {
 const TASK_MARK = { goto: 'G', explore: 'X', work: 'A' };
 const BAD = '#F2756A';
 const SLIDE_MS = 160;         // a unit sliding to the next tile after an order
+const LEG_MS = 120;           // the least each tile of a longer way takes...
+const WAY_MS = 900;           // ...unless the whole way would then take more than this
+const BURST_MS = 480;         // a destroyed unit going up in a flash
+const LINGER_MS = 260;        // the camera stays this long on a move that has just ended
 const BLINK_ON_MS = 520;      // the unit waiting for orders shows this long...
 const BLINK_OFF_MS = 280;     // ...then hides this long, as in the original game
 
@@ -56,7 +60,10 @@ export class MapView {
     this.onTileHover = () => {};
     // Html about sending the active unit to a tile: null for the usual tooltip, '' for none.
     this.describeMove = () => null;
-    this.slides = new Map();            // unit id -> {x0, y0, x1, y1, start, duration}
+    this.slides = new Map();            // unit id -> {path: [[x, y], ...], start, leg}
+    this.bursts = [];                   // units just destroyed: {x, y, units, start}
+    this.busyUntil = 0;                 // something moves on screen until then
+    this.wanted = null;                 // the tile to bring into view once that is over
     this.blink = { key: null, since: 0, timer: null };
     this.still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this._bind();
@@ -109,6 +116,7 @@ export class MapView {
   }
 
   centerOn(x, y) {
+    this.wanted = null;
     this.cx = x + 0.5;
     this.cy = y + 0.5;
     this._clamp();
@@ -116,20 +124,58 @@ export class MapView {
     this.onViewChange();
   }
 
-  // Brings a tile into view if it is off screen or too close to the edges (the bottom edge
+  // True if a tile shows at least `margin` pixels away from the edges (the bottom edge
   // counts double: the unit bar lies over it).
-  reveal(x, y) {
-    if (!store.map) return;
+  _inView(x, y, margin = Math.min(160, this.width / 5)) {
     const w = store.map.width;
     let dx = x + 0.5 - this.cx;
     if (dx > w / 2) dx -= w;
     if (dx < -w / 2) dx += w;
     const px = this.width / 2 + dx * this.tile;
     const py = this.height / 2 + (y + 0.5 - this.cy) * this.tile;
-    const margin = Math.min(160, this.width / 5);
-    if (px < margin || px > this.width - margin || py < margin || py > this.height - 2 * margin) {
-      this.centerOn(x, y);
-    }
+    return px >= margin && px <= this.width - margin && py >= margin && py <= this.height - 2 * margin;
+  }
+
+  // Brings a tile into view if it is off screen or too close to the edges. Returns true
+  // if the camera had to move.
+  bring(x, y) {
+    this.wanted = null;
+    if (!store.map || this._inView(x, y)) return false;
+    this.centerOn(x, y);
+    return true;
+  }
+
+  // The same, but not before the moves showing on screen are over: the camera never leaves
+  // in the middle of one.
+  reveal(x, y) {
+    this.wanted = { x, y };
+    this.invalidate();
+  }
+
+  // True while the camera has yet to go where `reveal` sent it.
+  get lagging() {
+    return this.wanted !== null && Boolean(store.map) && !this._inView(this.wanted.x, this.wanted.y);
+  }
+
+  // Resolves once the moves showing on screen have been seen.
+  settled() {
+    const wait = this.busyUntil - performance.now();
+    if (wait <= 0) return Promise.resolve();
+    return new Promise((resolve) => { setTimeout(resolve, wait); }).then(() => this.settled());
+  }
+
+  // Something moves on a tile until then: if it shows, the camera stays for it.
+  _hold(x, y, until) {
+    if (this._inView(x, y, 0)) this.busyUntil = Math.max(this.busyUntil, until + LINGER_MS);
+  }
+
+  // Goes where `reveal` asked, as soon as nothing moves on screen any more.
+  _follow() {
+    if (!this.wanted) return;
+    clearTimeout(this.followTimer);
+    const wait = this.busyUntil - performance.now();
+    if (wait > 0) this.followTimer = setTimeout(() => this.invalidate(), wait + 1);
+    else this.bring(this.wanted.x, this.wanted.y);
   }
 
   zoomBy(factor) {
@@ -393,6 +439,7 @@ export class MapView {
     ctx.fillRect(0, 0, this.width, this.height);
     const { map, state } = store;
     if (!map || !state) return;
+    this._follow();
     const ts = this.tile;
     const range = this.visibleRange();
     const explored = state.explored || null;
@@ -419,7 +466,10 @@ export class MapView {
     if (store.options.grid && ts >= 16) this._drawGrid(ctx, range);
 
     const sliding = this._advanceSlides();
-    const hidden = this._blinkedOut();      // the active unit, while its blink hides it
+    // The tile of the unit waiting for orders, while its blink hides it. Everything on the
+    // tile goes with it (a ship and those aboard): nothing else flashes in its place.
+    const active = store.hud.unit;
+    const dark = this._blinkedOut() ? tileIndex(active[U.X], active[U.Y]) : -1;
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const index = tileIndex(tx, ty);
@@ -429,17 +479,15 @@ export class MapView {
         const size = this.screenX(tx + 1) - px;
         const city = store.cityAt.get(index);
         const all = store.unitsAt.get(index);
-        const units = all && (sliding || hidden !== null)
-          ? all.filter((unit) => !this.slides.has(unit[U.ID]) && unit[U.ID] !== hidden) : all;
+        const units = all && sliding ? all.filter((unit) => !this.slides.has(unit[U.ID])) : all;
         if (city) {
           this._drawCity(ctx, city, all, px, py, size);
           // In a city the unit waiting for orders shows over it, and blinks there.
-          const active = store.hud.unit;
-          if (active && active[U.ID] !== hidden && all && all.includes(active)
+          if (active && index !== dark && all && all.includes(active)
               && !this.slides.has(active[U.ID])) {
             this._drawUnits(ctx, [active], px, py, size);
           }
-        } else if (units && units.length) {
+        } else if (units && units.length && index !== dark) {
           this._drawUnits(ctx, units, px, py, size);
         }
         if (explored && explored[index] === '1') {
@@ -458,31 +506,70 @@ export class MapView {
       }
     }
     if (sliding) this._drawSlides(ctx, ts);
+    const bursting = this._drawBursts(ctx, ts);
     if (store.options.missions) this._drawMissions(ctx);
     this._drawSelection(ctx);
     this._drawOrders(ctx);
-    if (sliding) this.invalidate();
+    if (sliding || bursting) this.invalidate();
   }
 
   // ── Units on the move ───────────────────────────────────────────────────
 
-  // Slides the units that changed tile with the last message: [id, x0, y0, x1, y1].
-  // Longer jumps (a journey, several turns of an observed game) are not animated.
-  slide(moves, duration = SLIDE_MS) {
-    const w = store.map.width;
-    const now = performance.now();
-    for (const [id, x0, y0, x1, y1] of moves) {
-      let dx = x1 - x0;
-      if (dx > w / 2) dx -= w;
-      if (dx < -w / 2) dx += w;
-      if (Math.abs(dx) > 2 || Math.abs(y1 - y0) > 2) continue;
-      this.slides.set(id, { x0: x1 - dx, y0, x1, y1, start: now, duration });
+  // Slides the units that changed tile along the way they went: [[id, [[x, y], ...]], ...].
+  // One step takes `duration`, each step of a longer way a little less. Jumps (a journey
+  // nobody told the steps of, several turns of an observed game) are not animated. With
+  // `watched`, the camera waits for the slides that show before it goes anywhere else.
+  slide(routes, duration = SLIDE_MS, watched = true) {
+    for (const [id, tiles] of routes) {
+      const path = this._unwrap(tiles);
+      if (!path) continue;
+      const legs = path.length - 1;
+      this._start(id, path, Math.max(duration / legs, Math.min(LEG_MS, WAY_MS / legs)), watched);
     }
-    if (this.slides.size) this.invalidate();
   }
 
-  // The id of the active unit while its blink hides it, else null. The blink starts over,
-  // unit showing, each time the active unit changes or moves; a timer keeps it going.
+  // A unit strikes at the tile next to it and comes back.
+  lunge(id, from, to, duration) {
+    const path = this._unwrap([from, to]);
+    if (!path) return;
+    const [[x0, y0], [x1, y1]] = path;
+    const reach = [x0 + (x1 - x0) * 0.45, y0 + (y1 - y0) * 0.45];
+    this._start(id, [[x0, y0], reach, [x0, y0]], duration / 2);
+  }
+
+  // The units a fight has just destroyed on a tile go up in a flash.
+  burst(x, y, units) {
+    const now = performance.now();
+    this.bursts.push({ x, y, units, start: now });
+    this._hold(x, y, now + BURST_MS);
+    this.invalidate();
+  }
+
+  _start(id, path, leg, watched = true) {
+    const now = performance.now();
+    const [x, y] = path[path.length - 1];
+    this.slides.set(id, { path, start: now, leg });
+    if (watched) this._hold(Math.round(x), Math.round(y), now + leg * (path.length - 1));
+    this.invalidate();
+  }
+
+  // The tiles of a way, in columns that never jump across the edge of the world (they may
+  // leave it on either side). Null if two of them are too far apart for a slide.
+  _unwrap(tiles) {
+    const w = store.map.width;
+    const path = [tiles[0]];
+    for (let i = 1; i < tiles.length; i++) {
+      let dx = tiles[i][0] - tiles[i - 1][0];
+      if (dx > w / 2) dx -= w;
+      if (dx < -w / 2) dx += w;
+      if (Math.abs(dx) > 2 || Math.abs(tiles[i][1] - tiles[i - 1][1]) > 2) return null;
+      path.push([path[i - 1][0] + dx, tiles[i][1]]);
+    }
+    return path;
+  }
+
+  // True while the blink of the active unit hides it. The blink starts over, unit showing,
+  // each time the active unit changes or moves; a timer keeps it going.
   _blinkedOut() {
     const unit = store.hud.unit;
     const blink = this.blink;
@@ -492,19 +579,19 @@ export class MapView {
       blink.since = performance.now();
     }
     clearTimeout(blink.timer);
-    if (!unit || this.still || this.slides.has(unit[U.ID])) return null;
+    if (!unit || this.still || this.slides.has(unit[U.ID])) return false;
     const phase = (performance.now() - blink.since) % (BLINK_ON_MS + BLINK_OFF_MS);
     const showing = phase < BLINK_ON_MS;
     blink.timer = setTimeout(() => this.invalidate(),
       (showing ? BLINK_ON_MS : BLINK_ON_MS + BLINK_OFF_MS) - phase + 1);
-    return showing ? null : unit[U.ID];
+    return !showing;
   }
 
   // Drops the slides that are over. Returns true while some unit is still sliding.
   _advanceSlides() {
     const now = performance.now();
     for (const [id, slide] of this.slides) {
-      if (now - slide.start >= slide.duration) this.slides.delete(id);
+      if (now - slide.start >= slide.leg * (slide.path.length - 1)) this.slides.delete(id);
     }
     return this.slides.size > 0;
   }
@@ -512,20 +599,59 @@ export class MapView {
   _drawSlides(ctx, ts) {
     const now = performance.now();
     const explored = store.state.explored || null;
+    // Units going the same way show as the stack they are: a ship and those aboard.
+    const stacks = new Map();
     for (const unit of store.state.units) {
       const slide = this.slides.get(unit[U.ID]);
       if (!slide) continue;
+      const legs = slide.path.length - 1;
+      const t = Math.min(legs, (now - slide.start) / slide.leg);
+      const leg = Math.min(legs - 1, Math.floor(t));
+      const [x0, y0] = slide.path[leg];
+      const [x1, y1] = slide.path[leg + 1];
       // Someone watching through a civilization's eyes only sees the arrival tile.
-      if (explored && explored[tileIndex(slide.x1, slide.y1)] !== '2') continue;
-      const t = Math.min(1, (now - slide.start) / slide.duration);
-      const ease = t * (2 - t);
-      const x = slide.x0 + (slide.x1 - slide.x0) * ease;
-      const y = slide.y0 + (slide.y1 - slide.y0) * ease;
+      if (explored && explored[tileIndex(Math.round(x1), Math.round(y1))] !== '2') continue;
+      const ease = (t - leg) * (2 - (t - leg));
+      const x = x0 + (x1 - x0) * ease;
+      const y = y0 + (y1 - y0) * ease;
+      const key = `${x}:${y}`;
+      if (!stacks.has(key)) stacks.set(key, { x, y, units: [] });
+      stacks.get(key).units.push(unit);
+    }
+    for (const { x, y, units } of stacks.values()) {
       for (const tx of this._wrapped(Math.round(x))) {
         const px = this.screenX(tx) + (x - Math.round(x)) * ts;
-        this._drawUnits(ctx, [unit], px, this.screenY(0) + y * ts, ts);
+        this._drawUnits(ctx, units, px, this.screenY(0) + y * ts, ts);
       }
     }
+  }
+
+  // Draws the destroyed units fading under a flash. Returns true while some are left.
+  _drawBursts(ctx, ts) {
+    const now = performance.now();
+    this.bursts = this.bursts.filter((burst) => now - burst.start < BURST_MS);
+    for (const burst of this.bursts) {
+      const t = (now - burst.start) / BURST_MS;
+      for (const tx of this._wrapped(burst.x)) {
+        const px = this.screenX(tx);
+        const py = this.screenY(burst.y);
+        ctx.globalAlpha = 1 - t;
+        this._drawUnits(ctx, burst.units, px, py, ts);
+        ctx.globalAlpha = Math.max(0, 1 - 2.5 * t);
+        ctx.fillStyle = '#FFE3B8';
+        ctx.beginPath();
+        ctx.arc(px + ts / 2, py + ts / 2, ts * (0.2 + 0.5 * t), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = BAD;
+        ctx.lineWidth = Math.max(1.5, ts * 0.1 * (1 - t));
+        ctx.beginPath();
+        ctx.arc(px + ts / 2, py + ts / 2, ts * (0.3 + 0.45 * t), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+    return this.bursts.length > 0;
   }
 
   // Pastes the painted ground over the visible tiles. Returns a test telling whether a
@@ -847,6 +973,8 @@ export class MapView {
     const inset = Math.max(1, Math.round(size * 0.14));
     const box = size - 2 * inset;
     const radius = size * 0.16;
+    const asleep = top[U.ORDER] === 'sentry';
+    const dugIn = top[U.ORDER] === 'fortified' || top[U.ORDER] === 'fortify';
     ctx.lineWidth = Math.max(1, size * 0.04);
     ctx.strokeStyle = INK;
     if (units.length > 1) {
@@ -862,7 +990,6 @@ export class MapView {
     roundRect(ctx, px + inset, py + inset, box, box, radius);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.stroke();
     const image = sprite('unit', definition.sprite);
     if (image && size >= 14) {
       ctx.imageSmoothingEnabled = true;
@@ -872,6 +999,34 @@ export class MapView {
       const w = image.width * scale;
       const h = image.height * scale;
       ctx.drawImage(image, px + inset + (box - w) / 2, py + inset + (box - h) / 2, w, h);
+    }
+    if (asleep) {
+      // A sentry is out of the game until something wakes it: greyed out and hatched.
+      ctx.save();
+      roundRect(ctx, px + inset, py + inset, box, box, radius);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(92, 100, 112, 0.52)';
+      ctx.fillRect(px + inset, py + inset, box, box);
+      ctx.strokeStyle = 'rgba(11, 14, 19, 0.32)';
+      ctx.lineWidth = Math.max(1, size * 0.035);
+      ctx.beginPath();
+      for (let d = -box; d < box; d += Math.max(4, size * 0.13)) {
+        ctx.moveTo(px + inset + d, py + inset + box);
+        ctx.lineTo(px + inset + d + box, py + inset);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A fortified unit has a heavier outline with a pale line inside, like a rampart.
+    roundRect(ctx, px + inset, py + inset, box, box, radius);
+    if (dugIn) ctx.lineWidth = Math.max(1.5, size * 0.1);
+    ctx.stroke();
+    if (dugIn && size >= 22) {
+      const edge = ctx.lineWidth / 2 + 0.75;
+      roundRect(ctx, px + inset + edge, py + inset + edge, box - 2 * edge, box - 2 * edge, radius - edge);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.stroke();
     }
     if (size >= 22) {
       if (units.length > 1) {

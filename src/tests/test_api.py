@@ -205,6 +205,29 @@ def test_play_session(client):
         assert receive(socket, "turn")["state"]["turn"] == 2
 
 
+def test_the_steps_of_an_order(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket)
+        unit = next(u for u in init["state"]["units"] if u[1] == "settlers")
+        around = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy]
+        for dx, dy in around:
+            update = order(socket, action="move", unit=unit[0], x=unit[3] + dx, y=unit[4] + dy)
+            if update["ok"]:
+                break
+        assert update["ok"] and update["outcome"] == "moved"
+        there = [unit[3] + dx, unit[4] + dy]
+        (step,) = update["steps"]
+        assert (step["unit"], step["owner"], step["outcome"]) == (unit[0], 1, "moved")
+        assert (step["from"], step["to"]) == ([unit[3], unit[4]], there)
+        assert [tile[:2] for tile in step["tiles"]] == [[unit[3], unit[4]], there]
+        assert unit[0] in [row[0] for row in step["tiles"][1][2]]
+
+        # A refused order, or one that moves nothing, tells of no step.
+        assert order(socket, action="move", unit=unit[0], x=unit[3], y=unit[4])["steps"] == []
+        socket.send_json({"cmd": "end_turn"})
+        assert isinstance(receive(socket, "turn")["steps"], list)
+
+
 def test_a_person_only_hears_what_it_may_know(client):
     with client.websocket_connect("/ws") as socket:
         init = start_playing(socket)

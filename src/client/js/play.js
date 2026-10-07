@@ -66,7 +66,7 @@ export function queue() {
 }
 
 function syncHud() {
-  const unit = activeUnit();
+  const unit = play.waiting ? null : activeUnit();     // nobody to give orders to meanwhile
   const preview = play.preview;
   store.hud.unit = unit;
   store.hud.route = null;

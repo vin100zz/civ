@@ -13,6 +13,7 @@ from typing import Any, Optional
 from ..engine import effects as fx
 from ..engine.model.entities import WORK_ORDERS, City, CityMemory, Player, Unit
 from ..engine.model.game import Game
+from ..engine.model.worldmap import Tile
 from ..engine.rules.schema import Rules
 from ..engine.systems import city as city_rules
 from ..engine.systems import production, research
@@ -384,6 +385,27 @@ def unit_detail(view: PlayerView, controller: HumanController, unit: Unit) -> di
         "destination": controller.destination(unit.id),
         "orders": orders.unit_orders(view, controller, unit),
         "stack": [own_unit_payload(u, controller) for u in view.my_units_at(tile)],
+    }
+
+
+def step_payload(game: Game, viewer: Player, controller: HumanController, unit: Unit,
+                 origin: Tile, target: Tile, outcome: str) -> Optional[dict[str, Any]]:
+    """A unit that has just moved, attacked or captured, as the person saw it: None out of
+    its sight, else the step with the units now standing on the tiles it sees of the two."""
+    seen = [tile for tile in (origin, target) if viewer.visible[tile.index]]
+    if not seen:
+        return None
+
+    def row(other: Unit) -> list:
+        if other.owner == viewer.id:
+            return own_unit_payload(other, controller)
+        return unit_payload(other)
+
+    return {
+        "unit": unit.id, "owner": unit.owner, "outcome": outcome,
+        "from": [origin.x, origin.y], "to": [target.x, target.y],
+        "tiles": [[tile.x, tile.y, [row(other) for other in game.units_at(tile)]]
+                  for tile in seen],
     }
 
 

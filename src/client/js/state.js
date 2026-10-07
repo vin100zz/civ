@@ -29,7 +29,7 @@ export const store = {
   options: { territory: true, grid: false, missions: false },
   // What the map draws for the person playing (see play.js).
   hud: { unit: null, route: null, target: null },
-  moves: [],            // units that changed tile with the last message: [id, x0, y0, x1, y1]
+  moves: [],            // units that changed tile with the last message: [id, [[x, y], ...]]
   // indexes rebuilt from the data above
   terrains: [],
   unitDefs: {},
@@ -142,6 +142,15 @@ function groundTerrain() {
   return ground;
 }
 
+function indexUnits() {
+  store.unitsAt = new Map();
+  for (const unit of store.state.units) {
+    const index = tileIndex(unit[U.X], unit[U.Y]);
+    if (!store.unitsAt.has(index)) store.unitsAt.set(index, []);
+    store.unitsAt.get(index).push(unit);
+  }
+}
+
 function rebuildIndexes() {
   const { map, state } = store;
   store.cityAt = new Map();
@@ -149,11 +158,7 @@ function rebuildIndexes() {
   if (!map || !state) return;
   map.ground = groundTerrain();
   for (const city of state.cities) store.cityAt.set(tileIndex(city.x, city.y), city);
-  for (const unit of state.units) {
-    const index = tileIndex(unit[U.X], unit[U.Y]);
-    if (!store.unitsAt.has(index)) store.unitsAt.set(index, []);
-    store.unitsAt.get(index).push(unit);
-  }
+  indexUnits();
   // Land owned by each civilization: the tiles its cities can work. First city wins.
   const owner = new Int16Array(map.width * map.height).fill(-1);
   const cities = [...state.cities].sort((a, b) => a.id - b.id);
@@ -168,8 +173,44 @@ function rebuildIndexes() {
   store.owner = owner;
 }
 
-// Replaces the state and notes which units changed tile, for the map to slide them.
-function setState(state) {
+// A step some unit took, told by the server ahead of the state it belongs to (replay.js):
+// the units of the tiles it touched are replaced by what stands there now. A unit that
+// stepped out of sight is on none of them, and gone.
+export function applyStep(step) {
+  const touched = new Set(step.tiles.map(([x, y]) => tileIndex(x, y)));
+  const there = step.tiles.flatMap(([, , units]) => units);
+  const placed = new Set(there.map((unit) => unit[U.ID]));
+  placed.add(step.unit);
+  store.state.units = store.state.units
+    .filter((unit) => !placed.has(unit[U.ID]) && !touched.has(tileIndex(unit[U.X], unit[U.Y])))
+    .concat(there);
+  indexUnits();
+}
+
+const WALKS = ['moved', 'captured'];
+
+// The ways the units went, from the steps the server told of: [[[x, y], [x, y], ...], ...].
+function ways(steps) {
+  const walking = new Map();        // unit id -> the way it is on
+  const all = [];
+  for (const step of steps) {
+    if (!WALKS.includes(step.outcome)) continue;
+    const way = walking.get(step.unit);
+    const last = way && way[way.length - 1];
+    if (last && last[0] === step.from[0] && last[1] === step.from[1]) {
+      way.push(step.to);
+    } else {
+      walking.set(step.unit, [step.from, step.to]);
+      all.push(walking.get(step.unit));
+    }
+  }
+  return all;
+}
+
+// Replaces the state and notes the way each unit that changed tile went, for the map to
+// slide it: the steps the server told of (a unit carried by another went the same way),
+// else straight from where it was.
+function setState(state, steps = []) {
   const before = new Map();
   if (store.state && store.state.seed === state.seed) {
     for (const unit of store.state.units) before.set(unit[U.ID], unit);
@@ -184,11 +225,16 @@ function setState(state) {
     }
   }
   store.moves = [];
+  const told = ways(steps);
   for (const unit of state.units) {
     const old = before.get(unit[U.ID]);
-    if (old && (old[U.X] !== unit[U.X] || old[U.Y] !== unit[U.Y])) {
-      store.moves.push([unit[U.ID], old[U.X], old[U.Y], unit[U.X], unit[U.Y]]);
-    }
+    if (!old || (old[U.X] === unit[U.X] && old[U.Y] === unit[U.Y])) continue;
+    const ends = [[old[U.X], old[U.Y]], [unit[U.X], unit[U.Y]]];
+    const fits = (way) => ends.every(([x, y], i) => {
+      const [wx, wy] = way[i ? way.length - 1 : 0];
+      return wx === x && wy === y;
+    });
+    store.moves.push([unit[U.ID], told.find(fits) || ends]);
   }
 }
 
@@ -239,7 +285,7 @@ export function handleMessage(message) {
       emit('status');
       break;
     case 'turn':
-      setState(message.state);
+      setState(message.state, message.steps);
       applyTiles(message.tile_changes);
       if (message.history) store.history.push(message.history);
       pushLog(message.events);
@@ -250,7 +296,7 @@ export function handleMessage(message) {
       break;
     case 'update':
       // One order of the person was applied (or refused).
-      setState(message.state);
+      setState(message.state, message.steps);
       applyTiles(message.tile_changes);
       pushLog(message.events);
       if (message.city_detail && message.city_detail.id === store.selectedCity) {

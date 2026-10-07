@@ -153,6 +153,13 @@ def move_unit(game: Game, unit: Unit, target: Tile) -> str:
     if why_cannot_enter(game, unit, target) is not None:
         return ILLEGAL
     origin = game.tile_of(unit)
+    outcome = _step(game, unit, origin, target)
+    if outcome != STALLED:
+        game.report_step(unit, origin, target, outcome)
+    return outcome
+
+
+def _step(game: Game, unit: Unit, origin: Tile, target: Tile) -> str:
     occupant = game.tile_owner(target)
     cancel_order(unit)
 

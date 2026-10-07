@@ -2,7 +2,8 @@
 // observer and for the person leading a civilization.
 
 import { connect, send } from './net.js';
-import { store, on, emit, handleMessage, yearLabel, leader, player, plural, turnsFor, U } from './state.js';
+import { store, on, emit, yearLabel, leader, player, plural, turnsFor, U } from './state.js';
+import { initReplay, receive, replaying, settling, skipReplay } from './replay.js';
 import { icon, mountIcons } from './icons.js';
 import { MapView, MISSION_COLORS } from './renderer/map.js';
 import { Minimap } from './renderer/minimap.js';
@@ -54,6 +55,7 @@ let mapTab = 'civs';         // the last tab that leaves the map in view
 let gameOverSeen = null;     // "seed:turn" of the finished game already announced
 let defeatSeen = null;       // seed of the game whose loss was already announced
 const prompted = { turn: null, research: false, proposals: new Set() };   // asked this turn
+initReplay(mapView, () => WORKSPACES.includes(activeTab));
 
 function syncDock() {
   const dock = $('dock');
@@ -376,7 +378,7 @@ on('init', () => {
 
 on('turn', (message) => {
   refreshClock();
-  mapView.slide(store.moves, 420);
+  mapView.slide(store.moves, 420, false);
   mapView.invalidate();
   minimap.render();
   if (store.selectedCity !== null && !store.state.cities.some((c) => c.id === store.selectedCity)) {
@@ -548,13 +550,21 @@ mapView.describeMove = describeMove;
 window.addEventListener('keydown', (e) => {
   if (document.querySelector('dialog[open]')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (replaying()) {
+    // The others are moving: these keys go straight to the person's turn.
+    if (['Escape', 'Enter', ' '].includes(e.key)) skipReplay();
+    e.preventDefault();
+    return;
+  }
   if (e.key === 'Escape' && !play.mode) {
     if (WORKSPACES.includes(activeTab)) showTab(mapTab);
     else if (activeTab === 'city' && store.selectedCity !== null) emit('close-city');
     return;
   }
   if (leader() !== null) {
-    if (handleKey(e)) e.preventDefault();
+    // No orders while a fight is being settled, nor while the camera is still on the last
+    // move: the unit they would go to is not in view yet.
+    if (settling() || mapView.lagging || handleKey(e)) e.preventDefault();
     return;
   }
   if (e.code === 'Space') {
@@ -571,7 +581,7 @@ document.addEventListener('click', (e) => {
   if (button && e.detail > 0 && !button.closest('dialog')) button.blur();
 });
 
-connect(handleMessage, (online) => {
+connect(receive, (online) => {
   $('connection').className = `status ${online ? 'on' : 'off'}`;
   $('connection-label').textContent = online ? 'Live' : 'Offline';
 });

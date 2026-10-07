@@ -11,6 +11,7 @@ from server.engine.systems import cities, city as city_rules, movement, research
 from server.engine.view import PlayerView
 from server.human import orders, report
 from server.human.controller import ARRIVED, BLOCKED, MOVING, HumanController
+from server.api import serialize
 from server.sim.runner import create_game, restore_game
 
 from .conftest import add_city, make_game
@@ -359,6 +360,38 @@ def test_events_the_person_hears_of(rules):
     assert view.knows_event({"type": "war", "text": "", "player": 2, "other": 3})
     game.relation(1, 3).state = "no_contact"
     assert not view.knows_event({"type": "war", "text": "", "player": 2, "other": 3})
+
+
+def test_steps_taken_in_sight(rules):
+    game = make_game(rules, relation=WAR, width=30)
+    add_city(game, 1, 4, 5)
+    guard = game.add_unit("phalanx", 1, 6, 5)
+    controller, _ = lead(game, knows_the_map=False)
+    raider = game.add_unit("chariot", 2, 8, 5)         # one tile beyond the guard's sight
+    stranger = game.add_unit("legion", 2, 20, 5)
+    steps = []
+    game.watcher = lambda *step: steps.append(
+        serialize.step_payload(game, game.players[1], controller, *step))
+    turn.end_player_turn(game, game.players[1])
+    turn.begin_player_turn(game, game.players[2])
+
+    assert actions.apply(game, 2, actions.MoveUnit(stranger.id, 21, 5))
+    assert steps == [None], "out of sight: the person is told nothing"
+    assert actions.apply(game, 2, actions.MoveUnit(raider.id, 7, 5))
+    arrival = steps[1]
+    assert (arrival["unit"], arrival["owner"], arrival["outcome"]) == (raider.id, 2, "moved")
+    assert (arrival["from"], arrival["to"]) == ([8, 5], [7, 5])
+    assert arrival["tiles"] == [[7, 5, [serialize.unit_payload(raider)]]], "only the tile in sight"
+
+    assert actions.apply(game, 2, actions.MoveUnit(raider.id, 6, 5))
+    fight = steps[2]
+    assert fight["outcome"] in ("attack_won", "attack_lost")
+    left = {(x, y): [unit[0] for unit in units] for x, y, units in fight["tiles"]}
+    survivor = guard if fight["outcome"] == "attack_lost" else raider
+    assert left == {(7, 5): [raider.id] if survivor is raider else [],
+                    (6, 5): [guard.id] if survivor is guard else []}
+    if survivor is guard:
+        assert len(fight["tiles"][1][2][0]) == 10, "the person's own units come in full"
 
 
 def test_alerts(rules):

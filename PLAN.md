@@ -95,6 +95,7 @@ src/
     index.html  css/style.css
     js/  main.js  net.js  state.js  icons.js
          play.js        mode jeu : unité active, file d'attente, ordres, clavier, fin de tour
+         replay.js      mouvements vus par le joueur, rejoués avant que le message qui les porte soit appliqué
          dialogs.js     partie (nouvelle, sauvegardes), choix de recherche, messages, fin de partie
          toasts.js      messages du tour
          renderer/      map (carte), ground (sol), minimap, sprites
@@ -146,6 +147,7 @@ Les unités suivent le même principe : `domain` (terre, mer, air), `abilities` 
 - Commandes de l'observateur : `new_game` (graine, nombre de civs, monde), `play`, `pause`, `step`, `speed`, `pov` (tout voir ou voir comme une civ), `city` et `player` (détails, avec les raisons de l'IA), `save` et `load` (par nom, dans `saves/`).
 - Commandes du joueur : `new_game` avec `mode: play`, `civ` et `level` ; `action` (un ordre, voir `api/commands.py`) ; `end_turn` ; `goto`, `automate`, `govern` (délégations) ; `unit` (détail et ordres possibles d'une unité) ; `preview` (ce que ferait un déplacement).
 - Messages propres au mode jeu : `update` après chaque ordre (résultat, état, cases modifiées ou découvertes, événements, détail de l'unité ou de la ville concernée), `unit`, `preview`. L'état porte alors `play` (qui est le joueur), `me` (ses affaires : recherche, budget, relations, propositions de paix), `alerts` et `notes`.
+- `update` et `turn` portent aussi `steps` : les pas d'unités que le joueur a vus (les siens après un ordre, ceux des autres pendant qu'ils jouaient), dans l'ordre. Le moteur signale chaque pas (`Game.watcher`), la session ne garde que ceux dont une case au moins était en vue à ce moment-là, avec les unités présentes sur ces cases après le pas.
 
 ### Sauvegardes
 
@@ -223,7 +225,7 @@ Une IA qui propose la paix au joueur n'obtient pas de réponse immédiate : la p
 
 ### Interface
 
-Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Le tour se termine de lui-même quand la dernière unité a reçu son ordre ; sans unité à déplacer, c'est au joueur de le finir. Tant qu'une décision attend (ville sans production, recherche à choisir, proposition de paix), le tour ne peut pas finir : le bouton est grisé et dit pourquoi. Chaque demande de fin de tour nomme le tour qu'elle clôt, pour que deux fenêtres ouvertes sur la même partie ne puissent pas en sauter un. L'unité active clignote, comme dans l'original (pas de clignotement si le système demande de réduire les animations). Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran, celles des autres civilisations comprises quand elles sont en vue.
+Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Le tour se termine de lui-même quand la dernière unité a reçu son ordre ; sans unité à déplacer, c'est au joueur de le finir. Tant qu'une décision attend (ville sans production, recherche à choisir, proposition de paix), le tour ne peut pas finir : le bouton est grisé et dit pourquoi. Chaque demande de fin de tour nomme le tour qu'elle clôt, pour que deux fenêtres ouvertes sur la même partie ne puissent pas en sauter un. L'unité active clignote, comme dans l'original (pas de clignotement si le système demande de réduire les animations). Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran le long du chemin suivi. Au début du tour, les pas et les combats des autres civilisations vus par le joueur sont rejoués un par un, caméra à l'appui (Échap pour passer) ; un combat se voit : l'attaquant s'élance, le perdant disparaît dans un éclair. La caméra ne quitte jamais un mouvement en cours : elle attend sa fin avant d'aller à l'unité suivante, et les touches d'ordre sont ignorées pendant ce court instant.
 
 ## 6. Jalons
 
@@ -264,6 +266,7 @@ Dessinés au canvas, sans sprite :
 
 - carré à la couleur de la civ derrière l'unité et la ville, taille de la ville, étoile de la capitale ;
 - marqueurs d'ordre (F fortifiée, S sentinelle, R route, I irrigation, M mine, P dépollution), point jaune des vétérans ;
+- sentinelle grisée et hachurée, unité fortifiée à bordure épaisse ;
 - rivières et routes, reliées de case en case (les sprites `river_overlay` et `route` ne se raccordent pas) ;
 - huttes, forteresses, territoires, brouillard.
 

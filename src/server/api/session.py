@@ -4,7 +4,9 @@ One game at a time, in one of two modes. Observed: the AI plays every civilizati
 session plays turns on demand or in a loop and each browser picks its point of view.
 Played: a person leads one civilization; the session waits for its orders, applies them one
 by one, and lets the AI play the others when the person ends its turn. Every browser then
-sees the game through that person's eyes, and only what it is supposed to know.
+sees the game through that person's eyes, and only what it is supposed to know. That
+includes the steps the units take in its sight: its own, and those of the others while they
+play, which the browser shows one after the other.
 
 Turns are played in a worker thread, so the web server stays responsive. The session also
 saves the game to the `saves` folder and loads it back.
@@ -22,8 +24,9 @@ from typing import Any, Optional
 from fastapi import WebSocket
 
 from ..engine import actions, persistence
-from ..engine.model.entities import Player
+from ..engine.model.entities import Player, Unit
 from ..engine.model.game import Game
+from ..engine.model.worldmap import Tile
 from ..engine.rules.loader import PROJECT_ROOT
 from ..engine.rules.schema import MapSettings, Rules
 from ..engine.systems import turn
@@ -55,6 +58,7 @@ class Session:
         self.heard: deque[dict] = deque(maxlen=MAX_LOG)         # what the person heard of
         self._events_read = 0                  # events of game.events already in the logs
         self._known = bytearray()              # tiles the person's browser already holds
+        self._steps: list[dict] = []           # steps the person saw since its last order
         self._busy = asyncio.Lock()
         self.new_game(random.randrange(1, 100000))
 
@@ -110,6 +114,7 @@ class Session:
         self.heard.clear()
         self._events_read = len(game.events)
         self._known = bytearray(self._leader().explored) if self.human is not None else bytearray()
+        game.watcher = self._watch if self.human is not None else None
         for client in self.clients:
             self.clients[client] = None
 
@@ -192,6 +197,15 @@ class Session:
         self.heard.extend(known)
         return fresh, known
 
+    def _watch(self, unit: Unit, origin: Tile, target: Tile, outcome: str) -> None:
+        """A unit has just stepped (the engine tells): kept if the person saw it."""
+        if not self.in_play():
+            return
+        step = serialize.step_payload(self.game, self._leader(), self._controller(),
+                                      unit, origin, target, outcome)
+        if step is not None:
+            self._steps.append(step)
+
     def _tiles(self) -> list[list[int]]:
         """The tiles the browsers must redraw: those that changed and, for a person, those
         its civilization has just discovered (and only tiles it has explored)."""
@@ -254,6 +268,7 @@ class Session:
             if turn_number is not None and turn_number != game.turn:
                 return
             before = game.turn
+            self._steps = []
             await asyncio.to_thread(self._advance)
             if not self.in_play():
                 # Destroyed, or the game is over: nothing is hidden any more.
@@ -266,7 +281,7 @@ class Session:
             row = self._shown(self.history[-1]) if game.turn != before else None
             await self._broadcast(lambda pov: {
                 "type": "turn", "state": self._state(pov), "tile_changes": changes,
-                "events": known, "history": row, "playing": False})
+                "events": known, "steps": self._steps, "history": row, "playing": False})
             if game.turn != before and game.turn % AUTOSAVE_EVERY == 0:
                 await asyncio.to_thread(self.save, AUTOSAVE)
                 await self._broadcast(lambda pov: {"type": "saves", "saves": self.saved_games()})
@@ -301,6 +316,7 @@ class Session:
         message = {
             "type": "update", **result, "unit": unit_id, "city": city_id,
             "state": self._state(self.human), "tile_changes": self._tiles(), "events": known,
+            "steps": self._steps,
             "unit_detail": serialize.unit_detail(view, controller, unit) if unit else None,
             "city_detail": serialize.city_detail(game, city, controller=controller)
             if city else None,
@@ -314,6 +330,7 @@ class Session:
                 return
             action = commands.parse(message)
             name = message.get("action")
+            self._steps = []
             if action is None:
                 await self._report({"ok": False, "action": name, "outcome": "",
                                     "reason": "unknown order"})
@@ -333,6 +350,7 @@ class Session:
                 return
             game, view, controller = self.game, self._view(), self._controller()
             command = message["cmd"]
+            self._steps = []
             unit = view.unit(message.get("unit")) if type(message.get("unit")) is int else None
             result = {"ok": False, "action": command, "outcome": "", "reason": "no such unit"}
             if command == "govern":
