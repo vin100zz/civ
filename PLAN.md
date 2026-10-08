@@ -98,10 +98,11 @@ src/
          replay.js      mouvements vus par le joueur, rejoués avant que le message qui les porte soit appliqué
          dialogs.js     partie (nouvelle, sauvegardes), choix de recherche, messages, fin de partie
          toasts.js      messages du tour
+         tips.js        infobulles des panneaux (éléments marqués data-tip)
          renderer/      map (carte), ground (sol), minimap, sprites
          panels/        turn (tour du joueur), civs (monde, empire d'une IA), empire (empire du
                         joueur), city, tech, chart, log, unitbar (barre de l'unité active)
-  tests/                158 tests : config, carte, villes, unités, empire, mer et air,
+  tests/                161 tests : config, carte, villes, unités, empire, mer et air,
                         fin de partie et sauvegardes, IA, joueur humain, API
 ```
 

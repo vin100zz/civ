@@ -19,12 +19,12 @@ export const MISSION_COLORS = {
   attack_unit: '#ff9d4a', explore: '#d7d7d7', help_wonder: '#e58cff', trade: '#ffd94a',
   explore_sea: '#8fd3ff', embark: '#4ad9c8',
 };
-const ORDER_MARK = {
+export const ORDER_MARK = {
   fortified: 'F', fortify: 'F', sentry: 'S', road: 'R', railroad: 'R', irrigate: 'I', mine: 'M',
   fortress: 'O', clean: 'P',
 };
 // What a unit of the person was left to do by itself.
-const TASK_MARK = { goto: 'G', explore: 'X', work: 'A' };
+export const TASK_MARK = { goto: 'G', explore: 'X', work: 'A' };
 const BAD = '#F2756A';
 const SLIDE_MS = 160;         // a unit sliding to the next tile after an order
 const LEG_MS = 120;           // the least each tile of a longer way takes...
@@ -902,9 +902,22 @@ export class MapView {
     ctx.fillStyle = color;
     ctx.fill();
     // Walls show as a heavier outline.
-    ctx.lineWidth = Math.max(1.5, size * (city.walls ? 0.1 : 0.045));
+    const outline = Math.max(1.5, size * (city.walls ? 0.1 : 0.045));
+    ctx.lineWidth = outline;
     ctx.strokeStyle = INK;
     ctx.stroke();
+    if (city.disorder) {
+      // A city in civil disorder is ringed in red, whatever the zoom: the names are not
+      // drawn from afar. The ring is edged in black to show on a red city and on any land.
+      const ring = Math.max(2, size * 0.06);
+      const out = (outline + ring) / 2;
+      roundRect(ctx, px + inset - out, py + inset - out, box + 2 * out, box + 2 * out, size * 0.2 + out);
+      ctx.lineWidth = ring + 2;
+      ctx.stroke();
+      ctx.lineWidth = ring;
+      ctx.strokeStyle = BAD;
+      ctx.stroke();
+    }
     if (size >= 12) {
       const ink = inkOn(color);
       ctx.font = `700 ${Math.round(size * 0.5)}px ${FONT}`;
@@ -920,10 +933,12 @@ export class MapView {
     }
   }
 
-  // The name under the city, in a dark pill: civilization dot, star for a capital.
+  // The name under the city, in a dark pill: civilization dot, star for a capital. A city in
+  // civil disorder has a red plate instead, with a warning sign in place of the dot.
   _drawCityLabel(ctx, city, px, py, size) {
+    const riot = Boolean(city.disorder);
     const fontSize = Math.max(10, Math.min(13, Math.round(size * 0.3)));
-    ctx.font = `600 ${fontSize}px ${FONT}`;
+    ctx.font = `${riot ? 700 : 600} ${fontSize}px ${FONT}`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     const star = city.capital ? '★ ' : '';
@@ -931,29 +946,53 @@ export class MapView {
     const nameWidth = ctx.measureText(city.name).width;
     const h = fontSize + 8;
     const pad = Math.round(h * 0.42);
-    const dot = Math.round(fontSize * 0.56);
+    const dot = riot ? fontSize : Math.round(fontSize * 0.56);
     const w = pad + dot + 5 + starWidth + nameWidth + pad;
     const x = Math.round(px + size / 2 - w / 2);
-    const y = Math.round(py + size + 1);
+    // The red ring around the city takes a little room of its own.
+    const y = Math.round(py + size + (riot ? 3 : 1));
     const selected = store.selectedCity === city.id;
+    const ink = riot ? '#1B0705' : '#F0F2F6';
     roundRect(ctx, x, y, w, h, h / 2);
-    ctx.fillStyle = 'rgba(11, 14, 19, 0.88)';
+    ctx.fillStyle = riot ? BAD : 'rgba(11, 14, 19, 0.88)';
     ctx.fill();
     ctx.lineWidth = selected ? 1.5 : 1;
-    ctx.strokeStyle = selected ? GOLD : 'rgba(255, 255, 255, 0.18)';
+    ctx.strokeStyle = selected ? GOLD : riot ? INK : 'rgba(255, 255, 255, 0.18)';
     ctx.stroke();
     const middle = y + h / 2 + 0.5;
-    ctx.fillStyle = player(city.owner).color;
-    ctx.beginPath();
-    ctx.arc(x + pad + dot / 2, middle, dot / 2, 0, Math.PI * 2);
-    ctx.fill();
+    if (riot) {
+      // The warning sign: a triangle and its exclamation mark.
+      const left = x + pad;
+      const top = middle - dot / 2;
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = Math.max(1.2, dot * 0.13);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(left + dot / 2, top + dot * 0.1);
+      ctx.lineTo(left + dot * 0.96, top + dot * 0.88);
+      ctx.lineTo(left + dot * 0.04, top + dot * 0.88);
+      ctx.closePath();
+      ctx.moveTo(left + dot / 2, top + dot * 0.4);
+      ctx.lineTo(left + dot / 2, top + dot * 0.6);
+      ctx.moveTo(left + dot / 2, top + dot * 0.73);
+      ctx.lineTo(left + dot / 2, top + dot * 0.74);
+      ctx.stroke();
+      ctx.lineJoin = 'miter';
+      ctx.lineCap = 'butt';
+    } else {
+      ctx.fillStyle = player(city.owner).color;
+      ctx.beginPath();
+      ctx.arc(x + pad + dot / 2, middle, dot / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     let tx = x + pad + dot + 5;
     if (star) {
-      ctx.fillStyle = GOLD;
+      ctx.fillStyle = riot ? ink : GOLD;
       ctx.fillText(star, tx, middle);
       tx += starWidth;
     }
-    ctx.fillStyle = city.disorder ? '#FFAAA0' : '#F0F2F6';
+    ctx.fillStyle = ink;
     ctx.fillText(city.name, tx, middle);
   }
 

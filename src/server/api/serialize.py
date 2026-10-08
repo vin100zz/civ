@@ -16,7 +16,7 @@ from ..engine.model.game import Game
 from ..engine.model.worldmap import Tile
 from ..engine.rules.schema import Rules
 from ..engine.systems import city as city_rules
-from ..engine.systems import production, research
+from ..engine.systems import pollution, production, research
 from ..engine.view import PlayerView
 from ..human import orders, report
 from ..human.controller import HumanController
@@ -293,13 +293,21 @@ def city_detail(game: Game, city: City, decision=None,
                       "yields": [y.food, y.shields, y.trade],
                       "worked": (dx, dy) == (0, 0) or (dx, dy) in city.worked})
     item = city.production
+    player = game.players[city.owner]
+    here = game.units_at(game.tile_of(city))
+    supported = game.units_of_city(city)
+    settlers_food = city_rules.settlers_of(game, city) * game.government(player).settlers_food
+    # Buildings in the order the production list offers them, wonders last.
+    rank = {building_id: i for i, building_id in enumerate(game.rules.buildings)}
     detail: dict[str, Any] = {
         **city_payload(game, city),
         "food": city.food, "food_box": stats.food_box, "shields": city.shields,
+        "item": [item.kind, item.id] if item else None,
         "production_cost": production.item_cost(game, item) if item else None,
         "buy_cost": production.buy_cost(game, city),
         "stats": {
             "food": stats.food, "food_surplus": stats.food_surplus,
+            "food_eaten": stats.food_eaten, "food_settlers": settlers_food,
             "shields": stats.shields, "shield_upkeep": stats.shield_upkeep,
             "shield_surplus": stats.shield_surplus,
             "trade": stats.trade, "corruption": stats.corruption,
@@ -307,11 +315,24 @@ def city_detail(game: Game, city: City, decision=None,
             "happy": stats.happy, "content": stats.content, "unhappy": stats.unhappy,
             "building_upkeep": stats.building_upkeep, "pollution": stats.pollution,
         },
+        "pollution": _pollution_payload(game, city, stats, effects),
+        # What its units cost the city each turn; the government may keep some for free.
+        "support": {"units": stats.supported_units,
+                    "free": stats.supported_units - stats.shield_upkeep,
+                    "shields": stats.shield_upkeep, "food": settlers_food},
         "specialists": dict(city.specialists),
-        "buildings": sorted(city.buildings, key=lambda b: game.rules.buildings[b].name),
+        "buildings": sorted(city.buildings,
+                            key=lambda b: (game.rules.buildings[b].wonder, rank[b])),
+        "upkeeps": {b: city_rules.building_upkeep(game, city, b) for b in city.buildings},
         "tiles": tiles,
-        "units_here": [unit_payload(u) for u in game.units_at(game.tile_of(city))],
-        "units_supported": [unit_payload(u) for u in game.units_of_city(city)],
+        "units_here": [unit_payload(u) for u in here],
+        "units_supported": [unit_payload(u) for u in supported],
+        # Unit id -> the city that supports it (units here), the city it stands in (its own).
+        "homes": {u.id: game.cities[u.home_city].name for u in here
+                  if u.home_city in game.cities},
+        "places": {u.id: game.cities[tile.city_id].name
+                   for u in supported for tile in [game.tile_of(u)]
+                   if tile.city_id in game.cities},
         "trade_routes": [game.cities[c].name for c in city.trade_routes if c in game.cities],
         "founded_turn": city.founded_turn,
     }
@@ -327,6 +348,17 @@ def city_detail(game: Game, city: City, decision=None,
     if controller is not None:
         detail["manage"] = _city_choices(game, city, controller)
     return detail
+
+
+def _pollution_payload(game: Game, city: City, stats, effects) -> Optional[dict[str, Any]]:
+    """Where the pollution of a city comes from, and the chance it spoils a tile this turn."""
+    settings = game.rules.game.pollution
+    player = game.players[city.owner]
+    if not settings.enabled or player.is_barbarian:
+        return None
+    industry, citizens = pollution.pollution_sources(game, city, stats.shields, effects)
+    return {"industry": industry, "citizens": citizens, "tolerance": settings.tolerance,
+            "risk": pollution.pollution_risk(game, player, stats.pollution)}
 
 
 def _city_choices(game: Game, city: City, controller: HumanController) -> dict[str, Any]:

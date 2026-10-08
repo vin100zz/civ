@@ -4,7 +4,11 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from server.api import serialize
 from server.api.app import create_app
+from server.engine.systems import pollution
+
+from .conftest import add_city, make_game
 
 
 @pytest.fixture(scope="module")
@@ -305,3 +309,48 @@ def test_a_destroyed_person_becomes_an_observer(client):
         assert over["state"]["players"][2]["gold"] is not None, "nothing is hidden any more"
         socket.send_json({"cmd": "step"})
         assert socket.receive_json()["type"] == "turn"
+
+
+def test_city_sheet_tells_where_things_go(rules):
+    """What the city sheet shows beyond the totals: who eats, what the units cost, where
+    the pollution comes from, and which city supports the units standing in it."""
+    game = make_game(rules)
+    player = game.players[1]
+    player.government = "monarchy"                   # every supported unit costs a shield
+    player.techs.update({"industrialization", "automobile"})
+    capital = add_city(game, 1, 5, 5, size=8)
+    other = add_city(game, 1, 10, 5)
+    capital.buildings.update({"colossus", "temple", "palace", "granary"})
+    militia = game.add_unit("militia", 1, 5, 5, home_city=capital.id)
+    game.add_unit("settlers", 1, 6, 5, home_city=capital.id)
+    guest = game.add_unit("legion", 1, 5, 5, home_city=other.id)
+    away = game.add_unit("legion", 1, 10, 5, home_city=capital.id)
+
+    detail = serialize.city_detail(game, capital)
+    stats = detail["stats"]
+    # Buildings come in the order the production list offers them, wonders last.
+    assert detail["buildings"] == ["palace", "granary", "temple", "colossus"]
+    assert detail["upkeeps"]["temple"] == 1 and detail["upkeeps"]["palace"] == 0
+    assert detail["item"] is None
+    assert stats["food_settlers"] == game.government(player).settlers_food == 2
+    assert stats["food_eaten"] == 8 * rules.game.city.food_per_citizen + 2
+    assert detail["support"] == {"units": 3, "free": 0, "shields": 3, "food": 2}
+    assert detail["homes"] == {militia.id: capital.name, guest.id: other.name}
+    # The Settlers stand in the open: only the units in a city have a place to tell.
+    assert detail["places"] == {militia.id: capital.name, away.id: other.name}
+
+    # Pollution: the industry and the citizens, less what the land tolerates.
+    sources = detail["pollution"]
+    assert sources["citizens"] == 8 * 2 // 4 and sources["tolerance"] == 20
+    assert sources["industry"] == stats["shields"]
+    assert stats["pollution"] == max(0, sources["industry"] + 4 - 20)
+    assert sources["risk"] == pollution.pollution_risk(game, player, stats["pollution"])
+    roll = rules.game.pollution.roll - player.tech_count * rules.game.pollution.roll_per_tech
+    assert pollution.pollution_risk(game, player, 0) == 0
+    assert pollution.pollution_risk(game, player, 18) == round(100 * 36 / roll)
+    assert pollution.pollution_risk(game, player, 1000) == 100
+
+    # Under despotism the city keeps as many units as it has citizens for free.
+    player.government = "despotism"
+    assert serialize.city_detail(game, capital)["support"] == {
+        "units": 3, "free": 3, "shields": 0, "food": 1}

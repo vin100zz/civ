@@ -56,6 +56,13 @@ const PATHS = {
   temple: '<path d="M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10l9-6 9 6z"/>',
   route: '<path d="M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 16c4 0 6-8 10-8"/>',
   trash: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+  // The city sheet: what a city makes and where it goes.
+  food: '<path d="M12 21v-9M12 12c0-4 3-6.500 8-6.500 0 4.500-3 7-8 6.500zM12 15c0-3-2.500-5-7-5 0 3.500 2.500 5.500 7 5z"/>',
+  trade: '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',
+  gem: '<path d="M7 4h10l4 5-9 11L3 9zM3 9h18M9.500 4 8 9l4 11 4-11-1.500-5"/>',
+  lost: '<circle cx="12" cy="12" r="8.500"/><path d="M6 18 18 6"/>',
+  cloud: '<path d="M7 18h10a4 4 0 0 0 .500-7.970 5.500 5.500 0 0 0-10.700-1.300A4.500 4.500 0 0 0 7 18z"/>',
+  factory: '<path d="M3 21h18M5 21V11l5 3v-3l5 3V5h4v16"/>',
 };
 
 export function icon(name, size = 18, stroke = 1.75) {

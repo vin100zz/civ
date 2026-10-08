@@ -17,6 +17,7 @@ import { renderTurn, setTurnMessages } from './panels/turn.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
+import { hideTips } from './tips.js';
 import {
   play, activate, endTurn, handleKey, clickTile, sendTo, hoverTile, queue, activeUnit, setMode,
   pendingDecisions, whyNotEnd,
@@ -71,6 +72,7 @@ function showTab(name) {
   if (!WORKSPACES.includes(name)) mapTab = name;
   if (name !== 'log') mapView.setMarker(null);
   $('tooltip').hidden = true;
+  hideTips();
   document.querySelectorAll('#rail button').forEach((b) =>
     b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((p) =>

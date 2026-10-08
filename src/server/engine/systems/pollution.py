@@ -8,10 +8,25 @@ from __future__ import annotations
 
 from .. import effects as fx
 from ..mapgen.generator import set_terrain
-from ..model.entities import City
+from ..model.entities import City, Player
 from ..model.game import Game
 from ..rules.schema import Effect
 from . import city as city_rules
+
+
+def pollution_sources(game: Game, city: City, shields: int,
+                      effects: list[Effect]) -> tuple[int, int]:
+    """What the city gives off before any is tolerated: (its industry, its citizens once
+    they drive cars)."""
+    settings = game.rules.game.pollution
+    player = game.players[city.owner]
+    percent = min((e.percent for e in effects if e.type == "pollution_percent"), default=100)
+    industry = int(shields * percent / 100)
+    citizens = 0
+    if not fx.has_effect(effects, "no_population_pollution"):
+        known = sum(1 for tech in settings.population_techs if tech in player.techs)
+        citizens = city.size * known // 4
+    return industry, citizens
 
 
 def pollution_index(game: Game, city: City, shields: int, effects: list[Effect]) -> int:
@@ -19,24 +34,30 @@ def pollution_index(game: Game, city: City, shields: int, effects: list[Effect])
     settings = game.rules.game.pollution
     if not settings.enabled:
         return 0
-    player = game.players[city.owner]
-    percent = min((e.percent for e in effects if e.type == "pollution_percent"), default=100)
-    index = int(shields * percent / 100) - settings.tolerance
-    if not fx.has_effect(effects, "no_population_pollution"):
-        known = sum(1 for tech in settings.population_techs if tech in player.techs)
-        index += city.size * known // 4
-    return max(0, index)
+    return max(0, sum(pollution_sources(game, city, shields, effects)) - settings.tolerance)
+
+
+def _roll(game: Game, player: Player) -> int:
+    settings = game.rules.game.pollution
+    return max(1, settings.roll - player.tech_count * settings.roll_per_tech)
+
+
+def pollution_risk(game: Game, player: Player, index: int) -> int:
+    """Chance, in percent, that a city with this index spoils a tile this turn (the tile
+    drawn may still be spared: sea, a city, or polluted already)."""
+    if index <= 0:
+        return 0
+    roll = _roll(game, player)
+    return max(1, round(100 * min(index * 2, roll) / roll))
 
 
 def pollute(game: Game, city: City) -> None:
     """Each turn a polluting city may spoil one tile of its area."""
-    settings = game.rules.game.pollution
     index = city.stats.pollution
     if index <= 0:
         return
     player = game.players[city.owner]
-    roll = max(1, settings.roll - player.tech_count * settings.roll_per_tech)
-    if index * 2 <= game.rng.randrange(roll):
+    if index * 2 <= game.rng.randrange(_roll(game, player)):
         return
     area = game.map.city_area(city.x, city.y)
     _, tile = area[game.rng.randrange(len(area))]

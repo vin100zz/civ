@@ -31,6 +31,7 @@
 
 - id: palace
   name: Palace
+  description: Seat of your government. Corruption grows with the distance to it.
   cost: 200
   upkeep: 0
   requires: masonry
@@ -39,6 +40,7 @@
 
 - id: barracks
   name: Barracks
+  description: Units built here start as veterans.
   cost: 40
   upkeep: 1
   upkeep_increase_techs: [gunpowder, combustion]
@@ -47,6 +49,7 @@
 
 - id: granary
   name: Granary
+  description: Keeps half of the food box when the city grows.
   cost: 60
   upkeep: 1
   requires: pottery
@@ -55,6 +58,7 @@
 
 - id: temple
   name: Temple
+  description: Makes 1 unhappy citizen content, 2 with Mysticism.
   cost: 40
   upkeep: 1
   requires: ceremonial_burial
@@ -64,6 +68,7 @@
 
 - id: marketplace
   name: Marketplace
+  description: +50% taxes and luxuries.
   cost: 80
   upkeep: 1
   requires: currency
@@ -73,6 +78,7 @@
 
 - id: library
   name: Library
+  description: +50% science.
   cost: 80
   upkeep: 1
   requires: writing
@@ -81,6 +87,7 @@
 
 - id: courthouse
   name: Courthouse
+  description: Halves corruption.
   cost: 80
   upkeep: 1
   requires: code_of_laws
@@ -89,6 +96,7 @@
 
 - id: city_walls
   name: City Walls
+  description: Triples the defense against land units.
   cost: 120
   upkeep: 2
   requires: masonry
@@ -97,6 +105,7 @@
 
 - id: aqueduct
   name: Aqueduct
+  description: Lets the city grow beyond size 10.
   cost: 120
   upkeep: 2
   requires: construction
@@ -105,6 +114,7 @@
 
 - id: bank
   name: Bank
+  description: +50% taxes and luxuries, on top of the Marketplace.
   cost: 120
   upkeep: 3
   requires: banking
@@ -115,6 +125,7 @@
 
 - id: cathedral
   name: Cathedral
+  description: Makes 4 unhappy citizens content.
   cost: 160
   upkeep: 3
   requires: religion
@@ -123,6 +134,7 @@
 
 - id: university
   name: University
+  description: +50% science, on top of the Library.
   cost: 160
   upkeep: 3
   requires: university
@@ -132,6 +144,7 @@
 
 - id: colosseum
   name: Colosseum
+  description: Makes 3 unhappy citizens content.
   cost: 100
   upkeep: 4
   requires: construction
@@ -140,6 +153,7 @@
 
 - id: factory
   name: Factory
+  description: +50% shields.
   cost: 200
   upkeep: 4
   requires: industrialization
@@ -148,6 +162,7 @@
 
 - id: mfg_plant
   name: Mfg. Plant
+  description: +50% shields, on top of the Factory.
   cost: 320
   upkeep: 6
   requires: robotics
@@ -157,6 +172,7 @@
 
 - id: power_plant
   name: Power Plant
+  description: +50% shields, on top of the Factory.
   cost: 160
   upkeep: 4
   requires: refining
@@ -166,6 +182,7 @@
 
 - id: hydro_plant
   name: Hydro Plant
+  description: +50% shields, on top of the Factory, and half the pollution of industry.
   cost: 240
   upkeep: 4
   requires: electronics
@@ -176,6 +193,7 @@
 
 - id: nuclear_plant
   name: Nuclear Plant
+  description: +50% shields, on top of the Factory, and half the pollution of industry. May melt down in civil disorder until Fusion Power.
   cost: 160
   upkeep: 2
   requires: nuclear_power
@@ -187,6 +205,7 @@
 
 - id: mass_transit
   name: Mass Transit
+  description: Citizens cause no pollution.
   cost: 160
   upkeep: 4
   requires: mass_production
@@ -195,6 +214,7 @@
 
 - id: sdi_defense
   name: SDI Defense
+  description: Protects the city from nuclear attacks.
   cost: 200
   upkeep: 4
   requires: superconductor
@@ -203,6 +223,7 @@
 
 - id: recycling_cntr
   name: Recycling Cntr.
+  description: Industry pollutes two thirds less.
   cost: 200
   upkeep: 2
   requires: recycling
@@ -213,6 +234,7 @@
 
 - id: ss_structural
   name: SS Structural
+  description: A structural part of your spaceship.
   cost: 80
   upkeep: 0
   requires: space_flight
@@ -222,6 +244,7 @@
 
 - id: ss_component
   name: SS Component
+  description: A component of your spaceship.
   cost: 160
   upkeep: 0
   requires: plastics
@@ -231,6 +254,7 @@
 
 - id: ss_module
   name: SS Module
+  description: A module of your spaceship.
   cost: 320
   upkeep: 0
   requires: robotics
