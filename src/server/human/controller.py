@@ -211,8 +211,9 @@ class HumanController:
         held = set(kept.values())
         plan = strategic.Plan()
         # The person chose how many settlers to automate: each gets a job, not only as many
-        # as an AI would keep.
-        strategic.improve_missions(view, know, plan, wanted=len(workers) + len(held))
+        # as an AI would keep. Land is improved even while the government holds back its yield.
+        strategic.improve_missions(view, know, plan, wanted=len(workers) + len(held),
+                                   patient=True)
         jobs = [mission for mission in plan.missions if mission.key not in held]
         others = frozenset(unit.id for unit in know.units if unit.id not in ids)
         assignment = missions.assign(view, know, jobs, self.work_missions, others)

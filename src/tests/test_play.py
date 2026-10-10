@@ -244,6 +244,22 @@ def test_every_automated_settler_works(rules):
     assert any(note.get("unit") == lost.id for note in stranger.notes)
 
 
+def test_automated_settlers_irrigate_under_despotism(rules):
+    # Grassland along the coast, roads everywhere: irrigation is all that is left to do,
+    # though Despotism holds back the extra food for now.
+    coast = {(x, 3): "ocean" for x in range(24)}
+    game = make_game(rules, relation=PEACE, width=24, height=16, patches=coast)
+    city = add_city(game, 1, 8, 5, size=7)
+    for _, tile in game.map.city_area(city.x, city.y):
+        tile.road = rules.terrains[tile.terrain].is_land
+    worker = game.add_unit("settlers", 1, 7, 5)
+    controller, view = lead(game)
+    assert game.players[1].government == "despotism"
+
+    assert controller.automate(view, worker, "work") and controller.task(worker.id) == "work"
+    assert controller.work_missions[worker.id][3] == "irrigate"
+
+
 def test_a_governor_chooses_for_the_city(rules):
     game = make_game(rules, relation=PEACE)
     city = add_city(game, 1, 6, 6, size=3)
