@@ -208,12 +208,13 @@ def _settle_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
 
 
 def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
-                     wanted: Optional[int] = None, patient: bool = False) -> int:
+                     for_person: bool = False) -> int:
     """Terrain work around our cities, most profitable first. Returns the number of jobs.
 
-    Only the `wanted` best jobs are posted: by default, as many as the empire wants workers.
-    `patient` also values the yield the government's tile penalty holds back for now
-    (irrigated grassland under Despotism): the land is ready for better times.
+    `for_person`: the jobs of a person's automated settlers. All of them are posted, each
+    settler taking the best one within its reach, and the yield the government's tile penalty
+    holds back for now counts too (irrigated grassland under Despotism): the land is ready
+    for better times.
     """
     rules = view.rules
     get = lambda name: rules.ai.get("settlers", name)
@@ -229,7 +230,7 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
 
     def gain(before: int, bonus: int, city: City) -> float:
         now = effective(before + bonus, city) - before
-        if patient and now < bonus:
+        if for_person and now < bonus:
             return now + (bonus - now) * get("withheld_gain")
         return now
 
@@ -290,8 +291,7 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
     # Settlers eat food: only as many jobs are posted as the empire wants workers.
     # Settlers left without a job go back to a city and join it.
     ranked = sorted(jobs.values(), key=lambda j: (-j[0], j[1].index))
-    if wanted is None:
-        wanted = workers_wanted(view, know, len(ranked))
+    wanted = len(ranked) if for_person else workers_wanted(view, know, len(ranked))
     for value, tile, order in ranked[:wanted]:
         plan.missions.append(Mission(M.IMPROVE, tile.x, tile.y, weight * (0.5 + value),
                                      order=order, note=order))

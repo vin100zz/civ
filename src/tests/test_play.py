@@ -244,6 +244,20 @@ def test_every_automated_settler_works(rules):
     assert any(note.get("unit") == lost.id for note in stranger.notes)
 
 
+def test_automated_settlers_work_within_reach(rules):
+    # Two islands alike: the best job of the empire is on the other one.
+    straits = {(x, y): "ocean" for x in (0, 12) for y in range(16)}
+    game = make_game(rules, relation=PEACE, width=24, height=16, patches=straits)
+    add_city(game, 1, 6, 6, size=3)
+    add_city(game, 1, 18, 6, size=3)
+    worker = game.add_unit("settlers", 1, 18, 6)
+    controller, view = lead(game)
+
+    assert controller.automate(view, worker, "work") and controller.task(worker.id) == "work"
+    _, x, y, _ = controller.work_missions[worker.id]
+    assert 12 < x < 24 and game.map.steps(18, 6, x, y) <= 2
+
+
 def test_automated_settlers_irrigate_under_despotism(rules):
     # Grassland along the coast, roads everywhere: irrigation is all that is left to do,
     # though Despotism holds back the extra food for now.
