@@ -207,8 +207,12 @@ def _settle_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
     return total
 
 
-def improve_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
-    """Terrain work around our cities, most profitable first. Returns the number of jobs."""
+def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
+                     wanted: Optional[int] = None) -> int:
+    """Terrain work around our cities, most profitable first. Returns the number of jobs.
+
+    Only the `wanted` best jobs are posted: by default, as many as the empire wants workers.
+    """
     rules = view.rules
     get = lambda name: rules.ai.get("settlers", name)
     weight = rules.ai.get("production", "workers")
@@ -276,7 +280,9 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
     # Settlers eat food: only as many jobs are posted as the empire wants workers.
     # Settlers left without a job go back to a city and join it.
     ranked = sorted(jobs.values(), key=lambda j: (-j[0], j[1].index))
-    for value, tile, order in ranked[:workers_wanted(view, know, len(ranked))]:
+    if wanted is None:
+        wanted = workers_wanted(view, know, len(ranked))
+    for value, tile, order in ranked[:wanted]:
         plan.missions.append(Mission(M.IMPROVE, tile.x, tile.y, weight * (0.5 + value),
                                      order=order, note=order))
     return len(ranked)

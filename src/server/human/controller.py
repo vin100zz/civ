@@ -201,18 +201,29 @@ class HumanController:
             self._work(ctx, workers)
 
     def _work(self, ctx: Context, workers: list[Unit]) -> None:
-        """Automated settlers share the terrain work an AI would do around the cities."""
+        """Automated settlers share the terrain work an AI would do around the cities.
+        A settler left without any job is handed back to the person."""
         view, know = ctx.view, ctx.know
-        plan = strategic.Plan()
-        strategic.improve_missions(view, know, plan)
         ids = {unit.id for unit in workers}
+        # The jobs of the automated settlers not in this round (when one more is automated).
+        kept = {unit_id: key for unit_id, key in self.work_missions.items()
+                if unit_id not in ids and self.memory["auto"].get(str(unit_id)) == WORK}
+        held = set(kept.values())
+        plan = strategic.Plan()
+        # The person chose how many settlers to automate: each gets a job, not only as many
+        # as an AI would keep.
+        strategic.improve_missions(view, know, plan, wanted=len(workers) + len(held))
+        jobs = [mission for mission in plan.missions if mission.key not in held]
         others = frozenset(unit.id for unit in know.units if unit.id not in ids)
-        assignment = missions.assign(view, know, plan.missions, self.work_missions, others)
+        assignment = missions.assign(view, know, jobs, self.work_missions, others)
         for unit in workers:
             mission = assignment.get(unit.id)
-            if mission is not None and view.unit(unit.id) is not None:
+            if mission is None:
+                self.release(unit.id)
+                self._note(f"{view.rules.units[unit.type].name} cannot find any land to "
+                           f"improve.", unit.x, unit.y, unit=unit.id)
+            elif view.unit(unit.id) is not None:
                 settler.act(ctx, unit, mission)
-        kept = {unit_id: key for unit_id, key in self.work_missions.items() if unit_id not in ids}
         self.work_missions = {**kept, **{unit_id: m.key for unit_id, m in assignment.items()}}
 
 

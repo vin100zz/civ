@@ -373,10 +373,14 @@ class Session:
                 if mode == "none":
                     controller.release(unit.id)
                     result.update(ok=True, reason="")
-                elif controller.automate(view, unit, mode):
-                    result.update(ok=True, reason="")
-                else:
+                elif not controller.automate(view, unit, mode):
                     result["reason"] = "this unit cannot do that by itself"
+                elif controller.task(unit.id) != mode:
+                    # Nothing to do on its own: it is back in the person's hands, and says why.
+                    result["reason"] = next((note["text"] for note in reversed(controller.notes)
+                                             if note.get("unit") == unit.id), "nothing to do")
+                else:
+                    result.update(ok=True, reason="")
             await self._report(result, unit.id if unit else None)
 
     # ── Clients ───────────────────────────────────────────────────────────────

@@ -219,6 +219,31 @@ def test_units_left_to_themselves(rules):
         t.road or t.irrigation or t.mine for t in area), "the worker improves the land"
 
 
+def test_every_automated_settler_works(rules):
+    game = make_game(rules, relation=PEACE, width=24, height=16)
+    add_city(game, 1, 6, 6, size=3)
+    first = game.add_unit("settlers", 1, 6, 6)
+    second = game.add_unit("settlers", 1, 6, 6)
+    controller, view = lead(game)
+
+    # One city is worth a single worker to an AI: the person's second settler works all the same.
+    assert controller.automate(view, first, "work")
+    assert controller.automate(view, second, "work")
+    jobs = controller.work_missions
+    assert first.id in jobs and second.id in jobs and jobs[first.id] != jobs[second.id]
+    turn.end_player_turn(game, game.players[1])
+    turn.begin_player_turn(game, game.players[1])
+    controller.begin_turn(game, game.players[1])
+    assert controller.task(first.id) == controller.task(second.id) == "work"
+    assert all(unit.order != "none" or (unit.x, unit.y) != (6, 6) for unit in (first, second))
+
+    # Without any land to improve, the settler is handed back with a word of explanation.
+    lost = game.add_unit("settlers", 2, 12, 6)
+    stranger, view = lead(game, player_id=2)
+    assert stranger.automate(view, lost, "work") and stranger.task(lost.id) == ""
+    assert any(note.get("unit") == lost.id for note in stranger.notes)
+
+
 def test_a_governor_chooses_for_the_city(rules):
     game = make_game(rules, relation=PEACE)
     city = add_city(game, 1, 6, 6, size=3)
