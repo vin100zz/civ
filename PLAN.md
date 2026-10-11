@@ -178,6 +178,8 @@ Les unités suivent le même principe : `domain` (terre, mer, air), `abilities` 
 5. **Gouverneurs de ville.** Chaque production possible reçoit un score = poids du besoin × urgence × efficacité. Les meilleurs candidats sont conservés pour l'observateur. Lancement du vaisseau spatial quand il est prêt.
 6. **Unités.** Chaque unité exécute sa mission selon son rôle. Les avions frappent d'abord, les navires bougent en dernier, une fois leurs passagers à bord.
 
+**Travaux de terrain** (`strategic.improve_missions`). Un travail vaut ce qu'il rapporte par tour de travail, si long soit-il : irrigation, mine, route qui apporte du commerce, chemin de fer partout où il augmente le rendement, jungle et marais changés en prairie (jamais sur une ressource ; les forêts restent). Les routes, puis les chemins de fer, qui relient les villes d'une même terre passent en priorité : les villes les plus proches d'abord jusqu'à ce que toutes soient reliées, en suivant les routes déjà faites.
+
 Tous les poids et seuils sont dans `ai.yaml`. Les trois traits de `civilizations.yaml` (humeur, politique, idéologie) les modulent.
 
 ### Mer et air (`ai/overseas.py`, `unit_ai/ship.py`, `unit_ai/aircraft.py`)
@@ -313,7 +315,7 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 - Diplomate désactivé (ambassade, vol de tech, sabotage non codés).
 - Pas de guerre civile à la prise d'une capitale, pas de catastrophes aléatoires, pas de pillage.
 - Le maire n'utilise que des amuseurs (ni percepteurs ni savants).
-- L'IA ne construit pas de forteresses, ne relie pas ses villes par des routes de façon délibérée et ne construit pas de porte-avions (le moteur les gère).
+- L'IA ne construit pas de forteresses et ne construit pas de porte-avions (le moteur les gère).
 - Le bombardier peut attaquer plusieurs fois par tour ; le sous-marin n'est pas invisible ; les chasseurs n'interceptent pas pendant le tour adverse.
 - Les invasions par mer sont rares : l'IA n'en lance que si elle n'a aucune cible accessible à pied et se juge plus forte.
 - La course à l'espace clôt en général la partie avant que l'arme nucléaire et le réchauffement n'aient pesé.

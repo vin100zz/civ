@@ -14,6 +14,7 @@ from ..engine.model.worldmap import Tile
 from ..engine.view import PlayerView
 
 MAX_NODES = 6000
+_STRAIGHT = 1000        # road_route: a diagonal step costs one more in a thousand
 
 
 def near_known_land(view: PlayerView, tile: Tile) -> bool:
@@ -87,6 +88,46 @@ def find_path(view: PlayerView, unit: Unit, goal: Tile, *, adjacent: bool = Fals
             elif not _can_stand_on_goal(view, unit, nxt):
                 continue
             new_cost = base + max(1, view.move_cost(unit, current, nxt))
+            if new_cost < cost_so_far.get(nxt.index, 1 << 30):
+                cost_so_far[nxt.index] = new_cost
+                came_from[nxt.index] = current
+                counter += 1
+                heapq.heappush(frontier, (new_cost + estimate(nxt), counter, nxt))
+    return None
+
+
+def road_route(view: PlayerView, start: Tile, goal: Tile,
+               cost: Callable[[Tile], Optional[int]]) -> Optional[list[Tile]]:
+    """Cheapest way between two tiles for a road (A*), both ends included. `cost` is what
+    stepping on a tile adds, at least 1; None closes the tile. None if there is no way.
+    Between ways of the same cost, the one with the fewest diagonal steps: roads run straight."""
+    world = view.map
+
+    def estimate(tile: Tile) -> int:
+        return world.steps(tile.x, tile.y, goal.x, goal.y) * _STRAIGHT
+
+    counter = 0
+    frontier: list[tuple[int, int, Tile]] = [(estimate(start), counter, start)]
+    cost_so_far: dict[int, int] = {start.index: 0}
+    came_from: dict[int, Tile] = {}
+    explored_nodes = 0
+    while frontier:
+        _, _, current = heapq.heappop(frontier)
+        explored_nodes += 1
+        if explored_nodes > MAX_NODES:
+            return None
+        if current is goal:
+            path = [current]
+            while path[-1].index in came_from:
+                path.append(came_from[path[-1].index])
+            path.reverse()
+            return path
+        base = cost_so_far[current.index]
+        for nxt in world.neighbors(current):
+            step = cost(nxt)
+            if step is None:
+                continue
+            new_cost = base + step * _STRAIGHT + (nxt.x != current.x and nxt.y != current.y)
             if new_cost < cost_so_far.get(nxt.index, 1 << 30):
                 cost_so_far[nxt.index] = new_cost
                 came_from[nxt.index] = current

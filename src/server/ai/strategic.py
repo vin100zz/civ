@@ -14,9 +14,13 @@ from ..engine.model.entities import City, CityMemory
 from ..engine.model.worldmap import Tile
 from ..engine.view import PlayerView
 from . import missions as M
-from . import overseas
+from . import overseas, pathfinding
 from .knowledge import Knowledge
 from .missions import Mission
+
+# Extra cost of a way through a tile where no road can be built yet (a river before
+# Bridge Building): the link goes around it if it can.
+_NO_ROAD = 20
 
 
 @dataclass
@@ -209,7 +213,11 @@ def _settle_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
 
 def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
                      for_person: bool = False) -> int:
-    """Terrain work around our cities, most profitable first. Returns the number of jobs.
+    """Terrain work around our cities and roads between them, most profitable first.
+    Returns the number of jobs.
+
+    A job is worth what it brings per turn of work: the longest ones (clearing a jungle)
+    wait until the quicker ones are done. The roads that link our cities come first.
 
     `for_person`: the jobs of a person's automated settlers. All of them are posted, each
     settler taking the best one within its reach, and the yield the government's tile penalty
@@ -219,8 +227,9 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
     rules = view.rules
     get = lambda name: rules.ai.get("settlers", name)
     weight = rules.ai.get("production", "workers")
-    max_turns = get("max_work_turns")
+    movement = rules.game.movement
     government = rules.governments[view.player.government]
+    links = _city_links(view, know)
     jobs: dict[int, tuple[float, Tile, str]] = {}
 
     def effective(value: int, city: City) -> int:
@@ -234,6 +243,14 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
             return now + (bonus - now) * get("withheld_gain")
         return now
 
+    def worth(food: float, shields: float, trade: float) -> float:
+        return get("irrigate") * food + get("mine") * shields + get("road") * trade
+
+    def post(tile: Tile, value: float, order: str) -> None:
+        best = jobs.get(tile.index)
+        if value > 0 and (best is None or value > best[0]):
+            jobs[tile.index] = (value, tile, order)
+
     for city in know.cities:
         worked = {(city.x + dx, city.y + dy) for dx, dy in city.worked}
         for (dx, dy), tile in view.map.city_area(city.x, city.y):
@@ -245,48 +262,64 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
                 continue
             terrain = rules.terrains[tile.terrain]
             base = view.city_tile_yields(city, tile)
+            link = get("connect") if tile.index in links else 0.0
             options: list[tuple[float, str]] = []
             irrigation = terrain.irrigation
             # Irrigation and mine replace each other: the work done is not undone.
             if irrigation is not None and irrigation.bonus and not tile.irrigation \
                     and not tile.mine:
                 turns = view.work_turns_at(tile, "irrigate")
-                if turns is not None and turns <= max_turns:
+                if turns is not None:
                     food = gain(base.food, irrigation.bonus, city)
                     options.append((get("irrigate") * food / turns, "irrigate"))
             mine = terrain.mine
             if mine is not None and mine.bonus and not tile.mine and not tile.irrigation:
                 turns = view.work_turns_at(tile, "mine")
-                if turns is not None and turns <= max_turns:
+                if turns is not None:
                     shields = gain(base.shields, mine.bonus, city)
                     options.append((get("mine") * shields / turns, "mine"))
-            if terrain.road_trade and not tile.road:
+            for order, work in (("irrigate", irrigation), ("mine", mine)):
+                if work is None or work.becomes is None or tile.special:
+                    continue                # a resource is never cleared away
+                more = _farmland_gain(view, tile, work.becomes)
+                turns = view.work_turns_at(tile, order)
+                if more is not None and turns is not None:
+                    options.append((worth(*more) / turns, order))
+            if not tile.road:
                 turns = view.work_turns_at(tile, "road")
-                if turns is not None and turns <= max_turns:
-                    bonus = rules.game.movement.road_trade_bonus
-                    if government.trade_bonus and base.trade == 0:
-                        bonus += 1
-                    trade = gain(base.trade, bonus, city)
-                    options.append((get("road") * trade / turns, "road"))
-            if tile.road and not tile.railroad and (tile.x, tile.y) in worked:
+                if turns is not None:
+                    trade = 0.0
+                    if terrain.road_trade:
+                        bonus = movement.road_trade_bonus
+                        if government.trade_bonus and base.trade == 0:
+                            bonus += 1
+                        trade = gain(base.trade, bonus, city)
+                    options.append(((link + get("road") * trade) / turns, "road"))
+            elif not tile.railroad:
                 turns = view.work_turns_at(tile, "railroad")
-                if turns is not None and turns <= max_turns:
-                    percent = rules.game.movement.railroad_yield_percent
-                    more = base.shields * percent // 100 + base.food * percent // 100
-                    options.append((get("mine") * more / turns, "railroad"))
+                if turns is not None:
+                    percent = movement.railroad_yield_percent
+                    more = worth(base.food * percent // 100, base.shields * percent // 100,
+                                 base.trade * percent // 100)
+                    options.append(((link + more) / turns, "railroad"))
             if tile.pollution:
                 # Pollution halves the tile and warms the planet: it is cleaned first.
                 options.append((get("clean"), "clean"))
             if not options:
                 continue
             value, order = max(options)
-            if value <= 0:
-                continue
             if (tile.x, tile.y) in worked:
                 value *= 1.5
-            best = jobs.get(tile.index)
-            if best is None or value > best[0]:
-                jobs[tile.index] = (value, tile, order)
+            post(tile, value, order)
+
+    # The roads between our cities, away from their land too.
+    for tile in links.values():
+        if view.foreign_units_at(tile):
+            continue
+        order = "railroad" if tile.road else "road"
+        turns = view.work_turns_at(tile, order)
+        if turns is not None:
+            post(tile, get("connect") / turns, order)
 
     # Settlers eat food: only as many jobs are posted as the empire wants workers.
     # Settlers left without a job go back to a city and join it.
@@ -296,6 +329,71 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
         plan.missions.append(Mission(M.IMPROVE, tile.x, tile.y, weight * (0.5 + value),
                                      order=order, note=order))
     return len(ranked)
+
+
+def _farmland_gain(view: PlayerView, tile: Tile, becomes: str) -> Optional[tuple[int, int, int]]:
+    """(food, shields, trade) gained by turning the tile into another terrain, if that makes
+    farmland of it: jungle and swamp become grassland, while forests are left standing."""
+    rules = view.rules
+
+    def plain(terrain_id: str) -> tuple[int, int, int]:
+        terrain = rules.terrains[terrain_id]
+        food, shields, trade = terrain.yields.food, terrain.yields.shields, terrain.yields.trade
+        if terrain.pattern_bonus is not None and tile.pattern:
+            bonus = terrain.pattern_bonus.yields
+            food, shields, trade = food + bonus.food, shields + bonus.shields, trade + bonus.trade
+        if terrain.road_trade and tile.road:
+            trade += rules.game.movement.road_trade_bonus
+        return food, shields, trade
+
+    before, after = plain(tile.terrain), plain(becomes)
+    if after[0] <= before[0]:
+        return None
+    return after[0] - before[0], after[1] - before[1], after[2] - before[2]
+
+
+def _city_links(view: PlayerView, know: Knowledge) -> dict[int, Tile]:
+    """Tiles of the roads that link our cities. On each land mass, the nearest cities are
+    linked first until every city is on the network (a minimum spanning tree); the links
+    follow the roads already built rather than open new ones."""
+    world = view.map
+    reach = view.rules.ai.get("settlers", "connect_max_steps")
+
+    def cost(tile: Tile) -> Optional[int]:
+        if not view.explored(tile) or not view.is_land(tile):
+            return None
+        if tile.city_id is not None:
+            return 1 if view.my_city_at(tile.x, tile.y) is not None else None
+        if tile.road:
+            return 1
+        turns = view.work_turns_at(tile, "road")
+        return 1 + (turns if turns is not None else _NO_ROAD)
+
+    links: dict[int, Tile] = {}
+    for region in know.regions.values():
+        cities = sorted(region.my_cities, key=lambda c: c.id)
+        pairs = sorted((world.steps(a.x, a.y, b.x, b.y), i, j)
+                       for i, a in enumerate(cities) for j, b in enumerate(cities[:i]))
+        network = list(range(len(cities)))         # union-find of the cities already linked
+
+        def root(i: int) -> int:
+            while network[i] != i:
+                network[i] = network[network[i]]
+                i = network[i]
+            return i
+
+        for steps, i, j in pairs:
+            if steps > reach or root(i) == root(j):
+                continue
+            a, b = cities[i], cities[j]
+            route = pathfinding.road_route(view, view.tile_of(a), view.tile_of(b), cost)
+            if route is None:
+                continue
+            network[root(i)] = root(j)
+            for tile in route:
+                if tile.city_id is None:
+                    links[tile.index] = tile
+    return links
 
 
 def workers_wanted(view: PlayerView, know: Knowledge, jobs: int) -> int:

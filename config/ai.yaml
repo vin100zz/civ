@@ -153,9 +153,10 @@ settlers:
   irrigate: 3.0                   # value of one food gained on a worked tile
   mine: 2.0                       # value of one shield gained
   road: 1.5                       # value of one trade gained
+  connect: 8.0                    # value of a road or railroad on the way between two cities
+  connect_max_steps: 12           # cities farther apart than this are not linked by road
   clean: 2.5                      # value of cleaning a polluted tile
   withheld_gain: 0.5              # automated settlers: yield the tile penalty holds back
-  max_work_turns: 12              # jobs longer than this are ignored
 
 economy:
   min_income: 0                   # gold per turn below which taxes are raised
