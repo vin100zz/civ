@@ -245,6 +245,45 @@ def _shield_upkeep(game: Game, city: City) -> int:
     return max(0, len(_supported_units(game, city)) - free)
 
 
+def _unhappy_per_unit(game: Game, city: City) -> int:
+    """Citizens one military unit away makes unhappy (Republic, Democracy)."""
+    player = game.players[city.owner]
+    per_unit = game.government(player).military_unhappiness
+    if per_unit <= 0:
+        return 0
+    per_unit += sum(e.amount for e in fx.player_effects(game, player, "military_unhappiness"))
+    return max(0, per_unit)
+
+
+def _is_abroad(game: Game, city: City, unit: Unit) -> bool:
+    """A military unit away from its city; aircraft count even at home."""
+    definition = game.rules.units[unit.type]
+    return definition.is_military and (definition.domain == "air"
+                                       or (unit.x, unit.y) != (city.x, city.y))
+
+
+def unit_costs(game: Game, city: City) -> dict[int, tuple[int, int, int]]:
+    """What each unit costs its city every turn: shields, food, unhappy citizens.
+
+    The rules only count the units the government keeps for free: they are taken to be the
+    first ones the city supports, so that the costs add up to the city's totals.
+    """
+    government = game.government(game.players[city.owner])
+    free = len(_supported_units(game, city)) - _shield_upkeep(game, city)
+    per_unit = _unhappy_per_unit(game, city)
+    costs = {}
+    for unit in game.units_of_city(city):
+        definition = game.rules.units[unit.type]
+        shields = 0
+        if definition.needs_support:
+            shields = 0 if free > 0 else 1
+            free -= 1
+        food = government.settlers_food if definition.can("found_city") else 0
+        unhappy = per_unit if _is_abroad(game, city, unit) else 0
+        costs[unit.id] = (shields, food, unhappy)
+    return costs
+
+
 def capital_distance(game: Game, city: City) -> int:
     player = game.players[city.owner]
     government = game.government(player)
@@ -399,13 +438,9 @@ def compute_city(game: Game, city: City) -> CityStats:
         garrison = sum(1 for u in game.units_at(game.tile_of(city))
                        if u.owner == city.owner and rules.units[u.type].is_military)
         unhappy -= min(garrison, government.martial_law, max(0, unhappy))
-    per_unit = government.military_unhappiness
+    per_unit = _unhappy_per_unit(game, city)
     if per_unit > 0:
-        per_unit += sum(e.amount for e in fx.player_effects(game, player, "military_unhappiness"))
-        abroad = sum(1 for u in game.units_of_city(city)
-                     if rules.units[u.type].is_military
-                     and (rules.units[u.type].domain == "air" or (u.x, u.y) != (city.x, city.y)))
-        unhappy += max(0, per_unit) * abroad
+        unhappy += per_unit * sum(1 for u in game.units_of_city(city) if _is_abroad(game, city, u))
     happy, unhappy, excess = _settle_mood(happy, unhappy, excess, city.size, workers)
 
     happy += sum(e.amount for e in effects if e.type == "happy")

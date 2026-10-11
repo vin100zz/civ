@@ -886,7 +886,16 @@ body.play #notice { bottom: auto; top: 72px; }
 button.unit-card { cursor: pointer; }
 button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .unit-card.small, .tip-title > span.unit-card:first-child { display: grid; width: 28px; height: 28px; border-radius: 6px; }
-.support-cost { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; }
+/* A supported unit and, under it, what it costs its city each turn. */
+.unit-slot { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 40px; }
+.unit-slot .pips { display: flex; align-items: center; gap: 4px; height: 12px; }
+.unit-slot .pips > span { display: flex; }
+/* The title keeps to one line beside the three totals, in half the width of the city sheet. */
+.support-head { align-items: center; gap: 8px; }
+.support-head h2 { white-space: nowrap; }
+.support-cost { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.support-cost .amount { gap: 2px; }
+.support-cost svg.icon { width: 13px; height: 13px; }
 
 .citizens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .citizens .sep { width: 1px; height: 24px; background: var(--line); margin: 0 6px; }
