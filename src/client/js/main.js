@@ -267,8 +267,10 @@ function loudness(event, me) {
   switch (event.type) {
     case 'combat': return event.winner === me ? ['good', 6] : ['bad', 0];
     case 'city_captured': return mine ? ['good', 0] : ['bad', 0];
-    case 'city_destroyed': case 'disorder': case 'famine': case 'disband': case 'unit_lost':
-    case 'meltdown': case 'pollution': case 'barbarians': return ['bad', 0];
+    case 'disorder': case 'famine': case 'disband': case 'unit_lost': case 'pollution':
+      return mine ? ['bad', 0] : null;          // the misfortunes of others seen in passing
+    case 'city_destroyed': case 'meltdown': return mine ? ['bad', 0] : ['info', 0];
+    case 'barbarians': return ['bad', 0];
     case 'war': return mine || against ? ['bad', 0] : ['info', 0];
     case 'peace': case 'order': return ['good', 0];
     case 'sold': return ['info', 8];
