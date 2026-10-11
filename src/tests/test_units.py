@@ -99,11 +99,14 @@ def test_irrigation_needs_water_and_time(rules):
     settlers = game.add_unit("settlers", 1, 5, 5)
     tile = game.map.tile(5, 5)
     assert movement.set_order(game, settlers, "irrigate")      # first of 5 turns
-    for _ in range(3):
+    assert movement.work_left(game, settlers) == 4
+    for turn in range(3):
         start(game, 1)
         assert not tile.irrigation
+        assert movement.work_left(game, settlers) == 3 - turn
     start(game, 1)
     assert tile.irrigation and settlers.order == "none"
+    assert movement.work_left(game, settlers) == 0
 
 
 def test_road_and_mine(rules):

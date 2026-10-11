@@ -171,7 +171,8 @@ function spriteBox(definition, color) {
 }
 
 // A unit drawn as on the map: heavy outline when fortified, hatched on sentry, a letter for
-// what it is doing, a gold dot for a veteran.
+// what it is doing (with the turns its work still takes), another for what it was left to do
+// by itself, a gold dot for a veteran.
 // `click` is what a click on the card does: 'orders' activates the unit, 'center' centres
 // the map on it, nothing otherwise.
 function unitCard(unit, tip, click, count) {
@@ -180,9 +181,11 @@ function unitCard(unit, tip, click, count) {
   const classes = ['unit-card'];
   if (order === 'fortified' || order === 'fortify') classes.push('fortified');
   if (order === 'sentry') classes.push('sentry');
-  const mark = TASK_MARK[unit[U.TASK]] || ORDER_MARK[order];
+  const mark = ORDER_MARK[order];
+  const task = TASK_MARK[unit[U.TASK]];
   const inner = `<img src="/resources/unit/${definition.sprite}.png" alt="">`
-    + (mark ? `<span class="mark">${mark}</span>` : '')
+    + (mark ? `<span class="mark">${mark}${unit[U.WORK_LEFT] ? `<small>${unit[U.WORK_LEFT]}</small>` : ''}</span>` : '')
+    + (task ? `<span class="mark task">${task}</span>` : '')
     + (unit[U.VETERAN] ? '<i class="vet"></i>' : '')
     + (count > 1 ? `<span class="count">${count}</span>` : '');
   const name = `${definition.name}${count > 1 ? ` ×${count}` : ''}`;
@@ -196,9 +199,19 @@ function unitCard(unit, tip, click, count) {
   return `<span ${attributes} role="img" aria-label="${name}">${inner}</span>`;
 }
 
+// "Building a road by itself, 2 turns left", "On sentry duty"...
+function doingText(unit) {
+  if (unit[U.ABOARD]) return 'Aboard a ship';
+  const doing = DOING[unit[U.ORDER]];
+  if (doing && unit[U.WORK_LEFT]) {
+    return `${doing}${unit[U.TASK] ? ' by itself' : ''}, ${plural(unit[U.WORK_LEFT], 'turn')} left`;
+  }
+  return TASKS[unit[U.TASK]] || doing;
+}
+
 function unitTip(unit, count, rows) {
   const definition = store.unitDefs[unit[U.TYPE]];
-  const doing = unit[U.ABOARD] ? 'Aboard a ship' : TASKS[unit[U.TASK]] || DOING[unit[U.ORDER]];
+  const doing = doingText(unit);
   const title = `${spriteBox(definition, player(unit[U.OWNER]).color)}<span>${definition.name}${
     unit[U.VETERAN] ? ' <small>veteran</small>' : ''}</span>`;
   return tipTitle(title, count > 1 ? `×${count}` : '') + tipStats(definition)

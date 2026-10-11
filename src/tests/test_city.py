@@ -90,6 +90,24 @@ def test_auto_arrange_avoids_disorder(rules):
     assert not city_rules.compute_city(game, city).disorder
 
 
+def test_growth_brings_disorder(rules):
+    """Four content citizens: the fifth would be unhappy and throw the city into disorder."""
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5, size=4)
+    city_rules.set_worked(game, city, [(0, -1), (1, 0), (0, 1), (-1, 0)])
+    city.specialists = {"entertainer": 0, "taxman": 0, "scientist": 0}
+    assert not city_rules.compute_city(game, city).disorder
+    assert city_rules.growth_brings_disorder(game, city)
+    assert city.size == 4 and len(city.worked) == 4         # the city itself is left alone
+
+    city.buildings.add("temple")
+    assert not city_rules.growth_brings_disorder(game, city)
+    city.buildings.discard("temple")
+
+    city.size = city_rules.max_size(game, city)             # no aqueduct: it cannot grow
+    assert not city_rules.growth_brings_disorder(game, city)
+
+
 def test_corruption_grows_with_distance(rules):
     game = make_game(rules, width=40)
     add_city(game, 1, 5, 5)                          # capital

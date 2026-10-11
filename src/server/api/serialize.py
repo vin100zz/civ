@@ -255,16 +255,21 @@ def city_payload(game: Game, city: City) -> dict[str, Any]:
 
 def own_city_payload(game: Game, city: City, controller: HumanController) -> dict[str, Any]:
     """A city of the person, with what the turn summary shows: how far its production is,
-    and whether it needs a decision."""
+    what it makes each turn, how its citizens feel, and whether it needs a decision.
+    The figures are computed afresh: rates and units moved during the turn change them."""
     item = city.production
     building = item is not None and production.can_build(game, city, item)
     done = city.last_completed
+    stats = city_rules.compute_city(game, city)
     return {
         **city_payload(game, city),
         "shields": city.shields,
         "cost": production.item_cost(game, item) if building else None,
-        "surplus": city.stats.shield_surplus,
-        "food_surplus": city.stats.food_surplus,
+        "surplus": stats.shield_surplus,
+        "food_surplus": stats.food_surplus,
+        "trade": stats.trade - stats.corruption,
+        "happy": stats.happy, "content": stats.content, "unhappy": stats.unhappy,
+        "growth_disorder": city_rules.growth_brings_disorder(game, city),
         "buy": production.buy_cost(game, city) if production.can_buy(game, city) else None,
         "idle": not building,
         "completed": production.item_name(game, done) if done is not None else None,
@@ -296,6 +301,15 @@ def city_detail(game: Game, city: City, decision=None,
     player = game.players[city.owner]
     here = game.units_at(game.tile_of(city))
     supported = game.units_of_city(city)
+    # The person's units come as on its map: what they do by themselves, how long their work
+    # still takes.
+    view = PlayerView(game, player) if controller is not None else None
+
+    def row(unit: Unit) -> list:
+        if view is not None and unit.owner == city.owner:
+            return own_unit_payload(view, unit, controller)
+        return unit_payload(unit)
+
     settlers_food = city_rules.settlers_of(game, city) * game.government(player).settlers_food
     costs = city_rules.unit_costs(game, city)
     # Buildings in the order the production list offers them, wonders last.
@@ -329,8 +343,8 @@ def city_detail(game: Game, city: City, decision=None,
                             key=lambda b: (game.rules.buildings[b].wonder, rank[b])),
         "upkeeps": {b: city_rules.building_upkeep(game, city, b) for b in city.buildings},
         "tiles": tiles,
-        "units_here": [unit_payload(u) for u in here],
-        "units_supported": [unit_payload(u) for u in supported],
+        "units_here": [row(u) for u in here],
+        "units_supported": [row(u) for u in supported],
         # Unit id -> the city that supports it (units here), the city it stands in (its own).
         "homes": {u.id: game.cities[u.home_city].name for u in here
                   if u.home_city in game.cities},
@@ -389,10 +403,12 @@ def unit_payload(unit: Unit) -> list:
             int(unit.aboard is not None)]
 
 
-def own_unit_payload(unit: Unit, controller: HumanController) -> list:
-    """A unit of the person: the same, then the movement points it has left and what it
-    was left to do by itself ("goto", "explore", "work" or "")."""
-    return [*unit_payload(unit), unit.moves_left, controller.task(unit.id)]
+def own_unit_payload(view: PlayerView, unit: Unit, controller: HumanController) -> list:
+    """A unit of the person: the same, then the movement points it has left, what it was
+    left to do by itself ("goto", "explore", "work" or "") and the turns before its work
+    is done (0 without work)."""
+    return [*unit_payload(unit), unit.moves_left, controller.task(unit.id),
+            view.work_left(unit)]
 
 
 def unit_detail(view: PlayerView, controller: HumanController, unit: Unit) -> dict[str, Any]:
@@ -414,13 +430,13 @@ def unit_detail(view: PlayerView, controller: HumanController, unit: Unit) -> di
         "terrain": rules.terrains[tile.terrain].name,
         "city": here.name if here is not None else None,
         "aboard": unit.aboard,
-        "cargo": [own_unit_payload(u, controller) for u in view.cargo_of(unit)]
+        "cargo": [own_unit_payload(view, u, controller) for u in view.cargo_of(unit)]
         if definition.capacity else [],
         "capacity": definition.capacity,
         "task": controller.task(unit.id),
         "destination": controller.destination(unit.id),
         "orders": orders.unit_orders(view, controller, unit),
-        "stack": [own_unit_payload(u, controller) for u in view.my_units_at(tile)],
+        "stack": [own_unit_payload(view, u, controller) for u in view.my_units_at(tile)],
     }
 
 
@@ -431,10 +447,11 @@ def step_payload(game: Game, viewer: Player, controller: HumanController, unit: 
     seen = [tile for tile in (origin, target) if viewer.visible[tile.index]]
     if not seen:
         return None
+    view = PlayerView(game, viewer)
 
     def row(other: Unit) -> list:
         if other.owner == viewer.id:
-            return own_unit_payload(other, controller)
+            return own_unit_payload(view, other, controller)
         return unit_payload(other)
 
     return {
@@ -489,7 +506,7 @@ def state_payload(game: Game, pov: Optional[int] = None,
         own_city_payload(game, c, controller) if c.owner == viewer.id
         else remembered_city_payload(viewer.known_cities[c.id]) for c in cities]
     payload["units"] = [
-        own_unit_payload(u, controller) if u.owner == viewer.id else unit_payload(u)
+        own_unit_payload(view, u, controller) if u.owner == viewer.id else unit_payload(u)
         for u in units]
     payload["me"] = own_detail(view, game)
     payload["alerts"] = report.alerts(view)

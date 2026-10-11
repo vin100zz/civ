@@ -102,7 +102,7 @@ src/
          renderer/      map (carte), ground (sol), minimap, sprites
          panels/        turn (tour du joueur), civs (monde, empire d'une IA), empire (empire du
                         joueur), city, tech, chart, log, unitbar (barre de l'unité active)
-  tests/                161 tests : config, carte, villes, unités, empire, mer et air,
+  tests/                169 tests : config, carte, villes, unités, empire, mer et air,
                         fin de partie et sauvegardes, IA, joueur humain, API
 ```
 

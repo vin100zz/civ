@@ -6,10 +6,12 @@ export const F = {
 };
 
 // Fields of a unit as sent by the server: [id, type, owner, x, y, order, veteran, aboard].
-// The units of the civilization a person leads carry two more: the movement points left
-// (see rules.points_per_move) and what the unit was left to do by itself.
+// The units of the civilization a person leads carry three more: the movement points left
+// (see rules.points_per_move), what the unit was left to do by itself, and the turns before
+// its work (road, irrigation...) is done, 0 without work.
 export const U = {
   ID: 0, TYPE: 1, OWNER: 2, X: 3, Y: 4, ORDER: 5, VETERAN: 6, ABOARD: 7, MOVES: 8, TASK: 9,
+  WORK_LEFT: 10,
 };
 
 export const store = {

@@ -1,17 +1,63 @@
 // "Turn" panel of the person playing: what needs a decision, what threatens, which units
-// still wait for orders, how the cities are doing, and what happened since the last turn.
+// still wait for orders, and how the cities are doing.
 
-import { store, U, emit, player, leader, yearLabel, plural, turnsFor } from '../state.js';
+import { store, U, emit, player, leader, turnsFor } from '../state.js';
 import { icon } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
-import { governmentName, techName } from './civs.js';
 import { movesText } from './unitbar.js';
-import { groupOf } from './log.js';
 
-let messages = [];          // events told with the last "turn" message
+// The columns of the city table after its production: [field, icon, class, title].
+const COLUMNS = [
+  ['food_surplus', 'food', 'food', 'Food per turn'],
+  ['surplus', 'shield', 'shield', 'Shields per turn'],
+  ['trade', 'trade', 'trade', 'Trade per turn'],
+  ['unhappy', 'unhappy', 'bad', 'Unhappy citizens'],
+];
 
-export function setTurnMessages(events) {
-  messages = events;
+// What is wrong with a city, in the order its icons follow the name: [field, icon, level].
+// 'bad' already costs something next turn; 'warn' stops the city short of it.
+function problems(city) {
+  const list = [];
+  if (city.food_surplus < 0) list.push(['food_surplus', 'food', 'bad']);
+  else if (city.food_surplus === 0) list.push(['food_surplus', 'food', 'warn']);
+  if (city.surplus < 0) list.push(['surplus', 'shield', 'bad']);
+  else if (city.surplus === 0) list.push(['surplus', 'shield', 'warn']);
+  if (city.unhappy > city.happy) list.push(['unhappy', 'unhappy', 'bad']);
+  else if (city.growth_disorder) list.push(['unhappy', 'unhappy', 'warn']);
+  return list;
+}
+
+const PROBLEM = {
+  food_surplus: { bad: 'Famine', warn: 'No growth' },
+  surplus: { bad: 'Units without support', warn: 'No production' },
+  unhappy: { bad: 'Civil disorder', warn: 'Disorder if it grows' },
+};
+
+function cityRow(city, color) {
+  const wrong = problems(city);
+  const level = wrong.some(([, , l]) => l === 'bad') ? 'bad' : wrong.length ? 'warn' : '';
+  const marks = wrong.map(([field, glyph, l]) =>
+    `<span class="${l}" title="${PROBLEM[field][l]}">${icon(glyph, 14, 2)}</span>`).join('');
+  const turns = city.idle ? null : turnsFor(city.cost - city.shields, city.surplus);
+  const when = city.idle ? '<span class="bad">—</span>'
+    : turns === null ? '<span class="bad">∞</span>'
+      : turns <= 1 ? '<span class="good">1</span>' : turns;
+  const flags = [];
+  if (city.governed) flags.push(`<span class="flag icon" title="Governor">${icon('cog', 12, 2)}</span>`);
+  if (city.buy !== null && !city.idle) flags.push(`<span class="flag gold" title="Buy">${city.buy}g</span>`);
+  const cells = COLUMNS.map(([field, , kind]) => {
+    const cause = wrong.find(([f]) => f === field);
+    const value = city[field];
+    const faint = value === 0 && (!cause || field === 'unhappy');
+    const classes = [faint ? 'faint' : kind, cause ? `cause ${cause[2]}` : ''].join(' ');
+    return `<span class="cell"><span class="${classes}">${value}</span></span>`;
+  }).join('');
+  return `<button class="city-row" data-city="${city.id}">
+    <span class="size" style="background:${color}">${city.size}</span>
+    <span class="name ${level}"><span>${city.capital ? '★ ' : ''}${city.name}</span>${marks}</span>
+    <span class="making"><span><span class="what${city.idle ? ' bad' : ''}">${city.idle ? 'Nothing' : city.production}</span>${flags.join('')}</span>
+      <span class="bar thin"><span style="width:${city.idle ? 0 : Math.min(100, 100 * city.shields / city.cost)}%;background:var(--shield)"></span></span></span>
+    <span class="when">${when}</span>${cells}</button>`;
 }
 
 function nearestCity(unit, cities) {
@@ -80,69 +126,29 @@ export function renderTurn(container) {
     return `<button class="unit-row${on ? ' on' : ''}" data-unit="${unit[U.ID]}">
       <span class="unit-portrait" style="background:${me.color}"><img src="/resources/unit/${definition.sprite}.png" alt=""></span>
       <span class="body"><b>${definition.name}${unit[U.VETERAN] ? ' <small>veteran</small>' : ''}</b>
-        <span>${place}${place ? ' · ' : ''}<span class="mono">${unit[U.X]}, ${unit[U.Y]}</span></span></span>
+        ${place ? `<span>${place}</span>` : ''}</span>
       ${on ? '<span class="state">Active</span>' : `<span class="sub">${movesText(unit[U.MOVES])}</span>`}</button>`;
   });
 
-  const cityRows = [...cities].sort((a, b) => {
-    const turns = (c) => (c.idle ? -1 : turnsFor(c.cost - c.shields, c.surplus) ?? 9999);
-    return turns(a) - turns(b) || a.id - b.id;
-  }).map((city) => {
-    const turns = city.idle ? null : turnsFor(city.cost - city.shields, city.surplus);
-    const when = city.idle ? '<span class="bad">idle</span>'
-      : turns === null ? '<span class="bad">stalled</span>'
-        : turns <= 1 ? '<span class="good">next turn</span>' : plural(turns, 'turn');
-    const flags = [];
-    if (city.disorder) flags.push('<span class="flag bad">Disorder</span>');
-    if (city.governed) flags.push('<span class="flag">Governor</span>');
-    if (city.buy !== null && !city.idle) flags.push(`<span class="flag gold">Buy ${city.buy}g</span>`);
-    return `<button class="city-row" data-city="${city.id}">
-      <span class="size" style="background:${me.color}">${city.size}</span>
-      <span class="name">${city.capital ? '★ ' : ''}${city.name}</span>
-      <span class="making"><span>${city.idle ? 'Nothing' : city.production}${flags.join('')}</span>
-        <span class="bar thin"><span style="width:${city.idle ? 0 : Math.min(100, 100 * city.shields / city.cost)}%;background:var(--shield)"></span></span></span>
-      <span class="when">${when}</span></button>`;
-  });
-
-  const notes = (state.notes || []).map((note) => `
-    <button class="event-row" data-x="${note.x}" data-y="${note.y}">
-      <span class="when">you</span><span class="dot" style="background:${me.color}"></span>
-      <span class="what">${note.text}</span></button>`);
-  const news = messages.filter((event) => groupOf(event.type) !== 'Economy' || event.player === id)
-    .slice(-12).reverse().map((event) => {
-      const who = event.player !== undefined ? player(event.player) : null;
-      const where = event.x !== undefined ? ` data-x="${event.x}" data-y="${event.y}"` : '';
-      return `<button class="event-row"${where}>
-        <span class="when">${yearLabel(event.year)}</span>
-        <span class="dot" style="background:${who ? who.color : '#8A95A5'}"></span>
-        <span class="what">${event.text}</span></button>`;
-    });
+  // Always in the same order, the order of their founding.
+  const cityRows = [...cities].sort((a, b) => a.id - b.id).map((city) => cityRow(city, me.color));
+  const columns = COLUMNS.map(([, glyph, kind, title]) =>
+    `<span class="cell ${kind}" title="${title}">${icon(glyph, 15)}</span>`).join('');
 
   const heading = (text, count) => `<div class="turn-head label"><span>${text}</span><span>${count}</span></div>`;
   container.innerHTML = `
     <div class="panel-head">
-      <div class="titles"><h1>${play.waiting ? 'The others are playing…' : 'Your turn'}</h1>
-        <span class="sub">${me.leader} of the ${me.nation} · ${governmentName(me.government)}</span></div>
+      <div class="titles"><h1>${play.waiting ? 'The others are playing…' : 'Your turn'}</h1></div>
       ${enemies.length ? `<span class="pill war" title="At war with ${enemies.join(', ')}">At war with ${enemies.join(', ')}</span>` : ''}
-    </div>
-    <div class="section" style="padding-top:16px">
-      <div class="stats">
-        <div class="stat"><b>${me.cities}</b><span>Cities</span></div>
-        <div class="stat"><b>${me.units}</b><span>Units</span></div>
-        <div class="stat"><b>${me.techs}</b><span>Advances</span></div>
-        <div class="stat"><b>${me.score}</b><span>Score</span></div>
-      </div>
     </div>
     ${toDecide.length ? `${heading('To decide before ending the turn', toDecide.length)}<div class="turn-list">${toDecide.join('')}</div>` : ''}
     ${advice.length ? `${heading('Worth a look', advice.length)}<div class="turn-list">${advice.join('')}</div>` : ''}
     ${alerts.length ? `${heading('Alerts', alerts.length)}<div class="turn-list">${alerts.join('')}</div>` : ''}
     ${heading('Units awaiting orders', waiting.length)}
-    <div class="turn-list tight">${units.join('') || '<span class="sub quiet">Every unit has its orders.</span>'}</div>
-    ${heading('Cities', cities.length)}
-    <div class="city-rows">${cityRows.join('') || '<span class="sub quiet">No city yet: found one with your Settlers (B).</span>'}</div>
-    ${notes.length || news.length ? `${heading('Since your last turn', notes.length + news.length)}${notes.join('')}${news.join('')}` : ''}
-    <div class="panel-foot">Researching ${techName(me.researching)} · click a unit on the map to give it orders,
-      a city to manage it.</div>`;
+    ${units.length ? `<div class="turn-list tight">${units.join('')}</div>` : ''}
+    <div class="city-cols"><span class="label">Cities<span>${cities.length}</span></span>
+      ${cities.length ? `<span class="when" title="Turns left">${icon('hourglass', 14)}</span>${columns}` : ''}</div>
+    <div class="city-rows">${cityRows.join('') || '<span class="sub quiet">No city yet: found one with your Settlers (B).</span>'}</div>`;
   container.scrollTop = scroll;
 
   container.querySelectorAll('[data-unit]').forEach((row) => {

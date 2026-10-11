@@ -212,6 +212,9 @@ class PlayerView:
     def work_turns(self, unit: Unit, order: str) -> Optional[int]:
         return movement.work_turns(self._game, unit, order)
 
+    def work_left(self, unit: Unit) -> int:
+        return movement.work_left(self._game, unit)
+
     def work_turns_at(self, tile: Tile, order: str) -> Optional[int]:
         return movement.work_turns_at(self._game, self.player, tile, order)
 

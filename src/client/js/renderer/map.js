@@ -1071,17 +1071,7 @@ export class MapView {
       if (units.length > 1) {
         this._badge(ctx, px + size - inset + size * 0.12, py + inset - size * 0.12, String(units.length), size);
       }
-      const mark = TASK_MARK[top[U.TASK]] || ORDER_MARK[top[U.ORDER]];
-      if (mark) {
-        ctx.font = `700 ${Math.round(size * 0.26)}px ${FONT}`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = INK;
-        ctx.fillStyle = '#fff';
-        ctx.strokeText(mark, px + inset + 2, py + size - inset - 1);
-        ctx.fillText(mark, px + inset + 2, py + size - inset - 1);
-      }
+      this._marks(ctx, top, px, py, size, inset);
       if (top[U.VETERAN]) {
         ctx.fillStyle = GOLD;
         ctx.strokeStyle = INK;
@@ -1091,6 +1081,37 @@ export class MapView {
         ctx.fill();
         ctx.stroke();
       }
+    }
+  }
+
+  // Bottom left, what the unit does on its tile, with the turns its work still takes
+  // ("R2": a road in 2 turns); bottom right, what the person left it to do by itself.
+  _marks(ctx, unit, px, py, size, inset) {
+    const order = ORDER_MARK[unit[U.ORDER]];
+    const task = TASK_MARK[unit[U.TASK]];
+    if (!order && !task) return;
+    const font = Math.round(size * 0.26);
+    const base = py + size - inset - 1;
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = INK;
+    ctx.fillStyle = '#fff';
+    const write = (text, x, height) => {
+      ctx.font = `700 ${height}px ${FONT}`;
+      ctx.strokeText(text, x, base);
+      ctx.fillText(text, x, base);
+    };
+    ctx.textAlign = 'left';
+    if (order) {
+      const left = px + inset + 2;
+      write(order, left, font);
+      if (unit[U.WORK_LEFT]) {
+        write(String(unit[U.WORK_LEFT]), left + ctx.measureText(order).width + 2, Math.round(font * 0.8));
+      }
+    }
+    if (task) {
+      ctx.textAlign = 'right';
+      write(task, px + size - inset - 2, font);
     }
   }
 

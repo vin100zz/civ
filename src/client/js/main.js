@@ -8,12 +8,12 @@ import { icon, mountIcons } from './icons.js';
 import { MapView, MISSION_COLORS } from './renderer/map.js';
 import { Minimap } from './renderer/minimap.js';
 import { preload, setOnLoad } from './renderer/sprites.js';
-import { renderCivs, renderCiv, techName } from './panels/civs.js';
+import { renderCivs, renderCiv, techName, governmentName } from './panels/civs.js';
 import { renderCity, setTileRenderer } from './panels/city.js';
 import { renderTech, resetTechLayout } from './panels/tech.js';
 import { renderChart } from './panels/chart.js';
 import { renderLog } from './panels/log.js';
-import { renderTurn, setTurnMessages } from './panels/turn.js';
+import { renderTurn } from './panels/turn.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
@@ -182,7 +182,12 @@ function refreshPlayBar() {
         <span class="bar thin"><span style="width:${progress}%;background:var(--sci)"></span></span>
         <span class="muted">${turns === null ? 'no science' : plural(turns, 'turn')}</span></button>`
     : `<button class="chip-btn lead" data-chip="research"><span>${icon('flask', 17)}</span><b>Choose research</b></button>`;
+  // A revolution lasts until the start of turn `anarchy_until`.
+  const anarchy = me.government === 'anarchy';
+  const turnsLeft = anarchy && me.anarchy_until ? me.anarchy_until - store.state.turn : 0;
   $('empire-chips').innerHTML = `
+    <button class="chip-btn${anarchy ? ' anarchy' : ''}" data-chip="empire" title="Government">
+      <span>${icon('crown', 17)}</span><b>${governmentName(me.government)}</b>${turnsLeft > 0 ? `<span>${plural(turnsLeft, 'turn')}</span>` : ''}</button>
     <button class="chip-btn" data-chip="empire" title="Treasury, and what the next turn should bring">
       <span class="trade">${icon('coin', 17)}</span><b class="num">${me.gold}</b><span class="muted">gold</span>
       <span class="${gold < 0 ? 'bad' : 'soft'}">${gold >= 0 ? '+' : ''}${gold}</span></button>
@@ -300,7 +305,6 @@ function openTurn(message) {
   const carried = play.carry || [];
   play.carry = null;
   clearToasts();
-  setTurnMessages([...carried, ...message.events]);
   for (const alert of state.alerts || []) toast({ text: alert.text, tone: 'bad', x: alert.x, y: alert.y });
   for (const note of state.notes || []) toast({ text: note.text, tone: 'info', x: note.x, y: note.y });
   announce(carried, true);
@@ -351,7 +355,6 @@ on('init', () => {
   gameOverSeen = null;
   mapView.setMarker(null);
   clearToasts();
-  setTurnMessages([]);
   syncMode();
   $('world-size').textContent = `${store.map.width} × ${store.map.height}`;
   refreshPovList();

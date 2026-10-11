@@ -13,6 +13,7 @@
   --gold-ink: #1B1405;
   --good: #5FCB8B;
   --bad: #F2756A;
+  --warn: #F59A3E;
   --food: #7CCB6B;
   --shield: #A9B8D0;
   --trade: #E9C452;
@@ -309,6 +310,7 @@ button.chip:hover { border-color: var(--line-3); }
 .chip-btn b.num { font-size: 15px; }
 .chip-btn .bar { width: 72px; background: var(--line); }
 .chip-btn.lead { border-color: rgba(226, 182, 89, 0.55); background: rgba(226, 182, 89, 0.10); color: var(--gold); }
+.chip-btn.anarchy { border-color: rgba(242, 117, 106, 0.45); background: rgba(242, 117, 106, 0.08); color: var(--bad); }
 .chip-btn.split { gap: 12px; }
 .chip-btn.split > span { display: inline-flex; align-items: center; gap: 5px; }
 .chip-btn.split i { width: 8px; height: 8px; border-radius: 3px; }
@@ -701,20 +703,42 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-row b { font-size: 14px; font-weight: 600; }
 .unit-row b small { font-size: 11px; font-weight: 400; color: var(--mute); }
 .unit-row .body span { font-size: 12px; color: var(--mute); }
-.unit-row .mono { font-size: 11px; }
 .unit-row .state { font-size: 11px; font-weight: 600; color: var(--gold); }
+/* The city table: size, name and its problem icons, production, turns left, then one column
+   per figure. The name is red or amber after the worst problem; the figure at fault gets a chip. */
 .city-rows { display: flex; flex-direction: column; border-top: 1px solid var(--line-2); flex: none; }
-.city-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 20px; border-bottom: 1px solid var(--line-2); }
+.city-row, .city-cols { width: 100%; display: flex; align-items: center; padding: 8px 20px; }
+.city-row { border-bottom: 1px solid var(--line-2); }
 .city-row:hover { background: var(--raise); }
-.city-row .size { width: 24px; height: 24px; border-radius: 7px; color: #0B0E13; font-size: 13px; font-weight: 700; display: grid; place-items: center; flex: none; }
-.city-row .name { width: 92px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
-.city-row .making { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--soft); }
-.city-row .making > span:first-child { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+.city-cols { padding-top: 16px; flex: none; }
+.city-cols .label { flex: 1; display: flex; gap: 8px; }
+.city-cols .label span { color: var(--soft); }
+.city-row .size { width: 24px; height: 24px; border-radius: 7px; color: #0B0E13; font-size: 13px; font-weight: 700; display: grid; place-items: center; flex: none; margin-right: 10px; }
+.city-row .name { width: 102px; flex: none; margin-right: 10px; display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; }
+.city-row .name > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.city-row .name > span + span { display: flex; flex: none; }
+.city-row .name.warn, .city-row .name .warn { color: var(--warn); }
+.city-row .making { flex: 1; min-width: 0; margin-right: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--soft); }
+.city-row .making > span:first-child { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+.city-row .making .what { overflow: hidden; text-overflow: ellipsis; }
 .city-row .bar { background: var(--line); }
-.city-row .when { width: 62px; text-align: right; font-size: 12px; color: var(--mute); flex: none; }
-.flag { font-size: 11px; font-weight: 600; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; color: var(--soft); }
+.city-row .when, .city-cols .when { width: 22px; margin-right: 8px; display: flex; justify-content: flex-end; font-size: 12px; color: var(--mute); flex: none; }
+.city-row .cell, .city-cols .cell { width: 28px; flex: none; display: flex; justify-content: flex-end; font-size: 13px; }
+.city-row .when + .cell { border-left: 1px solid var(--line-2); }
+.city-cols .cell { padding-right: 2px; }
+/* Symmetric padding keeps a figure centred in its chip and right-aligned with the others. */
+.city-row .cell > span { height: 20px; padding: 0 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.city-row .cell .bad { font-weight: 600; }
+.city-row .cell .faint { color: var(--line-3); font-weight: 500; }
+.city-row .cell .cause { font-weight: 600; }
+.city-row .cell .cause.bad { background: rgba(242, 117, 106, 0.18); }
+.city-row .cell .cause.warn { background: rgba(245, 154, 62, 0.16); }
+.city-row .cell .food.cause.bad, .city-row .cell .shield.cause.bad { color: var(--bad); }
+.city-row .cell .food.cause.warn, .city-row .cell .shield.cause.warn { color: var(--warn); }
+.flag { font-size: 11px; font-weight: 600; border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; color: var(--soft); flex: none; }
 .flag.gold { color: var(--gold); border-color: rgba(226, 182, 89, 0.45); }
 .flag.bad { color: var(--bad); border-color: rgba(242, 117, 106, 0.4); }
+.flag.icon { padding: 0 3px; display: inline-flex; align-items: center; height: 18px; }
 .panel-head .pill { max-width: 200px; }
 
 /* ── World panel ─────────────────────────────────────────────────────────── */
@@ -881,6 +905,8 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-card.fortified { border-width: 3px; box-shadow: 0 0 0 2px var(--bg), inset 0 0 0 1.5px rgba(255, 255, 255, 0.8); }
 .unit-card.sentry::after { content: ""; position: absolute; inset: 0; border-radius: 5px; background: repeating-linear-gradient(135deg, rgba(11, 14, 19, 0.34) 0 1.5px, rgba(11, 14, 19, 0) 1.5px 5px), rgba(92, 100, 112, 0.52); }
 .unit-card .mark { position: absolute; left: 2px; bottom: 0; z-index: 1; font-size: 11px; font-weight: 700; line-height: 1; color: #FFFFFF; text-shadow: -1px 0 var(--bg), 1px 0 var(--bg), 0 -1px var(--bg), 0 1px var(--bg); }
+.unit-card .mark small { margin-left: 1px; font-size: 9px; font-weight: 700; }
+.unit-card .mark.task { left: auto; right: 2px; }
 .unit-card .vet { position: absolute; left: -4px; top: -4px; z-index: 1; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); border: 1px solid var(--bg); }
 .unit-card .count { position: absolute; right: -7px; top: -7px; z-index: 1; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--bg); border: 1px solid rgba(233, 236, 241, 0.85); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1; display: grid; place-items: center; }
 button.unit-card { cursor: pointer; }

@@ -5,6 +5,7 @@ F0_1d12_6abc_GetCityResourceCount), rewritten as separate, testable steps.
 """
 from __future__ import annotations
 
+import dataclasses
 from typing import Optional
 
 from .. import effects as fx
@@ -480,3 +481,23 @@ def max_size(game: Game, city: City) -> Optional[int]:
         if limit not in allowed:
             return limit
     return None
+
+
+def growth_brings_disorder(game: Game, city: City) -> bool:
+    """Whether one more citizen would throw the city into disorder: the newcomer works the
+    best free tile and nobody else moves. On growth the mayor would rather take a worker off
+    the land (see `auto_arrange`), so the city is at the limit of its happiness either way.
+    False for a city that cannot grow any more."""
+    limit = max_size(game, city)
+    if limit is not None and city.size >= limit:
+        return False
+    effects = fx.city_effects(game, city)
+    free = [offset for offset, _ in workable_tiles(game, city) if offset not in city.worked]
+    specialists = dict(city.specialists)
+    worked = list(city.worked)
+    if free:
+        worked.append(max(free, key=lambda offset: _tile_worth(game, city, offset, effects)))
+    else:
+        specialists["entertainer"] += 1
+    grown = dataclasses.replace(city, size=city.size + 1, worked=worked, specialists=specialists)
+    return compute_city(game, grown).disorder

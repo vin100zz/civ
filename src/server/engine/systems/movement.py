@@ -232,6 +232,15 @@ def work_turns(game: Game, unit: Unit, order: str) -> Optional[int]:
     return work_turns_at(game, game.players[unit.owner], game.tile_of(unit), order)
 
 
+def work_left(game: Game, unit: Unit) -> int:
+    """Turns before the unit's work is done, the work of this turn included: 0 when it has
+    no work it can carry on with."""
+    if unit.order not in WORK_ORDERS:
+        return 0
+    turns = work_turns(game, unit, unit.order)
+    return max(0, turns - unit.work) if turns is not None else 0
+
+
 def work_turns_at(game: Game, player: Player, tile: Tile, order: str) -> Optional[int]:
     """Turns a terraforming unit of the player would need for this work on this tile."""
     terrain = game.terrain(tile)

@@ -167,7 +167,7 @@ def test_play_session(client):
         hidden = [i for i, mark in enumerate(state["explored"]) if mark == "0"]
         assert hidden and all(init["map"]["terrain"][i] == sea and init["map"]["flags"][i] == 0
                               for i in hidden)
-        assert state["units"] and all(u[2] == 1 and len(u) == 10 for u in state["units"])
+        assert state["units"] and all(u[2] == 1 and len(u) == 11 for u in state["units"])
 
         settlers = next(u for u in state["units"] if u[1] == "settlers")
         socket.send_json({"cmd": "unit", "id": settlers[0]})
@@ -179,6 +179,7 @@ def test_play_session(client):
         assert update["type"] == "update" and update["ok"] and update["unit_detail"] is None
         city = update["state"]["cities"][0]
         assert city["owner"] == 1 and city["idle"] and city["capital"]
+        assert city["trade"] >= 0 and city["unhappy"] == 0 and not city["growth_disorder"]
         assert update["events"] and update["events"][0]["type"] == "city_founded"
 
         update = order(socket, action="production", city=city["id"], kind="unit", id="militia")
