@@ -171,7 +171,9 @@ function spriteBox(definition, color) {
 
 // A unit drawn as on the map: heavy outline when fortified, hatched on sentry, a letter for
 // what it is doing, a gold dot for a veteran.
-function unitCard(unit, tip, clickable, count) {
+// `click` is what a click on the card does: 'orders' activates the unit, 'center' centres
+// the map on it, nothing otherwise.
+function unitCard(unit, tip, click, count) {
   const definition = store.unitDefs[unit[U.TYPE]];
   const order = unit[U.ORDER];
   const classes = ['unit-card'];
@@ -184,9 +186,13 @@ function unitCard(unit, tip, clickable, count) {
     + (count > 1 ? `<span class="count">${count}</span>` : '');
   const name = `${definition.name}${count > 1 ? ` ×${count}` : ''}`;
   const attributes = `class="${classes.join(' ')}" style="background:${player(unit[U.OWNER]).color}" data-tip="${tip}"`;
-  return clickable
-    ? `<button ${attributes} data-unit="${unit[U.ID]}" aria-label="${name}: give it orders">${inner}</button>`
-    : `<span ${attributes} role="img" aria-label="${name}">${inner}</span>`;
+  if (click === 'orders') {
+    return `<button ${attributes} data-unit="${unit[U.ID]}" aria-label="${name}: give it orders">${inner}</button>`;
+  }
+  if (click === 'center') {
+    return `<button ${attributes} data-x="${unit[U.X]}" data-y="${unit[U.Y]}" aria-label="${name}: centre the map on it">${inner}</button>`;
+  }
+  return `<span ${attributes} role="img" aria-label="${name}">${inner}</span>`;
 }
 
 function unitTip(unit, count, rows) {
@@ -200,12 +206,12 @@ function unitTip(unit, count, rows) {
 
 // The units of a list, as cards. The person picks one to give it orders, so each has its
 // own; otherwise the units alike share a card. `about(unit)` gives the rows of the tooltip.
-function unitTray(units, tips, prefix, about, clickable) {
+function unitTray(units, tips, prefix, about, click) {
   if (!units.length) return '<span class="muted">None</span>';
   const groups = new Map();
   for (const unit of units) {
     const rows = about(unit);
-    const alike = clickable ? unit[U.ID]
+    const alike = click === 'orders' ? unit[U.ID]
       : [unit[U.TYPE], unit[U.ORDER], unit[U.VETERAN], unit[U.ABOARD], JSON.stringify(rows)].join('|');
     if (!groups.has(alike)) groups.set(alike, { unit, rows, count: 0 });
     groups.get(alike).count += 1;
@@ -213,7 +219,7 @@ function unitTray(units, tips, prefix, about, clickable) {
   const cards = [...groups.values()].map(({ unit, rows, count }) => {
     const tip = `${prefix}:${unit[U.ID]}`;
     tips.set(tip, unitTip(unit, count, rows));
-    return unitCard(unit, tip, clickable, count);
+    return unitCard(unit, tip, click, count);
   });
   return `<div class="unit-tray">${cards.join('')}</div>`;
 }
@@ -519,9 +525,9 @@ export function renderCity(container) {
     ${amount(support.shields, 'shield', 'shield')}${amount(support.food, 'food', 'food')}</span>` : '';
 
   const here = unitTray(c.units_here, tips, 'here',
-    (unit) => [['Supported by', c.homes[unit[U.ID]] || '<span class="muted">no city</span>']], Boolean(manage));
+    (unit) => [['Supported by', c.homes[unit[U.ID]] || '<span class="muted">no city</span>']], manage ? 'orders' : null);
   const supported = unitTray(c.units_supported, tips, 'supported',
-    (unit) => [['Location', c.places[unit[U.ID]] || `<span class="mono">${unit[U.X]}, ${unit[U.Y]}</span>`]], false);
+    (unit) => [['Location', c.places[unit[U.ID]] || `<span class="mono">${unit[U.X]}, ${unit[U.Y]}</span>`]], 'center');
   const scroll = container.scrollTop;
 
   container.innerHTML = `
@@ -567,6 +573,9 @@ export function renderCity(container) {
 
   container.querySelector('#city-center').addEventListener('click', () => emit('center', { x: c.x, y: c.y }));
   container.querySelector('#city-close').addEventListener('click', () => emit('close-city'));
+  container.querySelectorAll('.unit-card[data-x]').forEach((card) => {
+    card.addEventListener('click', () => emit('center', { x: Number(card.dataset.x), y: Number(card.dataset.y) }));
+  });
   container.querySelectorAll('[data-step]').forEach((button) => {
     button.addEventListener('click', () => {
       const count = siblings.length;
