@@ -140,7 +140,9 @@ function wireOverview(container) {
 }
 
 export function renderTech(container) {
-  const detail = store.playerDetail;
+  // The person leading a civilization only ever studies its own advances, whoever is selected.
+  const own = leader() !== null ? store.state.me : null;
+  const detail = own || store.playerDetail;
   const head = (selected) => `
     <div class="work-head">
       <h1>Science</h1>
@@ -154,7 +156,7 @@ export function renderTech(container) {
         <button class="btn" data-back>Back to map</button>
       </div>
     </div>`;
-  if (store.selectedPlayer === null || !detail || detail.id !== store.selectedPlayer) {
+  if (!own && (store.selectedPlayer === null || !detail || detail.id !== store.selectedPlayer)) {
     container.innerHTML = `<div class="work">${head(null)}
       <p class="empty"><b>No civilization selected</b>Pick one above to see its advances.</p></div>`;
     wire(container);

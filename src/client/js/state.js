@@ -266,6 +266,9 @@ export function handleMessage(message) {
       setRules(message.rules);
       store.map = message.map;
       store.state = null;
+      store.playerDetail = null;
+      // A person starts a game on their own civilization, whatever was looked at before.
+      if (message.state.me) store.selectedPlayer = null;
       setState(message.state);
       store.history = message.history;
       store.historyFields = message.history_fields;
@@ -275,7 +278,6 @@ export function handleMessage(message) {
       store.saves = message.saves || [];
       store.selectedCity = null;
       store.cityDetail = null;
-      store.playerDetail = null;
       store.hud = { unit: null, route: null, target: null };
       if (store.selectedPlayer !== null && !store.state.players[store.selectedPlayer]) {
         store.selectedPlayer = null;
