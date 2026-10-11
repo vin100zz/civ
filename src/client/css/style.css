@@ -741,6 +741,85 @@ body.play #notice { bottom: auto; top: 72px; }
 .flag.icon { padding: 0 3px; display: inline-flex; align-items: center; height: 18px; }
 .panel-head .pill { max-width: 200px; }
 
+/* ── Cities panel (the person playing) ───────────────────────────────────── */
+
+/* The rows of the Turn panel; --tab is the colour of the tab on show. The tabs and the column
+   titles stay under the panel head while the list scrolls. */
+#panel-cities .top { position: sticky; top: 72px; z-index: 1; background: var(--panel); flex: none; }
+#panel-cities .tabs { margin: 14px 20px 0; display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); }
+/* Seven tabs of the same width: "Production", the longest label, sets the font size. */
+#panel-cities .tabs button { flex: 1 1 0; min-width: 0; height: 46px; padding: 0; border-radius: 7px; color: var(--mute); font-size: 10.5px; font-weight: 500; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+#panel-cities .tabs button:hover { color: var(--text); }
+#panel-cities .tabs button[aria-pressed="true"] { background: var(--hover); color: var(--text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line); }
+#panel-cities .tabs button[aria-pressed="true"] svg { color: var(--tab); }
+#panel-cities .cols { height: 44px; padding: 18px 20px 6px; display: flex; align-items: center; border-bottom: 1px solid var(--line-2); }
+#panel-cities .cols button { position: relative; height: 20px; flex: none; display: flex; align-items: center; color: var(--mute); }
+#panel-cities .cols button:hover, #panel-cities .cols button.sorted { color: var(--text); }
+#panel-cities .cols .city-label { width: 146px; gap: 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+#panel-cities .cols .city-label span { color: var(--soft); }
+#panel-cities .cols .b { width: 22px; justify-content: center; font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; }
+#panel-cities .cols .b.wonder, #panel-cities .cols .b.wonder:hover { color: var(--gold); font-size: 12px; }
+#panel-cities .cols .v { width: 30px; justify-content: flex-end; padding-right: 5px; color: var(--tab); }
+#panel-cities .cols .f { justify-content: flex-end; padding-right: 5px; font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; }
+#panel-cities .cols .l { font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+#panel-cities .legend { flex: 1; min-width: 0; margin: 0 10px; display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--mute); }
+#panel-cities .legend:first-child { margin-left: 0; }
+#panel-cities .legend > span { display: inline-flex; align-items: center; gap: 4px; }
+#panel-cities .legend i { width: 6px; height: 6px; border-radius: 2px; }
+/* The sort arrow sits under the title, in the gap above the first row. */
+#panel-cities .arrow { position: absolute; bottom: -8px; left: 50%; margin-left: -5px; color: var(--gold); }
+#panel-cities .v .arrow, #panel-cities .f .arrow { left: auto; right: 7px; margin: 0; }
+#panel-cities .l .arrow, #panel-cities .city-label .arrow { left: 0; margin: 0; }
+#panel-cities .city-row { min-height: 41px; }
+#panel-cities .widget { flex: 1; min-width: 0; margin-left: 8px; display: flex; align-items: center; }
+/* A building of the tab: filled when built, filling up in grey while it is built. */
+#panel-cities .bcell { width: 22px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; }
+#panel-cities .bcell i { position: relative; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line); display: grid; place-items: center; overflow: hidden; }
+#panel-cities .bcell i.built { border: 0; background: var(--tab); color: var(--bg); }
+#panel-cities .bcell i.making { border-color: var(--mute); }
+#panel-cities .bcell i.making::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--done); background: var(--mute); }
+#panel-cities .bcell i.needed { border-color: var(--warn); background: rgba(245, 154, 62, 0.16); }
+#panel-cities .bcell b { font-size: 12px; font-weight: 600; white-space: nowrap; }
+/* Figures: red with a tint when they already cost something, amber when they stop the city short. */
+#panel-cities .v { width: 30px; flex: none; display: flex; justify-content: flex-end; }
+#panel-cities .fig { flex: none; display: flex; justify-content: flex-end; }
+#panel-cities .num { height: 20px; padding: 0 5px; border-radius: 6px; display: inline-flex; align-items: center; font-size: 13px; line-height: 1; white-space: nowrap; }
+#panel-cities .num.small { font-size: 12px; }
+#panel-cities .num.bad, #panel-cities .num.warn, #panel-cities .num.strong { font-weight: 600; }
+#panel-cities .warn { color: var(--warn); }
+#panel-cities .faint { color: var(--line-3); }
+#panel-cities .num.chip.bad { background: rgba(242, 117, 106, 0.18); }
+#panel-cities .num.chip.warn { background: rgba(245, 154, 62, 0.16); }
+#panel-cities .track { flex: 1; min-width: 0; height: 6px; margin: 0 10px; border-radius: 3px; background: var(--line); display: flex; gap: 2px; overflow: hidden; }
+#panel-cities .track > span { height: 100%; border-radius: 3px; flex: none; }
+#panel-cities .track .next { opacity: 0.42; }
+#panel-cities .track .lose { background: var(--bad); opacity: 0.7; }
+#panel-cities .segs { flex: 1; min-width: 0; height: 8px; margin: 0 10px; display: flex; gap: 2px; }
+#panel-cities .segs > span { flex: 1 1 0; min-width: 0; border-radius: 3px; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 10px; font-weight: 700; line-height: 1; color: var(--bg); }
+#panel-cities .segs.tall { height: 16px; }
+#panel-cities .segs.tall > span { min-width: min-content; padding: 0 4px; border-radius: 4px; }
+#panel-cities .segs .lost { background: repeating-linear-gradient(135deg, #7A2F2A 0 3px, #4E2321 3px 6px); color: #FFD2CC; }
+#panel-cities .pair { flex: 1; min-width: 0; margin: 0 10px; display: flex; flex-direction: column; gap: 2px; }
+#panel-cities .pair > span { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+#panel-cities .pair > span > span { display: block; height: 100%; border-radius: 2px; }
+/* The citizens: one face each, closer together in a big city, or counted beyond 17. */
+#panel-cities .faces, #panel-cities .counts { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+#panel-cities .faces svg { flex: none; display: block; }
+#panel-cities .counts { gap: 7px; }
+#panel-cities .counts > span { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 600; }
+#panel-cities .counts .specialist-count { color: #C79BF2; }
+#panel-cities .spec { width: 12px; height: 12px; flex: none; border-radius: 50%; background: #C79BF2; box-shadow: 0 0 0 1.5px var(--panel); color: var(--bg); font-size: 8px; font-style: normal; font-weight: 700; line-height: 1; display: grid; place-items: center; }
+#panel-cities .mood { width: 20px; flex: none; display: flex; justify-content: flex-end; }
+/* Room for the veteran dot, taken back by the margin so the rows keep the height of the others. */
+#panel-cities .units { flex: 1; min-width: 0; padding: 3px 0 3px 3px; margin: -3px 0; display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: 12px; }
+#panel-cities .units .unit-card { width: 22px; height: 22px; border-radius: 5px; }
+#panel-cities .units .unit-card.fortified { border-width: 2px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8); }
+#panel-cities .units .unit-card.sentry::after { border-radius: 3px; }
+#panel-cities .units .unit-card .vet { left: -3px; top: -3px; width: 7px; height: 7px; }
+/* A tooltip that only names what is under the pointer. */
+#panel-tip:has(> .tip-name:only-child) { width: auto; padding: 7px 11px; }
+.tip-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+
 /* ── World panel ─────────────────────────────────────────────────────────── */
 
 .civ-cols, .civ-line { display: flex; align-items: center; gap: 6px; width: 100%; }

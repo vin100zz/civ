@@ -180,11 +180,18 @@ def test_play_session(client):
         city = update["state"]["cities"][0]
         assert city["owner"] == 1 and city["idle"] and city["capital"]
         assert city["trade"] >= 0 and city["unhappy"] == 0 and not city["growth_disorder"]
+        # What the cities panel shows of it.
+        assert city["item"] is None and city["food"] == 0 and city["food_box"] > 0
+        assert city["max_size"] == 10 and city["units_away"] == 0 and city["trade_routes"] == 0
+        assert city["specialists"] == {"entertainer": 0, "taxman": 0, "scientist": 0}
+        assert city["pollution_risk"] == 0 and city["building_upkeep"] >= 0
+        assert city["tax"] + city["luxury"] + city["science"] == city["trade"]
         assert update["events"] and update["events"][0]["type"] == "city_founded"
 
         update = order(socket, action="production", city=city["id"], kind="unit", id="militia")
         assert update["ok"] and update["city_detail"]["manage"]["current"] == ["unit", "militia"]
         assert not update["state"]["cities"][0]["idle"]
+        assert update["state"]["cities"][0]["item"] == ["unit", "militia"]
         refused = order(socket, action="production", city=city["id"], kind="unit", id="battleship")
         assert not refused["ok"] and refused["reason"]
         assert not order(socket, action="teleport")["ok"]

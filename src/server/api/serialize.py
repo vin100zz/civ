@@ -254,13 +254,16 @@ def city_payload(game: Game, city: City) -> dict[str, Any]:
 
 
 def own_city_payload(game: Game, city: City, controller: HumanController) -> dict[str, Any]:
-    """A city of the person, with what the turn summary shows: how far its production is,
-    what it makes each turn, how its citizens feel, and whether it needs a decision.
+    """A city of the person, with what the turn summary and the cities panel show: how far
+    its production is, what it makes each turn and where it goes, how its citizens feel, its
+    buildings, and whether it needs a decision.
     The figures are computed afresh: rates and units moved during the turn change them."""
     item = city.production
     building = item is not None and production.can_build(game, city, item)
     done = city.last_completed
     stats = city_rules.compute_city(game, city)
+    rank = {building_id: i for i, building_id in enumerate(game.rules.buildings)}
+    away = [unit for unit in game.units_of_city(city) if (unit.x, unit.y) != (city.x, city.y)]
     return {
         **city_payload(game, city),
         "shields": city.shields,
@@ -272,6 +275,17 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         "growth_disorder": city_rules.growth_brings_disorder(game, city),
         "buy": production.buy_cost(game, city) if production.can_buy(game, city) else None,
         "idle": not building,
+        "item": [item.kind, item.id] if building else None,
+        # The cities panel: buildings in rules order (wonders last), then each of its tabs.
+        "buildings": sorted(city.buildings, key=rank.get),
+        "food": city.food, "food_box": stats.food_box, "max_size": city_rules.max_size(game, city),
+        "shields_made": stats.shields, "shield_upkeep": stats.shield_upkeep,
+        "corruption": stats.corruption, "luxury": stats.luxury, "tax": stats.tax,
+        "science": stats.science, "specialists": dict(city.specialists),
+        "building_upkeep": stats.building_upkeep,
+        "pollution_risk": pollution.pollution_risk(game, game.players[city.owner], stats.pollution),
+        "trade_routes": len(city.trade_routes),
+        "units_away": len(away),
         "completed": production.item_name(game, done) if done is not None else None,
         "governed": controller.governed(city.id),
     }

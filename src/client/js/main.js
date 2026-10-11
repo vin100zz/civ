@@ -14,6 +14,7 @@ import { renderTech, resetTechLayout } from './panels/tech.js';
 import { renderChart } from './panels/chart.js';
 import { renderLog } from './panels/log.js';
 import { renderTurn } from './panels/turn.js';
+import { renderCities } from './panels/cities.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
@@ -45,6 +46,7 @@ const panels = {
   civs: () => renderCivs($('panel-civs')),
   civ: () => (leader() !== null ? renderEmpire($('panel-civ')) : renderCiv($('panel-civ'))),
   city: () => renderCity($('panel-city')),
+  cities: () => renderCities($('panel-cities')),
   tech: () => renderTech($('panel-tech')),
   chart: () => renderChart($('panel-chart')),
   log: () => renderLog($('panel-log')),
@@ -53,6 +55,7 @@ const panels = {
 const WORKSPACES = ['tech', 'chart'];
 let activeTab = 'civs';
 let mapTab = 'civs';         // the last tab that leaves the map in view
+let cityFrom = null;         // the tab a city was opened from, to go back to it
 let gameOverSeen = null;     // "seed:turn" of the finished game already announced
 let defeatSeen = null;       // seed of the game whose loss was already announced
 const prompted = { turn: null, research: false, proposals: new Set() };   // asked this turn
@@ -338,7 +341,7 @@ function refreshPlay() {
   refreshPlayBar();
   refreshBanner();
   renderUnitBar($('unit-bar'));
-  if (activeTab === 'turn') panels.turn();
+  if (activeTab === 'turn' || activeTab === 'cities') panels[activeTab]();
   mapView.invalidate();
 }
 
@@ -370,7 +373,7 @@ on('init', () => {
   refreshLegend();
   requestDetails();
   if (me !== null) showTab('turn');
-  else if (activeTab === 'turn') showTab('civs');
+  else if (activeTab === 'turn' || activeTab === 'cities') showTab('civs');
   else refreshActivePanel();
   refreshPlay();
 
@@ -471,6 +474,7 @@ on('select-city', (id) => {
     send({ cmd: 'player', id: city.owner });
   }
   send({ cmd: 'city', id });
+  if (activeTab !== 'city') cityFrom = activeTab;
   showTab('city');
 });
 
@@ -478,7 +482,8 @@ on('close-city', () => {
   store.selectedCity = null;
   store.cityDetail = null;
   mapView.invalidate();
-  showTab(leader() !== null ? 'turn' : store.selectedPlayer !== null ? 'civ' : 'civs');
+  if (leader() !== null) showTab(cityFrom === 'cities' ? 'cities' : 'turn');
+  else showTab(store.selectedPlayer !== null ? 'civ' : 'civs');
 });
 
 on('center', ({ x, y }) => mapView.centerOn(x, y));
