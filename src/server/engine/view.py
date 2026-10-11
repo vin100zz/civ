@@ -21,6 +21,8 @@ from .systems import production, research, spaceship, trade
 # Events every civilization hears of, wherever they happen.
 WORLD_NEWS = ("wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
               "global_warming", "game_over")
+# The affairs of a city only its owner hears of, even when the city is in sight of others.
+CITY_AFFAIRS = ("disband", "famine", "sold", "disorder", "order")
 
 
 class PlayerView:
@@ -330,10 +332,13 @@ class PlayerView:
 
     def knows_event(self, event: dict) -> bool:
         """Would the player hear of this event? Its own affairs, what happens under its
-        eyes, and the news the whole world learns."""
+        eyes (but not what goes on inside the cities of others), and the news the whole
+        world learns."""
         me = self.player.id
         if event.get("player") == me or event.get("other") == me:
             return True
+        if event["type"] in CITY_AFFAIRS:
+            return False
         if event["type"] in WORLD_NEWS:
             return True
         if event["type"] in ("war", "peace"):

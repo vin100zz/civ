@@ -411,6 +411,10 @@ def test_events_the_person_hears_of(rules):
     assert not view.knows_event({"type": "combat", "text": "", "player": 2, "other": 3, "x": 20, "y": 5})
     assert not view.knows_event({"type": "tech", "text": "", "player": 2})
     assert not view.knows_event({"type": "city_founded", "text": "", "player": 3, "x": 22, "y": 8})
+    # What goes on inside a foreign city stays there, even in sight.
+    assert view.knows_event({"type": "disband", "text": "", "player": 1, "x": 4, "y": 5})
+    assert not view.knows_event({"type": "disband", "text": "", "player": 2, "x": 5, "y": 5})
+    assert not view.knows_event({"type": "famine", "text": "", "player": 2, "x": 5, "y": 5})
     # A war between two civilizations is news only to those who know both of them.
     assert view.knows_event({"type": "war", "text": "", "player": 2, "other": 3})
     game.relation(1, 3).state = "no_contact"
