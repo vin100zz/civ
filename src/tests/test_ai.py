@@ -5,7 +5,7 @@ import pytest
 
 from server.ai.controller import AIController
 from server.ai.knowledge import Knowledge
-from server.ai import pathfinding
+from server.ai import pathfinding, strategic
 from server.engine.model.entities import SPECIALISTS
 from server.engine.systems import turn
 from server.engine.view import PlayerView
@@ -174,3 +174,66 @@ def test_railroads_do_not_trap_explorers(rules):
         turn.end_player_turn(game, player)
         game.turn += 1
     assert sum(player.explored) > 60
+
+
+# ── Terrain work ──────────────────────────────────────────────────────────────
+
+def settler_jobs(game, for_person=False, player_id=1):
+    """The terrain work the strategy posts for a player who knows the map: (x, y) -> order,
+    best job first. An AI only posts as many jobs as it wants workers."""
+    player = game.players[player_id]
+    player.explored = bytearray([1]) * len(game.map.tiles)
+    view = PlayerView(game, player)
+    plan = strategic.Plan()
+    strategic.improve_missions(view, Knowledge(view), plan, for_person=for_person)
+    return {(m.x, m.y): m.order for m in plan.missions}
+
+
+def test_settlers_clear_jungle_and_swamp_but_not_forest(rules):
+    patches = {(6, 4): "jungle", (8, 6): "swamp", (4, 6): "forest", (6, 8): "jungle"}
+    game = make_game(rules, width=16, height=12, patches=patches)
+    city = add_city(game, 1, 6, 6)
+    game.map.tile(6, 8).special = True                     # gems are kept
+    for _, tile in game.map.city_area(city.x, city.y):
+        tile.road = tile.irrigation = tile.terrain == "grassland"
+
+    jobs = settler_jobs(game, for_person=True)
+    assert jobs == {(6, 4): "irrigate", (8, 6): "irrigate"}, "jungle and swamp to grassland"
+    assert rules.terrains["jungle"].irrigation.turns > 12, "however long it takes"
+    assert list(settler_jobs(game).values()) == ["irrigate"], "an AI clears them too"
+
+
+def test_settlers_lay_railroads_wherever_the_land_yields_more(rules):
+    game = make_game(rules, width=16, height=12, terrain="forest")
+    city = add_city(game, 1, 6, 6, size=2)
+    game.players[1].techs.add(rules.game.movement.railroad_tech)
+    for _, tile in game.map.city_area(city.x, city.y):
+        tile.road = True
+
+    jobs = settler_jobs(game, for_person=True)
+    area = {tile.pos for _, tile in game.map.city_area(city.x, city.y)}
+    assert jobs == {pos: "railroad" for pos in area}, "worked or not"
+    worked = {(city.x + dx, city.y + dy) for dx, dy in city.worked}
+    assert set(list(jobs)[:len(worked)]) == worked, "the worked tiles first"
+
+
+def test_settlers_link_the_cities_by_road_then_railroad(rules):
+    # Forest everywhere: a road there only helps to move.
+    game = make_game(rules, width=40, height=12, terrain="forest")
+    add_city(game, 1, 4, 6)
+    add_city(game, 1, 10, 6)
+    add_city(game, 1, 25, 6)                               # too far to be linked
+    between = {(x, 6) for x in range(5, 10)}
+
+    jobs = settler_jobs(game, for_person=True)
+    assert set(jobs) == between and set(jobs.values()) == {"road"}
+    ai_jobs = settler_jobs(game)
+    assert ai_jobs and set(ai_jobs) <= between, "an AI links its cities first"
+
+    # A road already laid nearby is followed; once there, the railroad comes.
+    for x in range(5, 10):
+        game.map.tile(x, 7).road = True
+    game.players[1].techs.add(rules.game.movement.railroad_tech)
+    jobs = settler_jobs(game, for_person=True)
+    assert {(x, 7) for x in range(5, 10)} <= set(jobs) and set(jobs.values()) == {"railroad"}
+    assert not set(jobs) & between
