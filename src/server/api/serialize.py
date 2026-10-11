@@ -46,7 +46,7 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
             {"id": u.id, "name": u.name, "sprite": u.sprite, "attack": u.attack,
              "defense": u.defense, "moves": u.moves, "cost": u.cost, "domain": u.domain,
              "role": u.role, "capacity": u.capacity, "requires": u.requires,
-             "pop_cost": u.pop_cost}
+             "pop_cost": u.pop_cost, "needs_support": u.needs_support}
             for u in rules.units.values()],
         "buildings": [
             {"id": b.id, "name": b.name, "cost": b.cost, "upkeep": b.upkeep, "wonder": b.wonder,
@@ -297,6 +297,7 @@ def city_detail(game: Game, city: City, decision=None,
     here = game.units_at(game.tile_of(city))
     supported = game.units_of_city(city)
     settlers_food = city_rules.settlers_of(game, city) * game.government(player).settlers_food
+    costs = city_rules.unit_costs(game, city)
     # Buildings in the order the production list offers them, wonders last.
     rank = {building_id: i for i, building_id in enumerate(game.rules.buildings)}
     detail: dict[str, Any] = {
@@ -319,7 +320,10 @@ def city_detail(game: Game, city: City, decision=None,
         # What its units cost the city each turn; the government may keep some for free.
         "support": {"units": stats.supported_units,
                     "free": stats.supported_units - stats.shield_upkeep,
-                    "shields": stats.shield_upkeep, "food": settlers_food},
+                    "shields": stats.shield_upkeep, "food": settlers_food,
+                    "unhappy": sum(unhappy for _, _, unhappy in costs.values())},
+        # Unit id -> [shields, food, unhappy citizens] it costs the city each turn.
+        "unit_costs": {unit_id: list(cost) for unit_id, cost in costs.items()},
         "specialists": dict(city.specialists),
         "buildings": sorted(city.buildings,
                             key=lambda b: (game.rules.buildings[b].wonder, rank[b])),

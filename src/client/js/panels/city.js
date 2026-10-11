@@ -7,6 +7,7 @@ import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { setTips } from '../tips.js';
 import { ORDER_MARK, TASK_MARK } from '../renderer/map.js';
+import { governmentName } from './civs.js';
 
 const LAND = 450;           // pixels of the land view (css/style.css)
 const FACE = {
@@ -204,14 +205,36 @@ function unitTip(unit, count, rows) {
     + tipRows(doing ? [['Orders', doing], ...rows] : rows, true);
 }
 
+// What a unit costs its city each turn, an icon a point as in the original game: nothing
+// under a unit the city keeps for free.
+function costPips([shields, food, unhappy]) {
+  const pips = (count, glyph, tone) =>
+    (count ? `<span class="${tone}">${icon(glyph, 12, 2).repeat(count)}</span>` : '');
+  return `<span class="pips">${pips(shields, 'shield', 'shield')}${pips(food, 'food', 'food')}${
+    pips(unhappy, 'unhappy', 'bad')}</span>`;
+}
+
+// The same, for the tooltip of the unit.
+function costRows(unit, [shields, food, unhappy]) {
+  const paid = [shields && amount(shields, 'shield', 'shield'), food && amount(food, 'food', 'food')]
+    .filter(Boolean).join(' ');
+  const kept = store.unitDefs[unit[U.TYPE]].needs_support && !shields;
+  const upkeep = paid ? `${paid} <span class="soft">per turn</span>`
+    : kept ? 'Kept for free' : '<span class="soft">None</span>';
+  const rows = [['Upkeep', upkeep]];
+  if (unhappy) rows.push(['Unhappy', `${amount(unhappy, 'unhappy', 'bad')} <span class="soft">citizens</span>`]);
+  return rows;
+}
+
 // The units of a list, as cards. The person picks one to give it orders, so each has its
 // own; otherwise the units alike share a card. `about(unit)` gives the rows of the tooltip.
-function unitTray(units, tips, prefix, about, click) {
+// With `costs` (unit id -> [shields, food, unhappy]), each unit has its card, its costs under it.
+function unitTray(units, tips, prefix, about, click, costs = null) {
   if (!units.length) return '<span class="muted">None</span>';
   const groups = new Map();
   for (const unit of units) {
     const rows = about(unit);
-    const alike = click === 'orders' ? unit[U.ID]
+    const alike = click === 'orders' || costs ? unit[U.ID]
       : [unit[U.TYPE], unit[U.ORDER], unit[U.VETERAN], unit[U.ABOARD], JSON.stringify(rows)].join('|');
     if (!groups.has(alike)) groups.set(alike, { unit, rows, count: 0 });
     groups.get(alike).count += 1;
@@ -219,7 +242,8 @@ function unitTray(units, tips, prefix, about, click) {
   const cards = [...groups.values()].map(({ unit, rows, count }) => {
     const tip = `${prefix}:${unit[U.ID]}`;
     tips.set(tip, unitTip(unit, count, rows));
-    return unitCard(unit, tip, click, count);
+    const card = unitCard(unit, tip, click, count);
+    return costs ? `<div class="unit-slot">${card}${costPips(costs[unit[U.ID]])}</div>` : card;
   });
   return `<div class="unit-tray">${cards.join('')}</div>`;
 }
@@ -520,14 +544,18 @@ export function renderCity(container) {
     ...(support.free ? [['Kept for free', support.free]] : []),
     ['Shields', amount(support.shields, 'shield', 'shield')],
     ['Food', amount(support.food, 'food', 'food')],
-  ], true));
+    ...(support.unhappy ? [['Unhappy', amount(support.unhappy, 'unhappy', 'bad')]] : []),
+  ], true) + (support.unhappy ? `<div class="tip-foot">Under ${governmentName(owner.government)},
+    military units away from the city make its citizens unhappy.</div>` : ''));
   const supportCost = c.units_supported.length ? `<span class="support-cost" data-tip="support">
-    ${amount(support.shields, 'shield', 'shield')}${amount(support.food, 'food', 'food')}</span>` : '';
+    ${amount(support.shields, 'shield', 'shield')}${amount(support.food, 'food', 'food')}${
+    support.unhappy ? amount(support.unhappy, 'unhappy', 'bad') : ''}</span>` : '';
 
   const here = unitTray(c.units_here, tips, 'here',
     (unit) => [['Supported by', c.homes[unit[U.ID]] || '<span class="muted">no city</span>']], manage ? 'orders' : null);
   const supported = unitTray(c.units_supported, tips, 'supported',
-    (unit) => [['Location', c.places[unit[U.ID]] || `<span class="mono">${unit[U.X]}, ${unit[U.Y]}</span>`]], 'center');
+    (unit) => [['Location', c.places[unit[U.ID]] || `<span class="mono">${unit[U.X]}, ${unit[U.Y]}</span>`],
+      ...costRows(unit, c.unit_costs[unit[U.ID]])], 'center', c.unit_costs);
   const scroll = container.scrollTop;
 
   container.innerHTML = `
@@ -554,7 +582,7 @@ export function renderCity(container) {
         <div class="two" style="margin-top:10px">
           <div class="stack" style="gap:8px"><h2>Units in the city</h2>${here}</div>
           <div class="stack" style="gap:8px">
-            <div class="between" style="align-items:center"><h2>Units supported</h2>${supportCost}</div>${supported}</div>
+            <div class="between support-head"><h2>Units supported</h2>${supportCost}</div>${supported}</div>
         </div>
       </div>
       <div class="city-right">

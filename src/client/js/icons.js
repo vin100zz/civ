@@ -63,6 +63,7 @@ const PATHS = {
   lost: '<circle cx="12" cy="12" r="8.500"/><path d="M6 18 18 6"/>',
   cloud: '<path d="M7 18h10a4 4 0 0 0 .500-7.970 5.500 5.500 0 0 0-10.700-1.300A4.500 4.500 0 0 0 7 18z"/>',
   factory: '<path d="M3 21h18M5 21V11l5 3v-3l5 3V5h4v16"/>',
+  unhappy: '<circle cx="12" cy="12" r="9"/><path d="M9 10v.6M15 10v.6M8.500 16c1-1.400 2.200-2 3.500-2s2.500.6 3.500 2"/>',
 };
 
 export function icon(name, size = 18, stroke = 1.75) {

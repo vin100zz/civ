@@ -322,7 +322,7 @@ def test_city_sheet_tells_where_things_go(rules):
     other = add_city(game, 1, 10, 5)
     capital.buildings.update({"colossus", "temple", "palace", "granary"})
     militia = game.add_unit("militia", 1, 5, 5, home_city=capital.id)
-    game.add_unit("settlers", 1, 6, 5, home_city=capital.id)
+    settlers = game.add_unit("settlers", 1, 6, 5, home_city=capital.id)
     guest = game.add_unit("legion", 1, 5, 5, home_city=other.id)
     away = game.add_unit("legion", 1, 10, 5, home_city=capital.id)
 
@@ -334,7 +334,8 @@ def test_city_sheet_tells_where_things_go(rules):
     assert detail["item"] is None
     assert stats["food_settlers"] == game.government(player).settlers_food == 2
     assert stats["food_eaten"] == 8 * rules.game.city.food_per_citizen + 2
-    assert detail["support"] == {"units": 3, "free": 0, "shields": 3, "food": 2}
+    assert detail["support"] == {"units": 3, "free": 0, "shields": 3, "food": 2, "unhappy": 0}
+    assert detail["unit_costs"] == {militia.id: [1, 0, 0], settlers.id: [1, 2, 0], away.id: [1, 0, 0]}
     assert detail["homes"] == {militia.id: capital.name, guest.id: other.name}
     # The Settlers stand in the open: only the units in a city have a place to tell.
     assert detail["places"] == {militia.id: capital.name, away.id: other.name}
@@ -353,4 +354,42 @@ def test_city_sheet_tells_where_things_go(rules):
     # Under despotism the city keeps as many units as it has citizens for free.
     player.government = "despotism"
     assert serialize.city_detail(game, capital)["support"] == {
-        "units": 3, "free": 3, "shields": 0, "food": 1}
+        "units": 3, "free": 3, "shields": 0, "food": 1, "unhappy": 0}
+
+
+def test_city_sheet_tells_what_each_unit_costs(rules):
+    """Each supported unit with what it costs its city: the units the government keeps for
+    free are the first ones, and military units away make the citizens unhappy."""
+    game = make_game(rules)
+    player = game.players[1]
+    player.government = "despotism"
+    city = add_city(game, 1, 5, 5, size=2)
+    add_city(game, 1, 10, 5)
+    militia = game.add_unit("militia", 1, 5, 5, home_city=city.id)
+    settlers = game.add_unit("settlers", 1, 6, 5, home_city=city.id)
+    legion = game.add_unit("legion", 1, 10, 5, home_city=city.id)
+    diplomat = game.add_unit("diplomat", 1, 7, 5, home_city=city.id)
+
+    # Despotism keeps two units for free (the size of the city): the Militia and the Settlers,
+    # which still eat. The Diplomat needs no support at all.
+    detail = serialize.city_detail(game, city)
+    assert detail["unit_costs"] == {militia.id: [0, 0, 0], settlers.id: [0, 1, 0],
+                                    legion.id: [1, 0, 0], diplomat.id: [0, 0, 0]}
+    assert detail["support"] == {"units": 3, "free": 2, "shields": 1, "food": 1, "unhappy": 0}
+    assert detail["stats"]["unhappy"] == 0
+
+    # Democracy keeps none for free, and the Legion, away in another city, makes two citizens
+    # unhappy; the Militia at home and the units without attack make none.
+    player.government = "democracy"
+    detail = serialize.city_detail(game, city)
+    assert detail["unit_costs"] == {militia.id: [1, 0, 0], settlers.id: [1, 2, 0],
+                                    legion.id: [1, 0, 2], diplomat.id: [0, 0, 0]}
+    assert detail["support"] == {"units": 3, "free": 0, "shields": 3, "food": 2, "unhappy": 2}
+    assert detail["stats"]["unhappy"] == 2
+
+    # Women's Suffrage: one unhappy citizen less for each.
+    city.buildings.add("womens_suffrage")
+    game.wonders["womens_suffrage"] = city.id
+    detail = serialize.city_detail(game, city)
+    assert detail["unit_costs"][legion.id] == [1, 0, 1]
+    assert detail["support"]["unhappy"] == 1 and detail["stats"]["unhappy"] == 1
