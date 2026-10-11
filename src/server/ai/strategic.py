@@ -208,10 +208,13 @@ def _settle_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
 
 
 def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
-                     wanted: Optional[int] = None) -> int:
+                     for_person: bool = False) -> int:
     """Terrain work around our cities, most profitable first. Returns the number of jobs.
 
-    Only the `wanted` best jobs are posted: by default, as many as the empire wants workers.
+    `for_person`: the jobs of a person's automated settlers. All of them are posted, each
+    settler taking the best one within its reach, and the yield the government's tile penalty
+    holds back for now counts too (irrigated grassland under Despotism): the land is ready
+    for better times.
     """
     rules = view.rules
     get = lambda name: rules.ai.get("settlers", name)
@@ -224,6 +227,12 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
         if government.tile_penalty and not city.celebrating and value > 2:
             return value - 1
         return value
+
+    def gain(before: int, bonus: int, city: City) -> float:
+        now = effective(before + bonus, city) - before
+        if for_person and now < bonus:
+            return now + (bonus - now) * get("withheld_gain")
+        return now
 
     for city in know.cities:
         worked = {(city.x + dx, city.y + dy) for dx, dy in city.worked}
@@ -238,31 +247,33 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
             base = view.city_tile_yields(city, tile)
             options: list[tuple[float, str]] = []
             irrigation = terrain.irrigation
-            if irrigation is not None and irrigation.bonus and not tile.irrigation:
+            # Irrigation and mine replace each other: the work done is not undone.
+            if irrigation is not None and irrigation.bonus and not tile.irrigation \
+                    and not tile.mine:
                 turns = view.work_turns_at(tile, "irrigate")
                 if turns is not None and turns <= max_turns:
-                    gain = effective(base.food + irrigation.bonus, city) - base.food
-                    options.append((get("irrigate") * gain / turns, "irrigate"))
+                    food = gain(base.food, irrigation.bonus, city)
+                    options.append((get("irrigate") * food / turns, "irrigate"))
             mine = terrain.mine
             if mine is not None and mine.bonus and not tile.mine and not tile.irrigation:
                 turns = view.work_turns_at(tile, "mine")
                 if turns is not None and turns <= max_turns:
-                    gain = effective(base.shields + mine.bonus, city) - base.shields
-                    options.append((get("mine") * gain / turns, "mine"))
+                    shields = gain(base.shields, mine.bonus, city)
+                    options.append((get("mine") * shields / turns, "mine"))
             if terrain.road_trade and not tile.road:
                 turns = view.work_turns_at(tile, "road")
                 if turns is not None and turns <= max_turns:
                     bonus = rules.game.movement.road_trade_bonus
                     if government.trade_bonus and base.trade == 0:
                         bonus += 1
-                    gain = effective(base.trade + bonus, city) - base.trade
-                    options.append((get("road") * gain / turns, "road"))
+                    trade = gain(base.trade, bonus, city)
+                    options.append((get("road") * trade / turns, "road"))
             if tile.road and not tile.railroad and (tile.x, tile.y) in worked:
                 turns = view.work_turns_at(tile, "railroad")
                 if turns is not None and turns <= max_turns:
                     percent = rules.game.movement.railroad_yield_percent
-                    gain = base.shields * percent // 100 + base.food * percent // 100
-                    options.append((get("mine") * gain / turns, "railroad"))
+                    more = base.shields * percent // 100 + base.food * percent // 100
+                    options.append((get("mine") * more / turns, "railroad"))
             if tile.pollution:
                 # Pollution halves the tile and warms the planet: it is cleaned first.
                 options.append((get("clean"), "clean"))
@@ -280,8 +291,7 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
     # Settlers eat food: only as many jobs are posted as the empire wants workers.
     # Settlers left without a job go back to a city and join it.
     ranked = sorted(jobs.values(), key=lambda j: (-j[0], j[1].index))
-    if wanted is None:
-        wanted = workers_wanted(view, know, len(ranked))
+    wanted = len(ranked) if for_person else workers_wanted(view, know, len(ranked))
     for value, tile, order in ranked[:wanted]:
         plan.missions.append(Mission(M.IMPROVE, tile.x, tile.y, weight * (0.5 + value),
                                      order=order, note=order))

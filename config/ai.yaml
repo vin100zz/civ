@@ -154,6 +154,7 @@ settlers:
   mine: 2.0                       # value of one shield gained
   road: 1.5                       # value of one trade gained
   clean: 2.5                      # value of cleaning a polluted tile
+  withheld_gain: 0.5              # automated settlers: yield the tile penalty holds back
   max_work_turns: 12              # jobs longer than this are ignored
 
 economy:
