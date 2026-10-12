@@ -178,6 +178,13 @@ class Session:
             row["players"] = {int(pid): values for pid, values in row["players"].items()}
         self.log.extend(extra.get("log", []))
         self.heard.extend(extra.get("heard", []))
+        # Saves made before the origins of the wonders were kept: the chronicle still tells
+        # when and by whom its latest wonders were completed.
+        told = {event["wonder"]: event for event in self.log if event.get("type") == "wonder"}
+        for wonder_id, event in told.items():
+            if game.wonders.get(wonder_id) == event.get("city"):
+                game.wonder_origins.setdefault(wonder_id, (event["year"], event["player"],
+                                                           game.cities[event["city"]].name))
         if self.in_play() and game.current_player != self.human:
             self._advance()                    # saved between two turns: on to the person's
             self._read_events()

@@ -201,6 +201,7 @@ def _deliver_building(game: Game, city: City, building_id: str) -> None:
     city.buildings.add(building_id)
     if building.wonder:
         game.wonders[building_id] = city.id
+        game.wonder_origins[building_id] = (game.year, player.id, city.name)
         game.emit("wonder", f"{city.name} ({player.civ.name}) completes {building.name}.",
                   player=player.id, x=city.x, y=city.y, wonder=building_id, city=city.id)
         for effect in building.effects:

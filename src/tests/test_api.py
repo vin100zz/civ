@@ -1,11 +1,14 @@
 """The web layer: static pages, rules, and the observer's WebSocket."""
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
 from server.api import serialize
 from server.api.app import create_app
+from server.api.session import Session
 from server.engine.systems import pollution
 
 from .conftest import add_city, make_game
@@ -401,3 +404,49 @@ def test_city_sheet_tells_what_each_unit_costs(rules):
     detail = serialize.city_detail(game, city)
     assert detail["unit_costs"][legion.id] == [1, 0, 1]
     assert detail["support"]["unhappy"] == 1 and detail["stats"]["unhappy"] == 1
+
+
+def test_wonders_payload(rules):
+    game = make_game(rules)
+    rome = add_city(game, 1, 5, 5)
+    athens = add_city(game, 2, 10, 5)
+    game.wonders.update({"colossus": rome.id, "pyramids": athens.id, "oracle": None})
+    game.wonder_origins["colossus"] = (-1500, 2, "Athens")   # built by the Greeks, taken since
+    game.wonder_origins["oracle"] = (-900, 1, "Antium")      # lost with its city
+    game.players[2].techs.add("communism")                   # the Pyramids work no more
+    rows = {row["id"]: row for row in serialize.wonders_payload(game)}
+    assert list(rows) == [wonder.id for wonder in rules.wonders]
+    assert rows["colossus"] == {"id": "colossus", "built": True, "obsolete": False,
+                                "year": -1500, "builder": 2, "lost": False, "city": rome.name,
+                                "city_id": rome.id, "owner": 1, "x": 5, "y": 5}
+    assert rows["pyramids"]["obsolete"] and rows["pyramids"]["year"] is None
+    assert rows["oracle"] == {"id": "oracle", "built": True, "obsolete": False, "year": -900,
+                              "builder": 1, "lost": True, "city": "Antium"}
+    assert rows["great_wall"] == {"id": "great_wall", "built": False, "obsolete": False}
+    assert serialize.state_payload(game)["wonders"] == list(rows.values())
+
+
+def test_wonder_origins_are_saved(rules, tmp_path):
+    session = Session(rules, saves_dir=tmp_path)
+    game = session.game
+    land = next(tile for tile in game.map.tiles if game.terrain(tile).is_land)
+    city = add_city(game, 1, land.x, land.y)
+    game.wonders["colossus"] = city.id
+    game.wonder_origins["colossus"] = (-1500, city.owner, city.name)
+    game.wonders["oracle"] = None
+    session.save("new")
+    session.load("new")
+    assert session.game.wonder_origins == {"colossus": (-1500, city.owner, city.name)}
+    assert session.game.wonders["oracle"] is None
+
+    # An older save kept no origins: the chronicle tells of the wonders it still holds.
+    data = json.loads((tmp_path / "new.json").read_text())
+    del data["wonder_origins"]
+    data["extra"]["log"] = [
+        {"type": "wonder", "turn": 9, "year": -3000, "player": city.owner, "wonder": "colossus",
+         "city": city.id + 1000},                          # a city destroyed since
+        {"type": "wonder", "turn": 30, "year": -1200, "player": city.owner, "wonder": "colossus",
+         "city": city.id}]
+    (tmp_path / "old.json").write_text(json.dumps(data))
+    session.load("old")
+    assert session.game.wonder_origins == {"colossus": (-1200, city.owner, city.name)}

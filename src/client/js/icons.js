@@ -67,6 +67,8 @@ const PATHS = {
   happy: '<circle cx="12" cy="12" r="9"/><path d="M9 10v.6M15 10v.6M8.500 14c1 1.400 2.200 2 3.500 2s2.500-.6 3.500-2"/>',
   // The cities panel: every city at once.
   cities: '<path d="M3 21h18M5 21v-9h4v9M10 21V4h5v17M16 21v-7h3v7M12.500 8v.01M12.500 12v.01M12.500 16v.01"/>',
+  // The wonders panel.
+  wonder: '<path d="M3 20h18L12 4.500zM12 4.500l2.800 15.500"/>',
 };
 
 export function icon(name, size = 18, stroke = 1.75) {

@@ -58,6 +58,8 @@ def game_to_data(game: Game) -> dict[str, Any]:
         "cities": [_city_to_data(c) for c in game.cities.values()],
         "units": [dataclasses.asdict(u) for u in game.units.values()],
         "wonders": [[wonder_id, city_id] for wonder_id, city_id in game.wonders.items()],
+        "wonder_origins": [[wonder_id, *origin]
+                           for wonder_id, origin in game.wonder_origins.items()],
         "relations": [[a, b, r.state, r.since_turn, r.last_proposal_turn, r.pending_from]
                       for (a, b), r in game.relations.items()],
         # A game led by a person is saved in the middle of that person's turn.
@@ -158,6 +160,10 @@ def _build_game(rules: Rules, data: dict[str, Any]) -> Game:
     for index, unit_ids in saved_map["units"]:
         world.tiles[index].unit_ids = list(unit_ids)
     game.wonders = {wonder_id: city_id for wonder_id, city_id in data["wonders"]}
+    # Saves made before the origins were kept have none: the panel shows no year then.
+    # The first ones kept no city name either: only a lost wonder needs it.
+    game.wonder_origins = {wonder_id: (year, builder, city[0] if city else None)
+                           for wonder_id, year, builder, *city in data.get("wonder_origins", [])}
     for a, b, state, since, proposal, *pending in data["relations"]:
         game.relations[(a, b)] = Relation(state, since, proposal, pending[0] if pending else None)
     game.current_player = data.get("current_player")

@@ -1,9 +1,10 @@
 """City rules: yields, trade, mood, growth."""
 from __future__ import annotations
 
+from server.engine import effects as fx
 from server.engine.model.entities import Item
 from server.engine.rules.schema import Effect, Yields
-from server.engine.systems import cities, city as city_rules
+from server.engine.systems import cities, city as city_rules, production
 
 from .conftest import add_city, make_game
 
@@ -184,5 +185,11 @@ def test_wonder_is_unique(rules):
     first.shields = 200
     cities.process_city(game, first)
     assert game.wonders == {"colossus": first.id}
+    assert game.wonder_origins == {"colossus": (game.year, 1, first.name)}
     assert rival.production is None                  # the race is lost
     assert any(e["type"] == "wonder" for e in game.events)
+    # A wonder goes down with its city: it works no more, and nobody can build it again.
+    cities.destroy_city(game, first, "test")
+    assert game.wonders == {"colossus": None}
+    assert fx.active_wonders(game, 1) == [] and fx.wonder_owner(game, "colossus") is None
+    assert not production.can_build(game, rival, Item("building", "colossus"))

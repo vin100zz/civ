@@ -224,8 +224,9 @@ def destroy_city(game: Game, city: City, reason: str) -> None:
     game.mark_tile(tile)
     for unit in list(game.units_of_city(city)):
         game.set_home(unit, None)
+    # Its wonders are lost: they work no more, and nobody can build them again (Civ 1).
     for wonder_id in [w for w, c in game.wonders.items() if c == city.id]:
-        del game.wonders[wonder_id]
+        game.wonders[wonder_id] = None
     for other in game.cities.values():
         if city.id in other.trade_routes:
             other.trade_routes.remove(city.id)

@@ -50,7 +50,7 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
             for u in rules.units.values()],
         "buildings": [
             {"id": b.id, "name": b.name, "cost": b.cost, "upkeep": b.upkeep, "wonder": b.wonder,
-             "description": b.description, "requires": b.requires}
+             "description": b.description, "requires": b.requires, "obsolete_by": b.obsolete_by}
             for b in rules.buildings.values()],
         "techs": [
             {"id": t.id, "name": t.name, "era": t.era, "prerequisites": list(t.prerequisites)}
@@ -236,6 +236,29 @@ def own_detail(view: PlayerView, game: Game) -> dict[str, Any]:
         "level": player.level,
     })
     return detail
+
+
+# ── Wonders ───────────────────────────────────────────────────────────────────
+
+def wonders_payload(game: Game) -> list[dict[str, Any]]:
+    """Every wonder in rules order. The whole world hears of each completion, so a built
+    wonder comes with the year it was completed and who built it (None in saves older than
+    this record), then its city and owner, the city having maybe changed hands since; or,
+    lost with its city, the name of that city. Obsolete wonders work no more and can no
+    longer be built."""
+    rows = []
+    for wonder in game.rules.wonders:
+        row: dict[str, Any] = {"id": wonder.id, "built": wonder.id in game.wonders,
+                               "obsolete": fx.wonder_obsolete(game, wonder)}
+        if row["built"]:
+            year, builder, place = game.wonder_origins.get(wonder.id, (None, None, None))
+            city = game.cities.get(game.wonders[wonder.id])
+            row.update({"year": year, "builder": builder, "lost": city is None,
+                        "city": place if city is None else city.name})
+            if city is not None:
+                row.update({"city_id": city.id, "owner": city.owner, "x": city.x, "y": city.y})
+        rows.append(row)
+    return rows
 
 
 # ── Cities ────────────────────────────────────────────────────────────────────
@@ -494,6 +517,7 @@ def state_payload(game: Game, pov: Optional[int] = None,
         "warming": {"level": game.warming_level, "count": game.warming_count,
                     "threshold": game.rules.game.pollution.warming_threshold},
         "pov": viewer.id if viewer is not None else None,
+        "wonders": wonders_payload(game),
     }
     cities = list(game.cities.values())
     units = list(game.units.values())

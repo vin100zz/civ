@@ -18,7 +18,9 @@ class Game:
         self.players: list[Player] = []
         self.cities: dict[int, City] = {}
         self.units: dict[int, Unit] = {}
-        self.wonders: dict[str, int] = {}             # wonder id -> city id
+        # Wonder id -> city id, None once lost with its city: built for good, as in Civ 1.
+        self.wonders: dict[str, Optional[int]] = {}
+        self.wonder_origins: dict[str, tuple[int, int, str]] = {}  # -> (year, builder id, city)
         self.relations: dict[tuple[int, int], Relation] = {}
         self.turn = 0
         self.year = rules.game.calendar.start_year

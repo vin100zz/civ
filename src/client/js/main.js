@@ -15,6 +15,7 @@ import { renderChart } from './panels/chart.js';
 import { renderLog } from './panels/log.js';
 import { renderTurn } from './panels/turn.js';
 import { renderCities } from './panels/cities.js';
+import { renderWonders } from './panels/wonders.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
@@ -55,6 +56,7 @@ const panels = {
   civs: () => renderCivs($('panel-civs')),
   civ: () => (leader() !== null ? renderEmpire($('panel-civ')) : renderCiv($('panel-civ'))),
   cities: () => renderCities($('panel-cities')),
+  wonders: () => renderWonders($('panel-wonders')),
   tech: () => renderTech($('panel-tech')),
   chart: () => renderChart($('panel-chart')),
   log: () => renderLog($('panel-log')),
