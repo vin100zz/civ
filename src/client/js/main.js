@@ -40,7 +40,7 @@ setOnLoad(() => {
   picturesDue = true;
   requestAnimationFrame(() => {
     picturesDue = false;
-    if (activeTab === 'city' || activeTab === 'turn' || activeTab === 'cities') panels[activeTab]();
+    if (['city', 'turn', 'cities', 'tech'].includes(activeTab)) panels[activeTab]();
     renderUnitBar($('unit-bar'));
   });
 });

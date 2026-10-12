@@ -3,10 +3,11 @@
 import { store, emit, leader } from '../state.js';
 import { send } from '../net.js';
 import { ranking } from './civs.js';
+import { unitPicture } from '../renderer/sprites.js';
 
-const BOX_W = 176;
+const BOX_W = 200;
 const BOX_H = 52;
-const PITCH_X = 214;
+const PITCH_X = 238;
 const PITCH_Y = 68;
 const PAD = 28;
 const MINI_ROW = 9;          // overview: pixels per row, in its own 72 px tall drawing
@@ -50,17 +51,17 @@ function computeLayout() {
       position[id] = { x: PAD + d * PITCH_X, y: PAD + Math.round((i + shift) * PITCH_Y), row: i + shift, column: d };
     });
   });
-  // What each advance leads to and, when the rules say it, what it unlocks.
-  const leads = {};
+  // What each advance unlocks, when the rules say it, and the units among it.
   const unlocks = {};
-  for (const tech of techs) {
-    for (const pre of tech.prerequisites) (leads[pre] = leads[pre] || []).push(tech.name);
-  }
+  const units = {};
   for (const item of [...store.rules.units, ...store.rules.buildings, ...store.rules.governments]) {
     if (item.requires) (unlocks[item.requires] = unlocks[item.requires] || []).push(item.name);
   }
+  for (const unit of store.rules.units) {
+    if (unit.requires && unit.sprite) (units[unit.requires] = units[unit.requires] || []).push(unit);
+  }
   return {
-    position, leads, unlocks, rows,
+    position, unlocks, units, rows,
     columns: columns.length,
     hasUnlocks: Object.keys(unlocks).length > 0,
     width: 2 * PAD + (columns.length - 1) * PITCH_X + BOX_W,
@@ -171,8 +172,6 @@ export function renderTech(container) {
   const choosing = leader() === detail.id;
   const left = Math.max(0, detail.research_cost - detail.research_progress);
   const turns = detail.science > 0 && current ? Math.ceil(left / detail.science) : null;
-  const progress = detail.research_cost
-    ? Math.min(100, 100 * detail.research_progress / detail.research_cost) : 0;
 
   const links = { known: [], next: [], locked: [] };
   const boxes = [];
@@ -189,11 +188,14 @@ export function renderTech(container) {
     }
     // The person leading this civilization picks its research by clicking an advance.
     const pickable = choosing && state === 'available';
+    const pictures = (layout.units[tech.id] || []).map((unit) =>
+      `<img src="${unitPicture(unit)}" alt="${unit.name}" draggable="false">`).join('');
     boxes.push(`<div class="tech ${state}${pickable ? ' pickable' : ''}" style="left:${at.x}px;top:${at.y}px"
       title="${tech.name} — ${sub}"${pickable ? ` data-tech="${tech.id}" role="button" tabindex="0"` : ''}>
-      <b>${tech.name}</b><small>${sub}</small></div>`);
+      <span class="text"><b>${tech.name}</b><small>${sub}</small></span>
+      ${pictures ? `<span class="units">${pictures}</span>` : ''}</div>`);
     const fill = state === 'known' ? detail.color : state === 'researching' ? '#E2B659'
-      : state === 'available' ? '#8A95A5' : '#2F3948';
+      : state === 'available' ? '#5FCB8B' : '#2F3948';
     mini.push(`<rect x="${at.column * 100 + 6}" y="${at.row * MINI_ROW}" width="88" height="6" rx="2" fill="${fill}"/>`);
     for (const pre of tech.prerequisites) {
       const from = layout.position[pre];
@@ -208,45 +210,15 @@ export function renderTech(container) {
     }
   }
 
-  const info = current ? store.techDefs[current] : null;
-  const requires = info ? info.prerequisites.map((id) => store.techDefs[id].name).join(', ') || '—' : '—';
-  const ai = detail.ai && detail.ai.research ? detail.ai.research.slice(0, 5) : [];
-  const bestScore = ai.length ? Math.max(0.001, ai[0][1]) : 1;
-  const rankingCard = ai.length ? `
-    <div class="card">
-      <div class="ai-title"><span class="ai-badge">AI</span><span class="h2">Research ranking</span>
-        <span class="sub">${available.size} advances available</span></div>
-      <div class="ranking">${ai.map(([id, score]) => `
-        <div><b>${store.techDefs[id] ? store.techDefs[id].name : id}</b>
-          <span class="bar thin"><span style="width:${Math.max(3, 100 * score / bestScore)}%"></span></span>
-          <span class="sub">${score}</span></div>`).join('')}</div>
-    </div>` : `<div class="card"><span class="sub">${available.size} advances available</span></div>`;
-
   container.innerHTML = `
     <div class="work" style="--civ:${detail.color}">
       ${head(detail.id)}
-      <div class="research">
-        <div class="card">
-          <div class="between"><span class="sub">Researching${info ? ` · ${capital(info.era)} era` : ''}</span>
-            <span class="sub">${detail.techs} of ${store.rules.techs.length} advances known</span></div>
-          <div class="between"><span class="big">${info ? info.name : 'Nothing'}</span>
-            <span class="soft" style="font-size:13px"><b style="color:var(--text)">${detail.research_progress}</b> / ${detail.research_cost}
-              · +${detail.science} per turn${turns !== null ? ` · <b style="color:var(--gold)">${turnsLabel(turns)}</b>` : ''}</span></div>
-          <div class="bar"><span style="width:${progress}%"></span></div>
-        </div>
-        <dl class="card kv">
-          <dt>Requires</dt><dd>${requires}</dd>
-          <dt>Leads to</dt><dd>${info ? (layout.leads[current] || []).join(', ') || '—' : '—'}</dd>
-          ${layout.hasUnlocks ? `<dt>Unlocks</dt><dd><b>${info ? (layout.unlocks[current] || []).join(', ') || '—' : '—'}</b></dd>` : ''}
-        </dl>
-        ${rankingCard}
-      </div>
       <div class="tree">
         <div id="tech-tree">
           <div class="tree-canvas" style="width:${layout.width}px;height:${layout.height}px">
             <svg width="${layout.width}" height="${layout.height}" fill="none">
               <path d="${links.locked.join(' ')}" stroke="#2A3342" stroke-width="1.25"/>
-              <path d="${links.next.join(' ')}" stroke="#8A95A5" stroke-width="1.5" stroke-dasharray="4 4"/>
+              <path d="${links.next.join(' ')}" stroke="#5FCB8B" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7"/>
               <path d="${links.known.join(' ')}" stroke="${detail.color}" stroke-width="1.5" opacity="0.75"/>
             </svg>
             ${boxes.join('')}

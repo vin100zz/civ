@@ -1,7 +1,7 @@
 // "Turn" panel of the person playing: what needs a decision, what threatens, which units
 // still wait for orders, and how the cities are doing.
 
-import { store, U, emit, player, leader, turnsFor } from '../state.js';
+import { store, U, emit, leader, turnsFor } from '../state.js';
 import { icon } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
 import { movesText } from './unitbar.js';
@@ -108,7 +108,6 @@ export function renderTurn(container) {
   }
   const me = state.me;
   const cities = state.cities.filter((city) => city.owner === id);
-  const enemies = me.at_war.map((other) => player(other).nation);
   const waiting = queue();
   const scroll = container.scrollTop;
 
@@ -139,8 +138,7 @@ export function renderTurn(container) {
   const heading = (text, count) => `<div class="turn-head label"><span>${text}</span><span>${count}</span></div>`;
   container.innerHTML = `
     <div class="panel-head">
-      <div class="titles"><h1>${play.waiting ? 'The others are playing…' : 'Your turn'}</h1></div>
-      ${enemies.length ? `<span class="pill war" title="At war with ${enemies.join(', ')}">At war with ${enemies.join(', ')}</span>` : ''}
+      <div class="titles"><h1>${play.waiting ? 'The others are playing…' : 'Turn'}</h1></div>
     </div>
     ${toDecide.length ? `${heading('To decide before ending the turn', toDecide.length)}<div class="turn-list">${toDecide.join('')}</div>` : ''}
     ${advice.length ? `${heading('Worth a look', advice.length)}<div class="turn-list">${advice.join('')}</div>` : ''}

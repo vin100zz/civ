@@ -842,6 +842,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .civ-line .rank { font-size: 13px; color: var(--mute); }
 .civ-line .name { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
 .civ-line .name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.civ-line .name .pill { flex: none; }
 .civ-line .n { color: var(--soft); font-size: 13px; }
 .civ-line .score { font-size: 15px; font-weight: 600; }
 .civ-meta { display: flex; align-items: center; gap: 10px; width: 100%; padding-left: 26px; }
@@ -860,6 +861,10 @@ body.play #notice { bottom: auto; top: 72px; }
 }
 .civ-meta .ship { color: var(--sci); border-color: rgba(109, 183, 242, 0.4); }
 .civ-meta .bar { flex: 1; min-width: 24px; justify-content: flex-end; }
+/* A civilization the person has met, with what it can do about it on the right. */
+.civ-known { position: relative; flex: none; }
+.civ-known.acts .civ-row { padding-right: 136px; }
+.civ-act { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
 
 .dead-row { display: flex; align-items: center; gap: 9px; padding: 9px 20px 9px 48px; width: 100%; color: var(--mute); flex: none; }
 .dead-row .swatch { background: none !important; border: 1.5px solid; opacity: 0.7; }
@@ -896,7 +901,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .relation .state { font-size: 12px; font-weight: 600; width: 52px; text-align: right; }
 .stack { display: flex; flex-direction: column; gap: 6px; }
 
-/* The person's own empire: budget, government, foreign affairs. */
+/* The person's own empire: budget and government. */
 .rates { display: flex; flex-direction: column; padding: 0 20px; flex: none; }
 .rate { display: flex; align-items: center; gap: 12px; height: 44px; }
 .rate .what { width: 60px; font-size: 13px; font-weight: 600; flex: none; }
@@ -911,15 +916,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .stepper button:disabled { opacity: 0.35; cursor: default; }
 .stepper.narrow { width: 264px; }
 .block { display: flex; flex-direction: column; gap: 8px; padding: 0 20px; flex: none; }
-.block.row { flex-direction: row; align-items: center; gap: 12px; }
-.block .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.block .bar { background: var(--line); }
 .big-name { font-size: 15px; font-weight: 600; }
-.nations { display: flex; flex-direction: column; border-top: 1px solid var(--line-2); flex: none; }
-.nation { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--line-2); }
-.nation .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.nation .name { display: flex; align-items: center; gap: 8px; }
-.nation b { font-size: 15px; font-weight: 600; }
 .stack.tight { gap: 7px; }
 
 .ai { margin-top: 16px; border-top: 1px solid var(--line); padding: 14px 0 0; display: flex; flex-direction: column; gap: 12px; flex: none; }
@@ -1113,36 +1110,29 @@ button.specialist:hover { background: var(--hover); }
 .keys i.dot { width: 9px; height: 9px; border-radius: 50%; border: 0; }
 
 /* Science */
-.research { display: grid; grid-template-columns: minmax(320px, 1.2fr) minmax(240px, 0.9fr) minmax(360px, 1.3fr); gap: 16px; flex: none; }
-.research .kv { display: grid; grid-template-columns: 76px 1fr; gap: 7px 10px; align-content: center; }
-.research .kv dt { padding-top: 0; }
-.ranking { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
-.ranking div { display: flex; flex-direction: column; gap: 5px; min-width: 0; color: var(--soft); }
-.ranking div:first-child { color: var(--text); }
-.ranking b { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ranking .bar > span { background: var(--line-3); }
-.ranking div:first-child .bar > span { background: var(--gold); }
-.ranking .bar { background: var(--line); }
-
-.tree { position: relative; flex: 1; min-height: 160px; margin-top: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; }
+.tree { position: relative; flex: 1; min-height: 160px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; }
 #tech-tree { flex: 1; overflow: auto; display: flex; cursor: grab; }
 #tech-tree.dragging { cursor: grabbing; }
 .tree-canvas { position: relative; flex: none; margin: auto 0; }
 .tree-canvas svg { position: absolute; left: 0; top: 0; pointer-events: none; }
 .tech {
   position: absolute;
-  width: 176px;
+  width: 200px;
   height: 52px;
-  padding: 0 12px;
+  padding: 0 8px 0 12px;
   border-radius: 9px;
   border: 1px solid var(--line);
   background: var(--panel);
   color: var(--mute);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
+  align-items: center;
+  gap: 6px;
 }
+.tech .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* The units an advance brings, as on the map; faded while out of reach. */
+.tech .units { flex: none; display: flex; align-items: center; gap: 2px; }
+.tech .units img { width: 36px; height: 36px; object-fit: contain; opacity: 0.45; filter: grayscale(0.7); }
+.tech.known .units img, .tech.researching .units img, .tech.available .units img { opacity: 1; filter: none; }
 .tech b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tech small { font-size: 11px; color: #77828F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tech.known {
@@ -1151,15 +1141,15 @@ button.specialist:hover { background: var(--hover); }
   border-color: color-mix(in srgb, var(--civ) 60%, var(--bg));
 }
 .tech.known small { color: color-mix(in srgb, var(--civ) 45%, var(--soft)); }
-.tech.available { color: var(--text); background: var(--raise); border-color: #66758A; }
-.tech.available small { color: var(--soft); }
-.tech.researching { color: #fff; background: #2A2619; border: 2px solid var(--gold); padding: 0 11px; }
+.tech.available { color: var(--text); background: color-mix(in srgb, var(--good) 14%, var(--bg)); border-color: color-mix(in srgb, var(--good) 75%, var(--bg)); }
+.tech.available small { color: color-mix(in srgb, var(--good) 60%, var(--soft)); }
+.tech.researching { color: #fff; background: #2A2619; border: 2px solid var(--gold); padding: 0 7px 0 11px; }
 .tech.researching small { color: var(--gold); }
 .tech.pickable { cursor: pointer; }
 .tech.pickable:hover { border-color: var(--gold); }
 .keys i.known { background: color-mix(in srgb, var(--civ) 16%, var(--bg)); border-color: color-mix(in srgb, var(--civ) 60%, var(--bg)); }
 .keys i.researching { background: #2A2619; border: 2px solid var(--gold); }
-.keys i.available { background: var(--raise); border-color: #66758A; }
+.keys i.available { background: color-mix(in srgb, var(--good) 14%, var(--bg)); border-color: color-mix(in srgb, var(--good) 75%, var(--bg)); }
 
 .overview { flex: none; padding: 14px 0 0; display: flex; align-items: center; gap: 20px; }
 .overview .titles { display: flex; flex-direction: column; gap: 2px; width: 112px; flex: none; }
@@ -1200,7 +1190,6 @@ button.specialist:hover { background: var(--hover); }
 .small-card .axis { display: flex; justify-content: space-between; width: 100%; font-size: 11px; color: var(--mute); }
 
 @container (max-width: 1100px) {
-  .research { grid-template-columns: 1fr; }
   .history-main { flex-direction: column; }
   .rank-card { width: auto; }
   .work { overflow-y: auto; }
