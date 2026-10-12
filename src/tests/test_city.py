@@ -4,7 +4,7 @@ from __future__ import annotations
 from server.engine import effects as fx
 from server.engine.model.entities import Item
 from server.engine.rules.schema import Effect, Yields
-from server.engine.systems import cities, city as city_rules, production
+from server.engine.systems import cities, city as city_rules, government, production
 
 from .conftest import add_city, make_game
 
@@ -44,6 +44,24 @@ def test_improvements_and_specials(rules):
     assert city_rules.tile_yields(game, city, plains) == Yields(3, 1, 1)
     game.players[1].government = "despotism"         # more than 2 loses 1
     assert city_rules.tile_yields(game, city, hills) == Yields(1, 2, 0)
+
+
+def test_railroad_bonus_comes_before_the_government(rules):
+    """Shield grassland (2/1/0) with road and irrigation: the railroad adds 50% of the yield
+    before the government's penalty or bonus, as in the original."""
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5)
+    tile = game.map.tile(6, 5)
+    tile.pattern = tile.road = tile.irrigation = True
+    expected = {"despotism": ((2, 1, 1), (3, 1, 1)),
+                "monarchy": ((3, 1, 1), (4, 1, 1)),
+                "democracy": ((3, 1, 2), (4, 1, 2))}
+    for government_id, (without_railroad, with_railroad) in expected.items():
+        game.players[1].government = government_id
+        tile.railroad = False
+        assert city_rules.tile_yields(game, city, tile) == Yields(*without_railroad)
+        tile.railroad = True
+        assert city_rules.tile_yields(game, city, tile) == Yields(*with_railroad)
 
 
 def test_worker_assignment_is_consistent(rules):
@@ -107,6 +125,67 @@ def test_growth_brings_disorder(rules):
 
     city.size = city_rules.max_size(game, city)             # no aqueduct: it cannot grow
     assert not city_rules.growth_brings_disorder(game, city)
+
+
+def _farmland_city(rules, government_id: str, size: int, luxury: int):
+    """A city on irrigated grassland with roads, under the given government and luxury rate."""
+    game = make_game(rules)
+    player = game.players[1]
+    player.government = government_id
+    player.tax_rate, player.luxury_rate, player.science_rate = 100 - luxury, luxury, 0
+    for _, tile in game.map.city_area(5, 5):
+        tile.road = tile.irrigation = True
+    return game, add_city(game, 1, 5, 5, size=size)
+
+
+def test_mayor_makes_the_city_celebrate_under_democracy(rules):
+    """A celebrating city grows by one each turn under Democracy: the mayor gives up two
+    tiles for it, the food surplus stays positive."""
+    game, city = _farmland_city(rules, "democracy", size=6, luxury=60)
+    stats = city_rules.compute_city(game, city)
+    assert stats.celebrating and stats.food_surplus > 0
+    assert city.specialists["entertainer"] == 2
+    free = next(o for o, _ in city_rules.workable_tiles(game, city) if o not in city.worked)
+    city_rules.toggle_tile(game, city, free)                # one of them back to work
+    assert not city_rules.compute_city(game, city).celebrating
+
+    # Under Monarchy celebrating brings no growth: everybody works.
+    game, city = _farmland_city(rules, "monarchy", size=6, luxury=60)
+    assert city.specialists["entertainer"] == 0
+    assert not city_rules.compute_city(game, city).celebrating
+
+
+def test_luxury_change_rearranges_the_cities(rules):
+    game, city = _farmland_city(rules, "democracy", size=10, luxury=30)
+    city.buildings.add("aqueduct")
+    city_rules.auto_arrange(game, city)
+    assert city.specialists["entertainer"] == 4             # needed against disorder
+    player = game.players[1]
+
+    city_rules.toggle_tile(game, city, city.worked[0])      # placed by hand
+    hand_placed = (list(city.worked), dict(city.specialists))
+    assert government.set_rates(game, player, 50, 30, 20)   # same luxury: left alone
+    assert (city.worked, city.specialists) == hand_placed
+
+    assert government.set_rates(game, player, 40, 60, 0)
+    assert city.specialists["entertainer"] == 0             # all back to work
+    assert not city.stats.disorder
+
+
+def test_new_government_rearranges_the_cities(rules):
+    game, city = _farmland_city(rules, "monarchy", size=6, luxury=60)
+    assert city.specialists["entertainer"] == 0
+    player = game.players[1]
+    player.techs.add("democracy")
+    game.turn = 5
+    assert government.start_revolution(game, player, "democracy")
+    assert player.government == "anarchy"
+    assert len(city.worked) + city.specialist_count == city.size
+    game.turn = 8
+    government.tick(game, player)
+    assert player.government == "democracy"
+    assert city.specialists["entertainer"] == 2             # celebrating for rapture growth
+    assert city.stats.celebrating
 
 
 def test_corruption_grows_with_distance(rules):

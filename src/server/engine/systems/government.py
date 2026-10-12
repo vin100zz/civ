@@ -1,9 +1,14 @@
-"""Governments, revolutions and tax rates."""
+"""Governments, revolutions and tax rates.
+
+A new government changes tile yields and moods: every city of the player is re-arranged
+(see `rearrange_cities`).
+"""
 from __future__ import annotations
 
 from .. import effects as fx
 from ..model.entities import Player
 from ..model.game import Game
+from . import city as city_rules
 
 ANARCHY = "anarchy"
 
@@ -35,6 +40,7 @@ def start_revolution(game: Game, player: Player, target: str) -> bool:
     player.pending_government = target
     player.anarchy_until_turn = (game.turn // multiple + 1) * multiple
     clamp_rates(game, player)
+    rearrange_cities(game, player)
     game.emit("government", f"Revolution among the {player.civ.nation}: anarchy.",
               player=player.id, government=ANARCHY)
     return True
@@ -50,6 +56,7 @@ def collapse(game: Game, player: Player) -> None:
     player.pending_government = previous
     player.anarchy_until_turn = (game.turn // multiple + 1) * multiple
     clamp_rates(game, player)
+    rearrange_cities(game, player)
     game.emit("government", f"The {player.civ.name} government collapses into anarchy.",
               player=player.id, government=ANARCHY)
 
@@ -71,6 +78,7 @@ def _install(game: Game, player: Player, target: str) -> None:
     player.pending_government = None
     player.anarchy_until_turn = None
     clamp_rates(game, player)
+    rearrange_cities(game, player)
     name = game.rules.governments[target].name
     game.emit("government", f"The {player.civ.nation} adopt {name}.",
               player=player.id, government=target)
@@ -84,10 +92,23 @@ def valid_rates(game: Game, player: Player, tax: int, luxury: int, science: int)
 
 
 def set_rates(game: Game, player: Player, tax: int, luxury: int, science: int) -> bool:
+    """New rates. A change of luxuries changes the mood of every city, so their citizens are
+    placed again (entertainers no longer needed go back to work, celebrations start)."""
     if not valid_rates(game, player, tax, luxury, science):
         return False
+    luxury_changed = luxury != player.luxury_rate
     player.tax_rate, player.luxury_rate, player.science_rate = tax, luxury, science
+    if luxury_changed:
+        rearrange_cities(game, player)
     return True
+
+
+def rearrange_cities(game: Game, player: Player) -> None:
+    """The mayors of all the player's cities place the citizens again, after a change that
+    alters yields or moods everywhere (government, luxury rate). Hand placements are lost."""
+    for city in game.player_cities(player.id):
+        city_rules.auto_arrange(game, city)
+        city.stats = city_rules.compute_city(game, city)
 
 
 def clamp_rates(game: Game, player: Player) -> None:

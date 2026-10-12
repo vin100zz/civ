@@ -124,7 +124,8 @@ def auto_arrange(game: Game, city: City) -> None:
     Citizens are placed one by one on the tile worth the most to the city at that moment:
     food counts most while the city does not feed itself, shields while its units eat all
     the production (weights in game.yaml, city.worker_weights). Citizens left without a
-    tile become entertainers, and more are taken off the land while the city would riot.
+    tile become entertainers, and more are taken off the land while the city would riot,
+    or when a few entertainers make it celebrate (see `_seek_celebration`).
 
     The original game uses a similar two-step rule (CityWorker.cs, around line 575) that
     leaves large cities without any shield; this one keeps them producing.
@@ -180,6 +181,34 @@ def auto_arrange(game: Game, city: City) -> None:
         worst = min(city.worked, key=lambda o: _tile_worth(game, city, o, effects))
         set_worked(game, city, [o for o in city.worked if o != worst])
         city.specialists["entertainer"] += 1
+
+    _seek_celebration(game, city, effects)
+
+
+def _seek_celebration(game: Game, city: City, effects: list[Effect]) -> None:
+    """Under a government with rapture growth a celebrating city grows by one each turn, so
+    the mayor takes citizens off the land when that makes the city celebrate. Only while the
+    city keeps a food surplus (the condition of that growth) and pays its units' upkeep;
+    otherwise the citizens stay where they were."""
+    government = game.government(game.players[city.owner])
+    limit = max_size(game, city)
+    if (not government.rapture_growth or city.size < game.rules.game.city.celebration_min_size
+            or (limit is not None and city.size >= limit)):
+        return
+    worked, entertainers = list(city.worked), city.specialists["entertainer"]
+    while True:
+        stats = compute_city(game, city)
+        if stats.food_surplus <= 0 or stats.shield_surplus < 0:
+            break
+        if stats.celebrating:
+            return
+        if not city.worked:
+            break
+        worst = min(city.worked, key=lambda o: _tile_worth(game, city, o, effects))
+        set_worked(game, city, [o for o in city.worked if o != worst])
+        city.specialists["entertainer"] += 1
+    set_worked(game, city, worked)
+    city.specialists["entertainer"] = entertainers
 
 
 def toggle_tile(game: Game, city: City, offset: tuple[int, int]) -> bool:
