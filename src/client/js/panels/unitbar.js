@@ -7,6 +7,7 @@ import {
   play, activeUnit, queue, give, keyOf, wait, skip, activate, endTurn, pendingDecisions, whyNotEnd,
 } from '../play.js';
 import { replaying, skipReplay } from '../replay.js';
+import { unitPicture } from '../renderer/sprites.js';
 
 // Order id -> [label, icon].
 const LOOK = {
@@ -42,7 +43,7 @@ function portrait(type, size = 56) {
   const me = player(leader());
   const definition = store.unitDefs[type];
   return `<span class="unit-portrait" style="width:${size}px;height:${size}px;background:${me.color}">
-    <img src="/resources/unit/${definition.sprite}.png" alt=""></span>`;
+    <img src="${unitPicture(definition)}" alt=""></span>`;
 }
 
 function orderButton(order) {
@@ -67,7 +68,7 @@ function mate(unit, activeId) {
     : unit[U.ORDER] !== 'none' ? unit[U.ORDER] : unit[U.MOVES] > 0 ? 'ready' : 'moved';
   return `<button class="mate${unit[U.ID] === activeId ? ' on' : ''}" data-unit="${unit[U.ID]}"
       title="${definition.name} — ${state}">
-    <img src="/resources/unit/${definition.sprite}.png" alt="">${definition.name}
+    <img src="${unitPicture(definition)}" alt="">${definition.name}
     <small>${state}</small></button>`;
 }
 

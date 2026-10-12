@@ -32,9 +32,17 @@ const $ = (id) => document.getElementById(id);
 mountIcons();
 const mapView = new MapView($('map'), $('tooltip'));
 const minimap = new Minimap($('minimap'), mapView);
+// A sprite has loaded, or a unit picture of the panels is ready (several at once: one redraw).
+let picturesDue = false;
 setOnLoad(() => {
   mapView.invalidate();
-  if (activeTab === 'city') panels.city();
+  if (picturesDue) return;
+  picturesDue = true;
+  requestAnimationFrame(() => {
+    picturesDue = false;
+    if (activeTab === 'city' || activeTab === 'turn' || activeTab === 'cities') panels[activeTab]();
+    renderUnitBar($('unit-bar'));
+  });
 });
 mapView.onViewChange = () => minimap.render();
 setTileRenderer((...args) => mapView.drawTile(...args));

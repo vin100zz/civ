@@ -7,6 +7,7 @@ import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { setTips } from '../tips.js';
 import { ORDER_MARK, TASK_MARK } from '../renderer/map.js';
+import { unitPicture } from '../renderer/sprites.js';
 import { governmentName } from './civs.js';
 
 const LAND = 450;           // pixels of the land view (css/style.css)
@@ -167,7 +168,7 @@ function paintLand(container, detail) {
 // ── Units ───────────────────────────────────────────────────────────────────
 
 function spriteBox(definition, color) {
-  return `<span class="unit-card small" style="background:${color}"><img src="/resources/unit/${definition.sprite}.png" alt=""></span>`;
+  return `<span class="unit-card small" style="background:${color}"><img src="${unitPicture(definition)}" alt=""></span>`;
 }
 
 // A unit drawn as on the map: heavy outline when fortified, hatched on sentry, a letter for
@@ -183,7 +184,7 @@ function unitCard(unit, tip, click, count) {
   if (order === 'sentry') classes.push('sentry');
   const mark = ORDER_MARK[order];
   const task = TASK_MARK[unit[U.TASK]];
-  const inner = `<img src="/resources/unit/${definition.sprite}.png" alt="">`
+  const inner = `<img src="${unitPicture(definition)}" alt="">`
     + (mark ? `<span class="mark">${mark}${unit[U.WORK_LEFT] ? `<small>${unit[U.WORK_LEFT]}</small>` : ''}</span>` : '')
     + (task ? `<span class="mark task">${task}</span>` : '')
     + (unit[U.VETERAN] ? '<i class="vet"></i>' : '')
@@ -387,7 +388,7 @@ function makingCard(c, manage, owner, tips, decided) {
   let glyph = `<span class="making-icon">${icon('city', 22)}</span>`;
   if (building && c.item && c.item[0] === 'unit') {
     glyph = `<span class="making-icon" style="background:${owner.color}">
-      <img src="/resources/unit/${store.unitDefs[c.item[1]].sprite}.png" alt=""></span>`;
+      <img src="${unitPicture(store.unitDefs[c.item[1]])}" alt=""></span>`;
   } else if (building && c.item && store.buildingDefs[c.item[1]].wonder) {
     glyph = `<span class="making-icon">${icon('temple', 22)}</span>`;
   }

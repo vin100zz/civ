@@ -2,7 +2,7 @@
 // with drag to pan and wheel to zoom. The world wraps horizontally.
 
 import { F, U, store, tileIndex, player, leader, emit, inkOn, swatch } from '../state.js';
-import { sprite } from './sprites.js';
+import { sprite, trimmedSprite } from './sprites.js';
 import { Ground } from './ground.js';
 
 const MIN_TILE = 10;
@@ -1029,16 +1029,6 @@ export class MapView {
     roundRect(ctx, px + inset, py + inset, box, box, radius);
     ctx.fillStyle = color;
     ctx.fill();
-    const image = sprite('unit', definition.sprite);
-    if (image && size >= 14) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      const room = box * 0.82;
-      const scale = Math.min(room / image.width, room / image.height);
-      const w = image.width * scale;
-      const h = image.height * scale;
-      ctx.drawImage(image, px + inset + (box - w) / 2, py + inset + (box - h) / 2, w, h);
-    }
     if (asleep) {
       // A sentry is out of the game until something wakes it: greyed out and hatched.
       ctx.save();
@@ -1066,6 +1056,23 @@ export class MapView {
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.stroke();
+    }
+    // The unit itself, over its card and as big as the tile allows: a wide one (a ship, a
+    // plane, a tank) spills over the sides of the card, a standing one fills its height.
+    const image = trimmedSprite('unit', definition.sprite, definition.domain === 'sea');
+    if (image && size >= 14) {
+      const scale = Math.min(size * 0.94 / image.width, box * 1.06 / image.height);
+      const w = image.width * scale;
+      const h = image.height * scale;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      if (asleep) {
+        ctx.filter = 'grayscale(1)';
+        ctx.globalAlpha *= 0.85;
+      }
+      ctx.drawImage(image, px + (size - w) / 2, py + (size - h) / 2, w, h);
+      ctx.restore();
     }
     if (size >= 22) {
       if (units.length > 1) {
