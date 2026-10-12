@@ -335,7 +335,7 @@ export function renderCities(container) {
       const names = own.map((w) => store.buildingDefs[w].name).join(', ');
       cells.push(`<span class="bcell"${names ? ` title="${names}"` : ''}><b class="gold">${own.length > 1 ? `★${own.length}` : own.length ? '★' : ''}</b></span>`);
     }
-    return `<button class="city-row" data-city="${city.id}">
+    return `<button class="city-row${city.id === store.selectedCity ? ' selected' : ''}" data-city="${city.id}">
       <span class="size" style="background:${color}">${city.size}</span>
       <span class="name"><span>${city.capital ? '★ ' : ''}${city.name}</span></span>
       ${cells.join('')}<span class="widget">${draw(city)}</span></button>`;

@@ -94,9 +94,9 @@ function citizens(stats, specialists, manage, size) {
   for (const mood of ['happy', 'content', 'unhappy']) {
     const [color, mouth] = FACE[mood];
     for (let i = 0; i < stats[mood]; i++) {
-      faces.push(`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="${color}"
+      faces.push(`<span class="face"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${color}"
         stroke-width="1.6" stroke-linecap="round" role="img" aria-label="${mood} citizen">
-        <circle cx="12" cy="12" r="9.5" fill="var(--raise)"/><path d="M9 10v.6M15 10v.6"/><path d="${mouth}"/></svg>`);
+        <circle cx="12" cy="12" r="9.5" fill="var(--raise)"/><path d="M9 10v.6M15 10v.6"/><path d="${mouth}"/></svg></span>`);
     }
   }
   const others = [];
@@ -108,7 +108,9 @@ function citizens(stats, specialists, manage, size) {
         : `<span class="specialist" title="${kind}: ${SPECIALIST_NOTE[kind]}">${letter}</span>`);
     }
   }
-  return faces.join('') + (others.length ? `<span class="sep"></span>${others.join('')}` : '');
+  // One line: when it runs short, the faces overlap.
+  return `<span class="faces">${faces.join('')}</span>`
+    + (others.length ? `<span class="sep"></span>${others.join('')}` : '');
 }
 
 function landGrid(detail, owner, manage) {
@@ -439,10 +441,10 @@ function decisionBlock(c, decided) {
         <b>${Math.round(candidate.score * 10) / 10}</b></div>
     </div>`).join('');
   return `
-    <div class="stack" style="gap:10px">
+    <div class="stack chooser">
       <div class="ai-title"><span class="ai-badge">AI</span><h2>Why this production</h2>
         <span class="sub">${decided}</span></div>
-      ${rows}
+      <div class="option-list">${rows}</div>
     </div>`;
 }
 
@@ -476,11 +478,11 @@ function productionChooser(c, owner, tips) {
       <div class="between"><span class="label">${title}</span>${i === 0 ? '<span class="sub">turns</span>' : ''}</div>
       <div class="options${title === 'Wonders' ? ' long' : ''}">${rows.join('')}</div></div>`);
   return `
-    <div class="stack" style="gap:10px">
+    <div class="stack chooser">
       <div class="between" style="align-items:center"><h2>${manage.current ? 'Change production' : 'Choose what to build'}</h2>
         <label class="switch" title="A governor chooses the production the way an AI city would">
           <input type="checkbox" id="city-governor" ${manage.governed ? 'checked' : ''}><i></i>Governor</label></div>
-      ${blocks.join('')}
+      <div class="option-list">${blocks.join('')}</div>
     </div>`;
 }
 
@@ -509,12 +511,8 @@ function renderForeign(container, c) {
 export function renderCity(container) {
   const detail = store.cityDetail;
   const tips = new Map();
-  if (store.selectedCity === null || !detail || detail.id !== store.selectedCity) {
-    container.innerHTML = `<p class="empty"><b>No city selected</b>Click a city on the map to see
-      what it produces and how its citizens feel${leader() === null ? ', and why the AI builds what it builds' : ''}.</p>`;
-    setTips(container, tips);
-    return;
-  }
+  // The window keeps showing what it shows until the city asked for comes.
+  if (store.selectedCity === null || !detail || detail.id !== store.selectedCity) return;
   if (detail.foreign) {
     renderForeign(container, detail);
     setTips(container, tips);
@@ -588,19 +586,19 @@ export function renderCity(container) {
     </div>
     <div class="city-body">
       <div class="city-left">
-        <div class="between" style="align-items:center;min-height:32px"><h2>Land</h2>
+        <div class="between land-head"><h2>Land</h2>
           ${manage ? '<button class="btn small" id="city-arrange" title="The mayor places every citizen again">Let the mayor arrange</button>' : ''}</div>
         ${landGrid(c, owner, manage)}
-        <h2 style="margin-top:10px">Buildings${s.building_upkeep ? `<small>${gold(s.building_upkeep)}per turn</small>` : ''}</h2>
+        <h2 class="spaced">Buildings${s.building_upkeep ? `<small>${gold(s.building_upkeep)}per turn</small>` : ''}</h2>
         <div class="chips">${buildings}</div>
-        <div class="two" style="margin-top:10px">
-          <div class="stack" style="gap:8px"><h2>Units in the city</h2>${here}</div>
-          <div class="stack" style="gap:8px">
+        <div class="two city-units">
+          <div class="stack"><h2>Units in the city</h2>${here}</div>
+          <div class="stack">
             <div class="between support-head"><h2>Units supported</h2>${supportCost}</div>${supported}</div>
         </div>
       </div>
       <div class="city-right">
-        <div class="stack" style="gap:10px">
+        <div class="stack">
           <h2>Citizens</h2>
           <div class="citizens">${citizens(s, c.specialists, manage, c.size)}</div>
         </div>

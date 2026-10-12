@@ -64,6 +64,7 @@ export class MapView {
     this.bursts = [];                   // units just destroyed: {x, y, units, start}
     this.busyUntil = 0;                 // something moves on screen until then
     this.wanted = null;                 // the tile to bring into view once that is over
+    this.inset = 0;                     // pixels on the right hidden by a window over the map
     this.blink = { key: null, since: 0, timer: null };
     this.still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this._bind();
@@ -115,9 +116,10 @@ export class MapView {
     this.invalidate();
   }
 
+  // Centres a tile in the part of the map that shows (left of a window over it, if any).
   centerOn(x, y) {
     this.wanted = null;
-    this.cx = x + 0.5;
+    this.cx = x + 0.5 + this.inset / 2 / this.tile;
     this.cy = y + 0.5;
     this._clamp();
     this.invalidate();
@@ -125,15 +127,15 @@ export class MapView {
   }
 
   // True if a tile shows at least `margin` pixels away from the edges (the bottom edge
-  // counts double: the unit bar lies over it).
-  _inView(x, y, margin = Math.min(160, this.width / 5)) {
+  // counts double: the unit bar lies over it; the right edge is where a window starts).
+  _inView(x, y, margin = Math.min(160, (this.width - this.inset) / 5)) {
     const w = store.map.width;
     let dx = x + 0.5 - this.cx;
     if (dx > w / 2) dx -= w;
     if (dx < -w / 2) dx += w;
     const px = this.width / 2 + dx * this.tile;
     const py = this.height / 2 + (y + 0.5 - this.cy) * this.tile;
-    return px >= margin && px <= this.width - margin && py >= margin && py <= this.height - 2 * margin;
+    return px >= margin && px <= this.width - this.inset - margin && py >= margin && py <= this.height - 2 * margin;
   }
 
   // Brings a tile into view if it is off screen or too close to the edges. Returns true

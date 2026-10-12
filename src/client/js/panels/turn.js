@@ -53,7 +53,7 @@ function cityRow(city, color) {
     const classes = [faint ? 'faint' : kind, cause ? `cause ${cause[2]}` : ''].join(' ');
     return `<span class="cell"><span class="${classes}">${value}</span></span>`;
   }).join('');
-  return `<button class="city-row" data-city="${city.id}">
+  return `<button class="city-row${city.id === store.selectedCity ? ' selected' : ''}" data-city="${city.id}">
     <span class="size" style="background:${color}">${city.size}</span>
     <span class="name ${level}"><span>${city.capital ? '★ ' : ''}${city.name}</span>${marks}</span>
     <span class="making"><span><span class="what${city.idle ? ' bad' : ''}">${city.idle ? 'Nothing' : city.production}</span>${flags.join('')}</span>

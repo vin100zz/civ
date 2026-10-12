@@ -340,7 +340,14 @@ button.chip:hover { border-color: var(--line-3); }
 
 main { flex: 1; min-height: 0; display: flex; position: relative; }
 
-#map-area { position: relative; flex: 1; min-width: 0; background: #06080B; overflow: hidden; }
+#map-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #06080B;
+  overflow: hidden;
+  --sheet: min(960px, calc(100% - 400px));   /* width of the city window */
+}
 #map { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; display: block; }
 #map.dragging { cursor: grabbing; }
 
@@ -354,7 +361,6 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
   min-height: 0;
   container-type: inline-size;
 }
-#dock.wide { flex-basis: min(960px, calc(100vw - var(--rail) - 420px)); width: min(960px, calc(100vw - var(--rail) - 420px)); }
 #dock.full { position: absolute; left: 0; top: 0; bottom: 0; right: var(--rail); width: auto; border-left: 0; z-index: 4; }
 
 .panel { display: none; flex: 1; min-height: 0; flex-direction: column; overflow-y: auto; }
@@ -488,6 +494,29 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
   z-index: 2;
 }
 #unit-bar:empty, body.sheet-open #unit-bar { display: none; }
+
+/* A city, in a window over the map against the right panel. The unit bar steps aside for it
+   and the zoom buttons move to its left; the messages of the turn stay under it. */
+.city-window {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: var(--sheet);
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  z-index: 3;
+  container-type: inline-size;
+}
+.city-window[hidden] { display: none; }
+.city-window.waiting { visibility: hidden; }
+#map-area:has(> .city-window:not([hidden])) #unit-bar { display: none; }
+#map-area:has(> .city-window:not([hidden])) #zoom { right: calc(var(--sheet) + 28px); }
 #unit-bar.idle { flex-direction: row; align-items: center; min-height: 64px; padding: 0 12px 0 18px; }
 #unit-bar.idle > b { font-size: 15px; font-weight: 600; }
 #unit-bar.idle .btn { margin-left: auto; }
@@ -710,6 +739,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .city-row, .city-cols { width: 100%; display: flex; align-items: center; padding: 8px 20px; }
 .city-row { border-bottom: 1px solid var(--line-2); }
 .city-row:hover { background: var(--raise); }
+.city-row.selected { background: var(--hover); box-shadow: inset 3px 0 0 var(--gold); }
 .city-cols { padding-top: 16px; flex: none; }
 .city-cols .label { flex: 1; display: flex; gap: 8px; }
 .city-cols .label span { color: var(--soft); }
@@ -943,9 +973,9 @@ body.play #notice { bottom: auto; top: 72px; }
 
 /* ── City panel ──────────────────────────────────────────────────────────── */
 
-.city-head { min-height: 56px; padding: 0 24px; gap: 12px; }
-.city-head h1 { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.city-head .avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 17px; }
+.city-head { min-height: 46px; padding: 0 12px 0 16px; gap: 10px; }
+.city-head h1 { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.city-head .avatar { width: 30px; height: 30px; border-radius: 8px; font-size: 15px; }
 .city-head .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
 .city-head .who { font-size: 12px; color: var(--soft); }
 .city-head .who .mono { font-size: 12px; color: var(--mute); }
@@ -953,13 +983,22 @@ body.play #notice { bottom: auto; top: 72px; }
 .city-state { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; border: 1px solid; font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; }
 .city-state.bad { background: rgba(242, 117, 106, 0.14); border-color: rgba(242, 117, 106, 0.5); }
 .city-state.gold { background: rgba(226, 182, 89, 0.10); border-color: rgba(226, 182, 89, 0.45); padding-left: 10px; }
-.city-nav { display: flex; align-items: center; gap: 8px; flex: none; }
-.city-nav .arrows button { width: 36px; height: 34px; }
-.city-nav .btn { height: 36px; }
-.city-nav .btn.icon { width: 36px; }
-.city-body { display: flex; gap: 28px; padding: 20px 24px 24px; align-items: flex-start; }
-.city-left { width: 450px; flex: none; display: flex; flex-direction: column; gap: 12px; }
-.city-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.city-nav { display: flex; align-items: center; gap: 6px; flex: none; }
+.city-nav .arrows button { width: 32px; height: 30px; }
+.city-nav .btn { height: 32px; }
+.city-nav .btn.icon { width: 32px; }
+/* The window fits the screen: what does not fit scrolls inside the production list and the
+   unit trays, the rest stays in place. */
+.city-body { display: flex; gap: 20px; padding: 12px 16px 14px; align-items: stretch; flex: 1 1 auto; min-height: 0; }
+.city-left { width: 450px; flex: none; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.city-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.city-left .land-head { align-items: center; }
+.city-left .spaced { margin-top: 6px; }
+.city-units { flex: 0 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); margin-top: 6px; }
+.city-units > .stack { min-height: 0; }
+.city-units .unit-tray { min-height: 58px; overflow-y: auto; }
+.chooser { flex: 0 1 auto; min-height: 0; gap: 8px; }
+.option-list { flex: 0 1 auto; min-height: 96px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .city-body h2 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
 .city-body h2 small { font-weight: 400; color: var(--mute); font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
 
@@ -1000,19 +1039,23 @@ button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .support-cost .amount { gap: 2px; }
 .support-cost svg.icon { width: 13px; height: 13px; }
 
-.citizens { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.citizens .sep { width: 1px; height: 24px; background: var(--line); margin: 0 6px; }
-.specialist { width: 34px; height: 34px; border-radius: 50%; border: 1.6px solid #C79BF2; background: var(--raise); color: #C79BF2; font-size: 13px; font-weight: 600; display: grid; place-items: center; }
+.citizens { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.citizens .faces { display: flex; gap: 3px; min-width: 0; }
+/* A face gives up its width before the row would wrap: the next one then lies over it. */
+.citizens .face { flex: 0 1 30px; min-width: 8px; height: 30px; display: flex; }
+.citizens .face svg { flex: none; }
+.citizens .sep { width: 1px; height: 22px; background: var(--line); margin: 0 5px; flex: none; }
+.specialist { width: 30px; height: 30px; border-radius: 50%; border: 1.6px solid #C79BF2; background: var(--raise); color: #C79BF2; font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none; }
 
 .card { background: var(--raise); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card .big { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .card .bar { background: var(--line); }
 /* What the city builds. */
-.card.making { padding: 14px 16px 16px; gap: 12px; }
-.card.making .big { font-size: 20px; line-height: 1.2; }
+.card.making { padding: 10px 14px 12px; gap: 8px; flex: none; }
+.card.making .big { font-size: 18px; line-height: 1.2; }
 .making-head { display: flex; align-items: center; gap: 12px; }
 .making-head .titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.making-icon { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--hover); color: var(--soft); }
+.making-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--hover); color: var(--soft); }
 .making-icon img { width: 92%; height: 86%; object-fit: contain; }
 .progress-row { display: flex; align-items: center; gap: 14px; }
 
@@ -1046,8 +1089,8 @@ button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .made { width: 64px; flex: none; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: var(--mute); }
 .made b { font-size: 15px; font-weight: 600; color: var(--soft); }
 
-.ledger { display: flex; flex-direction: column; }
-.ledger-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
+.ledger { display: flex; flex-direction: column; flex: none; }
+.ledger-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line-2); }
 .ledger-row > .icon-box { display: flex; flex: none; }
 .ledger-row .what { width: 60px; font-weight: 600; flex: none; }
 .ledger-row .value { width: 46px; font-size: 18px; font-weight: 600; flex: none; white-space: nowrap; }
@@ -1061,10 +1104,10 @@ button.land-cell { cursor: pointer; }
 button.specialist { cursor: pointer; }
 button.specialist:hover { background: var(--hover); }
 /* What the city may build: a name and the turns it takes, the rest in the tooltip. */
-.option-group { display: flex; flex-direction: column; gap: 6px; }
-.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.option-group { display: flex; flex-direction: column; gap: 5px; }
+.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
 .options.long { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.option { height: 34px; padding: 0 6px 0 10px; border-radius: 9px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.option { height: 30px; padding: 0 6px 0 10px; border-radius: 9px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
 .option:hover { border-color: var(--line-3); background: var(--raise); }
 .option b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .option .when { min-width: 24px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--raise); color: var(--soft); font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none; }
@@ -1088,7 +1131,10 @@ button.specialist:hover { background: var(--hover); }
 .candidate .score b { width: 38px; text-align: right; font-weight: 600; }
 
 @container (max-width: 860px) {
-  .city-body { flex-direction: column; }
+  /* One column: the whole window scrolls again. */
+  .city-body { flex-direction: column; flex: none; }
+  .city-units, .chooser { flex: none; }
+  .city-units .unit-tray, .option-list { overflow: visible; }
   .city-left { width: 100%; }
   .city-right { width: 100%; }
   .land { width: min(450px, 100%); height: auto; aspect-ratio: 1; }

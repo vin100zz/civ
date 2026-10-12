@@ -104,6 +104,8 @@
       </div>
       <div id="mission-legend" class="glass" hidden></div>
       <section id="unit-bar" class="glass play-only" aria-label="Active unit"></section>
+      <!-- A city opens here, over the map, when it is clicked; the cross or Escape closes it. -->
+      <section id="panel-city" class="city-window" aria-label="City" hidden></section>
 
       <div id="tooltip" class="tip glass" role="tooltip" hidden></div>
     </section>
@@ -112,7 +114,6 @@
       <div id="panel-turn" class="panel"></div>
       <div id="panel-civs" class="panel active"></div>
       <div id="panel-civ" class="panel"></div>
-      <div id="panel-city" class="panel"></div>
       <div id="panel-cities" class="panel"></div>
       <div id="panel-tech" class="panel"></div>
       <div id="panel-chart" class="panel"></div>
@@ -123,7 +124,6 @@
       <button data-tab="turn" class="play-only"><span data-icon="hourglass" data-size="22" data-stroke="1.6"></span>Turn</button>
       <button data-tab="civs" class="active"><span data-icon="globe" data-size="22" data-stroke="1.6"></span>World</button>
       <button data-tab="civ"><span data-icon="crown" data-size="22" data-stroke="1.6"></span>Empire</button>
-      <button data-tab="city"><span data-icon="city" data-size="22" data-stroke="1.6"></span>City</button>
       <button data-tab="cities" class="play-only"><span data-icon="cities" data-size="22" data-stroke="1.6"></span>Cities</button>
       <button data-tab="tech"><span data-icon="flask" data-size="22" data-stroke="1.6"></span>Science</button>
       <button data-tab="chart"><span data-icon="chart" data-size="22" data-stroke="1.6"></span>History</button>

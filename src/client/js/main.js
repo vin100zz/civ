@@ -40,7 +40,8 @@ setOnLoad(() => {
   picturesDue = true;
   requestAnimationFrame(() => {
     picturesDue = false;
-    if (['city', 'turn', 'cities', 'tech'].includes(activeTab)) panels[activeTab]();
+    if (['turn', 'cities', 'tech'].includes(activeTab)) panels[activeTab]();
+    refreshCity();
     renderUnitBar($('unit-bar'));
   });
 });
@@ -53,30 +54,47 @@ const panels = {
   turn: () => renderTurn($('panel-turn')),
   civs: () => renderCivs($('panel-civs')),
   civ: () => (leader() !== null ? renderEmpire($('panel-civ')) : renderCiv($('panel-civ'))),
-  city: () => renderCity($('panel-city')),
   cities: () => renderCities($('panel-cities')),
   tech: () => renderTech($('panel-tech')),
   chart: () => renderChart($('panel-chart')),
   log: () => renderLog($('panel-log')),
 };
-// Science and History take the whole width; the city opens a wide sheet beside the map.
+// Science and History take the whole width; a city opens in a window over the map.
 const WORKSPACES = ['tech', 'chart'];
 let activeTab = 'civs';
 let mapTab = 'civs';         // the last tab that leaves the map in view
-let cityFrom = null;         // the tab a city was opened from, to go back to it
 let gameOverSeen = null;     // "seed:turn" of the finished game already announced
 let defeatSeen = null;       // seed of the game whose loss was already announced
 const prompted = { turn: null, research: false, proposals: new Set() };   // asked this turn
 initReplay(mapView, () => WORKSPACES.includes(activeTab));
 
 function syncDock() {
-  const dock = $('dock');
-  const wide = activeTab === 'city' && store.selectedCity !== null;
-  dock.classList.toggle('full', WORKSPACES.includes(activeTab));
-  dock.classList.toggle('wide', wide);
-  // The unit bar needs the width of the map: it steps aside for the city sheet.
-  document.body.classList.toggle('sheet-open', wide || WORKSPACES.includes(activeTab));
+  $('dock').classList.toggle('full', WORKSPACES.includes(activeTab));
+  document.body.classList.toggle('sheet-open', WORKSPACES.includes(activeTab));
 }
+
+// The window of the selected city, over the map. Until the city asked for comes, it keeps
+// showing the previous one, or stays invisible if it was closed (its width is already known).
+function refreshCity() {
+  const sheet = $('panel-city');
+  const id = store.selectedCity;
+  sheet.hidden = id === null;
+  if (id === null) {
+    sheet.innerHTML = '';
+  } else if (store.cityDetail && store.cityDetail.id === id) {
+    sheet.classList.remove('waiting');
+    renderCity(sheet);
+  } else if (!sheet.innerHTML) {
+    sheet.classList.add('waiting');
+  }
+  fitInset();
+}
+
+// The map centres what it shows in the part the city window leaves free.
+function fitInset() {
+  mapView.inset = store.selectedCity === null ? 0 : $('panel-city').offsetWidth + 12;
+}
+new ResizeObserver(fitInset).observe($('panel-city'));
 
 function showTab(name) {
   activeTab = name;
@@ -95,6 +113,7 @@ function showTab(name) {
 function refreshActivePanel() {
   syncDock();
   panels[activeTab]();
+  refreshCity();
 }
 
 function refreshClock() {
@@ -380,6 +399,7 @@ on('init', () => {
   minimap.render();
   refreshLegend();
   requestDetails();
+  refreshCity();
   if (me !== null) showTab('turn');
   else if (activeTab === 'turn' || activeTab === 'cities') showTab('civs');
   else refreshActivePanel();
@@ -448,7 +468,7 @@ on('notice', showNotice);
 
 on('city', () => {
   mapView.invalidate();
-  if (activeTab === 'city') refreshActivePanel();
+  refreshCity();
 });
 
 on('player', () => {
@@ -470,7 +490,7 @@ on('select-player', (id) => {
   store.selectedPlayer = id;
   if (leader() === null) send({ cmd: 'player', id });
   else if (id === leader()) store.playerDetail = store.state.me;
-  if (activeTab === 'civs' || activeTab === 'city' || activeTab === 'turn') showTab('civ');
+  if (activeTab === 'civs' || activeTab === 'turn') showTab('civ');
   else refreshActivePanel();
 });
 
@@ -482,22 +502,25 @@ on('select-city', (id) => {
     send({ cmd: 'player', id: city.owner });
   }
   send({ cmd: 'city', id });
-  if (activeTab !== 'city') cityFrom = activeTab;
-  showTab('city');
+  if (WORKSPACES.includes(activeTab)) showTab(mapTab);
+  refreshActivePanel();        // the window, and the row of the city in the lists
+  // A city clicked where the window now lies moves into the free part of the map.
+  if (city) mapView.bring(city.x, city.y);
+  mapView.invalidate();
 });
 
 on('close-city', () => {
   store.selectedCity = null;
   store.cityDetail = null;
+  hideTips();
+  refreshActivePanel();
   mapView.invalidate();
-  if (leader() !== null) showTab(cityFrom === 'cities' ? 'cities' : 'turn');
-  else showTab(store.selectedPlayer !== null ? 'civ' : 'civs');
 });
 
 on('center', ({ x, y }) => mapView.centerOn(x, y));
 on('focus', ({ x, y }) => mapView.reveal(x, y));
 on('locate', ({ x, y }) => {
-  if (WORKSPACES.includes(activeTab) || (activeTab === 'city' && store.selectedCity !== null)) showTab(mapTab === 'city' ? 'turn' : mapTab);
+  if (WORKSPACES.includes(activeTab)) showTab(mapTab);
   mapView.centerOn(x, y);
   mapView.setMarker({ x, y });
 });
@@ -578,7 +601,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape' && !play.mode) {
     if (WORKSPACES.includes(activeTab)) showTab(mapTab);
-    else if (activeTab === 'city' && store.selectedCity !== null) emit('close-city');
+    else if (store.selectedCity !== null) emit('close-city');
     return;
   }
   if (leader() !== null) {
