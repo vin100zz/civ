@@ -290,6 +290,8 @@ def capture_city(game: Game, unit: Unit, city: City) -> None:
         spaceship.lose(game, loser)
     city.owner = winner.id
     city.production = None
+    city.queue = []
+    city.from_queue = False
     city.shields = 0
     city.disorder = False
     city.celebrating = False

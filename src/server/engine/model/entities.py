@@ -103,6 +103,9 @@ class City:
     bought_this_turn: bool = False
     sold_this_turn: bool = False            # one building may be sold per turn
     last_completed: Optional[Item] = None   # what the city finished on its last turn
+    # What it builds next, in order, once its production is finished (the person's queue).
+    queue: list[Item] = field(default_factory=list)
+    from_queue: bool = False                # its production was the next item of its queue
 
     @property
     def pos(self) -> tuple[int, int]:
@@ -173,6 +176,7 @@ class Player:
     destroyed_turn: Optional[int] = None
     spaceship: Spaceship = field(default_factory=Spaceship)
     level: Optional[str] = None             # difficulty level of a human player (game.yaml)
+    research_goal: Optional[str] = None     # an advance further off: research heads there
     # Peace treaties this civilization broke by declaring war: [victim, turn, treaty age].
     broken_treaties: list[list[int]] = field(default_factory=list)
     # last turn totals, for display and for the AI

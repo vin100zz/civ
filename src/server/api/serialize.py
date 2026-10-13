@@ -53,7 +53,8 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
              "description": b.description, "requires": b.requires, "obsolete_by": b.obsolete_by}
             for b in rules.buildings.values()],
         "techs": [
-            {"id": t.id, "name": t.name, "era": t.era, "prerequisites": list(t.prerequisites)}
+            {"id": t.id, "name": t.name, "era": t.era, "prerequisites": list(t.prerequisites),
+             "repeatable": t.repeatable}
             for t in rules.techs.values()],
         "governments": [{"id": g.id, "name": g.name, "requires": g.requires,
                          "max_rate": g.max_rate, "senate": g.senate}
@@ -201,6 +202,11 @@ def player_detail(game: Game, player: Player, controller=None) -> dict[str, Any]
     detail["future_techs"] = player.future_techs
     detail["research_options"] = (research.research_options(game, player)
                                   if not player.is_barbarian else [])
+    # Where research heads: the goal, the advances on the way, the science still needed.
+    goal = player.research_goal
+    detail["research_goal"] = goal
+    detail["goal_path"] = research.goal_path(game.rules, player, goal) if goal else []
+    detail["goal_science"] = research.goal_science(game, player) if goal else 0
     detail["personality"] = {"mood": player.civ.personality.mood,
                              "policy": player.civ.personality.policy,
                              "ideology": player.civ.personality.ideology}
@@ -313,7 +319,22 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         "units_away": len(away),
         "completed": production.item_name(game, done) if done is not None else None,
         "governed": controller.governed(city.id),
+        "queue": queue_payload(game, city, stats.shield_surplus),
     }
+
+
+def queue_payload(game: Game, city: City, surplus: int) -> list[dict[str, Any]]:
+    """The city's queue, each item with the number of turns before it is done: the shields
+    left over from one item go to the next."""
+    total = production.item_cost(game, city.production) if city.production is not None else 0
+    rows = []
+    for item in city.queue:
+        total += production.item_cost(game, item)
+        missing = total - city.shields
+        turns = max(1, -(-missing // surplus)) if surplus > 0 else None
+        rows.append({"kind": item.kind, "id": item.id, "name": production.item_name(game, item),
+                     "turns": turns})
+    return rows
 
 
 def remembered_city_payload(memory: CityMemory) -> dict[str, Any]:
@@ -431,6 +452,7 @@ def _city_choices(game: Game, city: City, controller: HumanController) -> dict[s
         "sellable": [b for b in sorted(city.buildings) if view.can_sell(city, b)],
         "workable": [list(offset) for offset in sorted(view.workable_offsets(city))],
         "governed": controller.governed(city.id),
+        "queue": queue_payload(game, city, city_rules.compute_city(game, city).shield_surplus),
     }
 
 

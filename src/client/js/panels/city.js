@@ -2,7 +2,7 @@
 // builds what it builds; for the person leading the city, the levers to manage it.
 // The panel shows figures and bars; what they are made of is told by their tooltips.
 
-import { store, U, player, leader, emit, inkOn, plural, turnsFor } from '../state.js';
+import { store, U, player, leader, emit, inkOn, plural, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { setTips } from '../tips.js';
@@ -422,7 +422,29 @@ function makingCard(c, manage, owner, tips, decided) {
           <span class="big">${building ? c.production : '<span class="bad">Nothing</span>'}</span></div>
         ${purchase}</div>
       ${progress}
+      ${manage ? queueRow(manage.queue, owner, tips) : ''}
     </div>`;
+}
+
+// What the city builds next, in order: one chip per item (the same unit several times in a
+// row once, with its number), the turns before it is done, a cross to take one out.
+function queueRow(queue, owner, tips) {
+  const groups = queueGroups(queue);
+  if (!groups.length) return '';
+  const chips = groups.map((g) => {
+    const unit = g.kind === 'unit' ? store.unitDefs[g.id] : null;
+    const wonder = !unit && store.buildingDefs[g.id].wonder;
+    const picture = unit
+      ? `<span class="queue-pic" style="background:${owner.color}"><img src="${unitPicture(unit)}" alt=""></span>`
+      : `<span class="queue-glyph">${icon(wonder ? 'temple' : 'city', 15)}</span>`;
+    const when = g.turns === null ? '—' : g.turns;
+    tips.set(`queue:${g.end}`, tipTitle(`<span>${g.name}${g.count > 1 ? ` ×${g.count}` : ''}</span>`,
+      g.turns === null ? 'no progress' : `done in ${plural(g.turns, 'turn')}`));
+    return `<span class="queue-chip" data-tip="queue:${g.end}">${picture}<b>${g.name}</b>${
+      g.count > 1 ? `<span class="count">×${g.count}</span>` : ''}<span class="when">${when}</span>
+      <button class="queue-drop" data-unqueue="${g.end}" aria-label="Take one ${g.name} out of the queue">${icon('close', 12, 2.4)}</button></span>`;
+  });
+  return `<div class="queue-row"><span class="label">Then</span><div class="queue-chips">${chips.join('')}</div></div>`;
 }
 
 // Why the AI builds what it builds (observer).
@@ -453,6 +475,12 @@ function productionChooser(c, owner, tips) {
   const manage = c.manage;
   const surplus = c.stats.shield_surplus;
   const current = manage.current ? manage.current.join(':') : null;
+  // Where each item stands in the queue (its places, from 1 = next) and when it is done.
+  const queued = {};
+  manage.queue.forEach((item, index) => {
+    const key = `${item.kind}:${item.id}`;
+    (queued[key] = queued[key] || []).push({ place: index + 1, turns: item.turns });
+  });
   const groups = { Units: [], Buildings: [], Wonders: [] };
   for (const option of manage.options) {
     const unit = option.kind === 'unit' ? store.unitDefs[option.id] : null;
@@ -461,16 +489,23 @@ function productionChooser(c, owner, tips) {
     const turns = turnsFor(option.cost - c.shields, surplus);
     const when = turns === null ? 'no progress' : turns <= 1 ? 'next turn' : plural(turns, 'turn');
     const on = `${option.kind}:${option.id}` === current;
+    const inQueue = queued[`${option.kind}:${option.id}`] || [];
     const tip = `option:${option.kind}:${option.id}`;
     const rows = [['Cost', amount(option.cost, 'shield', 'shield')]];
     if (unit && unit.pop_cost) rows.push(['Takes', plural(unit.pop_cost, 'citizen')]);
     if (building && building.upkeep) rows.push(['Upkeep', `${gold(building.upkeep)} <span class="soft">per turn</span>`]);
     if (building && building.description) rows.push(['Effect', building.description]);
+    if (inQueue.length) {
+      const last = inQueue[inQueue.length - 1];
+      rows.push(['Queue', `<b class="gold">${inQueue.map((entry) => entry.place).join(' · ')}</b>${
+        last.turns === null ? '' : ` <span class="soft">· done in ${plural(last.turns, 'turn')}</span>`}`]);
+    }
     tips.set(tip, tipTitle(`${unit ? spriteBox(unit, owner.color) : ''}<span>${building && building.wonder ? '★ ' : ''}${name}</span>`, when)
-      + (unit ? tipStats(unit) : '') + tipRows(rows));
-    const row = `<button class="option${on ? ' on' : ''}" data-kind="${option.kind}" data-item="${option.id}"
+      + (unit ? tipStats(unit) : '') + tipRows(rows)
+      + '<div class="tip-foot"><span class="kbd">Ctrl</span> + click: add to the queue</div>');
+    const row = `<button class="option${on ? ' on' : ''}${inQueue.length ? ' queued' : ''}" data-kind="${option.kind}" data-item="${option.id}"
         aria-pressed="${on}" aria-label="${name}, ${when}" data-tip="${tip}">
-      <b>${name}</b><span class="when">${turns === null ? '—' : Math.max(1, turns)}</span></button>`;
+      <b>${name}</b><span class="tags">${inQueue.length ? `<span class="in-queue">+${inQueue.length}</span>` : ''}<span class="when">${turns === null ? '—' : Math.max(1, turns)}</span></span></button>`;
     groups[unit ? 'Units' : building.wonder ? 'Wonders' : 'Buildings'].push(row);
   }
   const blocks = Object.entries(groups).filter(([, rows]) => rows.length).map(([title, rows], i) => `
@@ -480,6 +515,7 @@ function productionChooser(c, owner, tips) {
   return `
     <div class="stack chooser">
       <div class="between" style="align-items:center"><h2>${manage.current ? 'Change production' : 'Choose what to build'}</h2>
+        <span class="queue-hint"><span class="kbd">Ctrl</span>+ click: queue</span>
         <label class="switch" title="A governor chooses the production the way an AI city would">
           <input type="checkbox" id="city-governor" ${manage.governed ? 'checked' : ''}><i></i>Governor</label></div>
       <div class="option-list">${blocks.join('')}</div>
@@ -642,8 +678,12 @@ export function renderCity(container) {
     button.addEventListener('click', () => act('specialist', { city: c.id, kind: button.dataset.specialist }));
   });
   container.querySelectorAll('[data-item]').forEach((button) => {
-    button.addEventListener('click', () =>
-      act('production', { city: c.id, kind: button.dataset.kind, id: button.dataset.item }));
+    button.addEventListener('click', (e) =>
+      act(e.ctrlKey || e.metaKey ? 'queue' : 'production',
+        { city: c.id, kind: button.dataset.kind, id: button.dataset.item }));
+  });
+  container.querySelectorAll('[data-unqueue]').forEach((button) => {
+    button.addEventListener('click', () => act('unqueue', { city: c.id, index: Number(button.dataset.unqueue) }));
   });
   const buy = container.querySelector('#city-buy');
   if (buy) buy.addEventListener('click', () => act('buy', { city: c.id }));

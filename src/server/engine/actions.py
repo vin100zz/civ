@@ -87,6 +87,21 @@ class SetProduction:
 
 
 @dataclass(frozen=True)
+class QueueProduction:
+    """Adds an item at the end of the city's queue: it is built after the current one."""
+    city_id: int
+    kind: str
+    id: str
+
+
+@dataclass(frozen=True)
+class UnqueueProduction:
+    """Takes the item at this place out of the city's queue (0 = the next one)."""
+    city_id: int
+    index: int
+
+
+@dataclass(frozen=True)
 class Buy:
     city_id: int
 
@@ -125,6 +140,13 @@ class SetResearch:
 
 
 @dataclass(frozen=True)
+class SetResearchGoal:
+    """An advance further off: research heads there one advance after another. An empty
+    id clears the goal."""
+    tech_id: str
+
+
+@dataclass(frozen=True)
 class SetRates:
     tax: int
     luxury: int
@@ -159,9 +181,10 @@ class LaunchSpaceship:
 
 
 Action = Union[MoveUnit, Board, Disembark, FoundCity, JoinCity, SetOrder, Disband, Rehome,
-               HelpBuildWonder, EstablishTradeRoute, SetProduction, Buy, ArrangeWorkers,
-               ToggleTile, ChangeSpecialist, SellBuilding, SetResearch, SetRates, Revolution,
-               DeclareWar, ProposePeace, AnswerPeace, LaunchSpaceship]
+               HelpBuildWonder, EstablishTradeRoute, SetProduction, QueueProduction,
+               UnqueueProduction, Buy, ArrangeWorkers, ToggleTile, ChangeSpecialist,
+               SellBuilding, SetResearch, SetResearchGoal, SetRates, Revolution, DeclareWar,
+               ProposePeace, AnswerPeace, LaunchSpaceship]
 
 
 @dataclass(frozen=True)
@@ -298,10 +321,28 @@ def _set_production(game: Game, player, action: SetProduction) -> Result:
     if city is None:
         return _refuse("no such city")
     item = Item(action.kind, action.id)
+    if not production.set_production(game, city, item):
+        return _refuse("the city cannot build that")
+    return OK
+
+
+def _queue_production(game: Game, player, action: QueueProduction) -> Result:
+    city = _own_city(game, player, action.city_id)
+    if city is None:
+        return _refuse("no such city")
+    item = Item(action.kind, action.id)
     if not production.can_build(game, city, item):
         return _refuse("the city cannot build that")
-    city.production = item
+    if not production.queue(game, city, item):
+        return _refuse("already on its way")
     return OK
+
+
+def _unqueue_production(game: Game, player, action: UnqueueProduction) -> Result:
+    city = _own_city(game, player, action.city_id)
+    if city is None:
+        return _refuse("no such city")
+    return OK if production.unqueue(city, action.index) else _refuse("nothing there in the queue")
 
 
 def _buy(game: Game, player, action: Buy) -> Result:
@@ -350,6 +391,17 @@ def _set_research(game: Game, player, action: SetResearch) -> Result:
     if not research.can_research(game.rules, player, action.tech_id):
         return _refuse("advance not available")
     player.researching = action.tech_id
+    return OK
+
+
+def _set_research_goal(game: Game, player, action: SetResearchGoal) -> Result:
+    if not action.tech_id:
+        player.research_goal = None
+        return OK
+    if action.tech_id not in game.rules.techs:
+        return _refuse("no such advance")
+    if not research.set_goal(game, player, action.tech_id):
+        return _refuse("already known")
     return OK
 
 
@@ -402,6 +454,8 @@ _HANDLERS = {
     FoundCity: _found_city, JoinCity: _join_city, SetOrder: _set_order,
     Disband: _disband, Rehome: _rehome, HelpBuildWonder: _help_wonder,
     EstablishTradeRoute: _trade_route, SetProduction: _set_production, Buy: _buy,
+    QueueProduction: _queue_production, UnqueueProduction: _unqueue_production,
+    SetResearchGoal: _set_research_goal,
     ArrangeWorkers: _arrange, SetResearch: _set_research, SetRates: _set_rates,
     Revolution: _revolution, DeclareWar: _declare_war, ProposePeace: _propose_peace,
     ToggleTile: _toggle_tile, ChangeSpecialist: _change_specialist,

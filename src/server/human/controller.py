@@ -49,6 +49,7 @@ class HumanController:
         self.notes = []
         self._forget_the_gone(view)
         self._wake_sentries(view)
+        self._ask_after_settlers(view)
         if self.memory["auto"] or self.memory["governed"]:
             know = Knowledge(view)
             self._govern_cities(view, know)
@@ -164,8 +165,10 @@ class HumanController:
     def _govern_cities(self, view: PlayerView, know: Knowledge,
                        only: Optional[int] = None) -> None:
         """Governed cities choose what to build the way an AI city would."""
+        # The queue the person set comes first: the governor takes over once it is done.
         cities = [city for city in know.cities
-                  if self.governed(city.id) and only in (None, city.id)]
+                  if self.governed(city.id) and only in (None, city.id)
+                  and not city.queue and not city.from_queue]
         if not cities:
             return
         plan = strategic.make_plan(view, know, {}, {})
@@ -180,6 +183,17 @@ class HumanController:
             if city.production is not None and city.production != before:
                 self._note(f"The governor of {city.name} starts building "
                            f"{view.item_name(city.production)}.", city.x, city.y, city=city.id)
+
+    def _ask_after_settlers(self, view: PlayerView) -> None:
+        """A city that has just finished Settlers, with nothing queued after them, stops and
+        waits for the person's choice instead of building more (other units are built
+        again, as in Civ 1). A governed city decides by itself."""
+        for city in view.my_cities():
+            done = city.last_completed
+            if done is None or done.kind != "unit" or city.production != done:
+                continue
+            if view.rules.units[done.id].can("found_city") and not self.governed(city.id):
+                city.production = None
 
     def _run_automated(self, view: PlayerView, know: Knowledge,
                        only: Optional[int] = None) -> None:

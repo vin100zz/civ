@@ -309,6 +309,7 @@ button.chip:hover { border-color: var(--line-3); }
 .chip-btn b { font-weight: 600; }
 .chip-btn b.num { font-size: 15px; }
 .chip-btn .bar { width: 72px; background: var(--line); }
+.chip-btn .goal { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); font-size: 13px; padding-left: 10px; border-left: 1px solid var(--line); }
 .chip-btn.lead { border-color: rgba(226, 182, 89, 0.55); background: rgba(226, 182, 89, 0.10); color: var(--gold); }
 .chip-btn.anarchy { border-color: rgba(242, 117, 106, 0.45); background: rgba(242, 117, 106, 0.08); color: var(--bad); }
 /* The treasury is about to sell a building (Turn panel alert). */
@@ -332,7 +333,7 @@ button.chip:hover { border-color: var(--line-3); }
 }
 @media (max-width: 1500px) {
   #topbar { gap: 12px; }
-  .chip-btn.split, .chip-btn .bar { display: none; }
+  .chip-btn.split, .chip-btn .bar, .chip-btn .goal { display: none; }
   .game-actions .btn.ghost span:not([data-icon]) { display: none; }
   .progress { width: 100px; }
 }
@@ -782,6 +783,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .flag.gold { color: var(--gold); border-color: rgba(226, 182, 89, 0.45); }
 .flag.bad { color: var(--bad); border-color: rgba(242, 117, 106, 0.4); }
 .flag.icon { padding: 0 3px; display: inline-flex; align-items: center; height: 18px; }
+.flag.queued { color: var(--gold); border-color: transparent; background: rgba(226, 182, 89, 0.14); }
 .panel-head .pill { max-width: 200px; }
 
 /* ── Cities panel (the person playing) ───────────────────────────────────── */
@@ -1172,6 +1174,25 @@ button.specialist:hover { background: var(--hover); }
 .option .when { min-width: 24px; height: 22px; padding: 0 6px; border-radius: 6px; background: var(--raise); color: var(--soft); font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none; }
 .option:hover .when { background: var(--line); }
 .option.on { border-color: rgba(226, 182, 89, 0.45); background: rgba(226, 182, 89, 0.08); }
+/* The queue: what the city builds next (city window), and its marks on the options. */
+.option .tags { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.option .in-queue { height: 18px; padding: 0 5px; border-radius: 5px; background: rgba(226, 182, 89, 0.16); color: var(--gold); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.option.queued:not(.on) { border-color: rgba(226, 182, 89, 0.28); }
+.queue-hint { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); white-space: nowrap; }
+.queue-row { display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid var(--line); padding-top: 9px; }
+.queue-row > .label { width: 36px; padding-top: 6px; flex: none; }
+.queue-chips { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.queue-chip { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 3px 0 7px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+.queue-chip:hover { border-color: var(--line-3); }
+.queue-chip b { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.queue-chip .count { font-size: 12px; font-weight: 700; color: var(--gold); }
+.queue-chip .when { min-width: 22px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--raise); color: var(--soft); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.queue-pic { width: 20px; height: 18px; border-radius: 5px; display: grid; place-items: center; flex: none; }
+.queue-pic img { width: 92%; height: 86%; object-fit: contain; }
+.queue-glyph { display: flex; color: var(--soft); }
+.queue-drop { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--mute); opacity: 0.6; }
+.queue-chip:hover .queue-drop { opacity: 1; }
+.queue-drop:hover { background: var(--line); color: var(--text); }
 .option.on .when { background: var(--gold); color: var(--gold-ink); font-weight: 700; }
 
 .candidate { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--soft); }
@@ -1219,7 +1240,7 @@ button.specialist:hover { background: var(--hover); }
 #tech-tree { flex: 1; overflow: auto; display: flex; cursor: grab; }
 #tech-tree.dragging { cursor: grabbing; }
 .tree-canvas { position: relative; flex: none; margin: auto 0; }
-.tree-canvas svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.tree-canvas > svg { position: absolute; left: 0; top: 0; pointer-events: none; }
 .tech {
   position: absolute;
   width: 200px;
@@ -1255,6 +1276,17 @@ button.specialist:hover { background: var(--hover); }
 .keys i.known { background: color-mix(in srgb, var(--civ) 16%, var(--bg)); border-color: color-mix(in srgb, var(--civ) 60%, var(--bg)); }
 .keys i.researching { background: #2A2619; border: 2px solid var(--gold); }
 .keys i.available { background: color-mix(in srgb, var(--good) 14%, var(--bg)); border-color: color-mix(in srgb, var(--good) 75%, var(--bg)); }
+/* The research goal and the advances on the way to it. */
+.tech.on-the-way:not(.researching) { border: 1px dashed rgba(226, 182, 89, 0.7); color: var(--soft); }
+.tech.on-the-way.available { border-style: dashed; border-color: var(--gold); }
+.tech.goal { border: 2px solid var(--gold); background: #211D12; color: var(--text); padding: 0 7px 0 11px; }
+.tech.goal small { color: var(--gold); }
+.tech .goal-mark { flex: none; display: flex; color: var(--gold); }
+.keys i.goal { border: 1px dashed var(--gold); }
+.goal-chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 4px 0 10px; border-radius: 8px; border: 1px solid rgba(226, 182, 89, 0.45); background: rgba(226, 182, 89, 0.08); color: var(--gold); font-size: 13px; white-space: nowrap; }
+.goal-chip b { color: var(--text); font-weight: 600; }
+.goal-drop { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--mute); }
+.goal-drop:hover { background: var(--hover); color: var(--text); }
 
 .overview { flex: none; padding: 14px 0 0; display: flex; align-items: center; gap: 20px; }
 .overview .titles { display: flex; flex-direction: column; gap: 2px; width: 112px; flex: none; }

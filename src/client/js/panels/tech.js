@@ -1,9 +1,10 @@
 // "Science" workspace: the technology tree of the selected civilization, over the whole width.
 
-import { store, emit, leader } from '../state.js';
+import { store, emit, leader, turnsFor } from '../state.js';
 import { send } from '../net.js';
 import { ranking } from './civs.js';
 import { unitPicture } from '../renderer/sprites.js';
+import { icon } from '../icons.js';
 
 const BOX_W = 200;
 const BOX_H = 52;
@@ -140,17 +141,31 @@ function wireOverview(container) {
   return sync;
 }
 
+// The goal research heads for: its name, the advances still on the way, the turns at the
+// present science, and a cross to give it up.
+function goalChip(detail) {
+  const goal = detail.research_goal ? store.techDefs[detail.research_goal] : null;
+  if (!goal) return '';
+  const turns = turnsFor(detail.goal_science, detail.science);
+  const steps = detail.goal_path.length;
+  return `<span class="goal-chip">${icon('flag', 15, 2)}<b>${goal.name}</b>
+    <span class="muted">${steps} advance${steps === 1 ? '' : 's'}${turns ? ` · ${turnsLabel(turns)}` : ''}</span>
+    <button class="goal-drop" data-goal="" aria-label="Give up this goal">${icon('close', 12, 2.4)}</button></span>`;
+}
+
 export function renderTech(container) {
   const detail = store.playerDetail;
+  const leading = leader() !== null && detail && detail.id === leader();
   const head = (selected) => `
     <div class="work-head">
       <h1>Science</h1>
       ${store.state && leader() === null ? civPicker(selected) : ''}
-      ${leader() !== null ? '<span class="sub">Click an advance within reach to research it.</span>' : ''}
+      ${leader() !== null ? '<span class="sub">Click an advance within reach to research it, a farther one to aim for it.</span>' : ''}
+      ${leading ? goalChip(detail) : ''}
       <div class="right">
         <div class="keys"${selected !== null && detail ? ` style="--civ:${detail.color}"` : ''}>
           <span><i class="known"></i>Known</span><span><i class="researching"></i>Researching</span>
-          <span><i class="available"></i>Available now</span><span><i></i>Locked</span>
+          <span><i class="available"></i>Available now</span>${leading ? '<span><i class="goal"></i>On the way to the goal</span>' : ''}<span><i></i>Locked</span>
         </div>
         <button class="btn" data-back>Back to map</button>
       </div>
@@ -170,10 +185,12 @@ export function renderTech(container) {
   const scrollTop = previous ? previous.scrollTop : 0;
 
   const choosing = leader() === detail.id;
+  const goal = choosing ? detail.research_goal : null;
+  const onTheWay = new Set(choosing ? detail.goal_path : []);
   const left = Math.max(0, detail.research_cost - detail.research_progress);
   const turns = detail.science > 0 && current ? Math.ceil(left / detail.science) : null;
 
-  const links = { known: [], next: [], locked: [] };
+  const links = { known: [], next: [], goal: [], locked: [] };
   const boxes = [];
   const mini = [];
   for (const tech of store.rules.techs) {
@@ -186,16 +203,23 @@ export function renderTech(container) {
     if (state === 'researching') {
       sub = `${detail.research_progress} / ${detail.research_cost}${turns !== null ? ` · ${turnsLabel(turns)}` : ''}`;
     }
-    // The person leading this civilization picks its research by clicking an advance.
+    if (tech.id === goal) sub = sub === '—' ? 'Goal' : `Goal · ${sub}`;
+    // The person leading this civilization picks its research by clicking an advance within
+    // reach, and aims for one further off by clicking it (once more to give it up).
     const pickable = choosing && state === 'available';
+    const aimable = choosing && !state && !tech.repeatable;
+    const way = onTheWay.has(tech.id) && tech.id !== goal ? ' on-the-way' : '';
+    const attributes = pickable ? ` data-tech="${tech.id}" role="button" tabindex="0"`
+      : aimable ? ` data-goal="${tech.id === goal ? '' : tech.id}" role="button" tabindex="0"` : '';
     const pictures = (layout.units[tech.id] || []).map((unit) =>
       `<img src="${unitPicture(unit)}" alt="${unit.name}" draggable="false">`).join('');
-    boxes.push(`<div class="tech ${state}${pickable ? ' pickable' : ''}" style="left:${at.x}px;top:${at.y}px"
-      title="${tech.name} — ${sub}"${pickable ? ` data-tech="${tech.id}" role="button" tabindex="0"` : ''}>
+    boxes.push(`<div class="tech ${state}${way}${tech.id === goal ? ' goal' : ''}${pickable || aimable ? ' pickable' : ''}" style="left:${at.x}px;top:${at.y}px"
+      title="${tech.name} — ${sub}"${attributes}>
       <span class="text"><b>${tech.name}</b><small>${sub}</small></span>
+      ${tech.id === goal ? `<span class="goal-mark">${icon('flag', 16, 2)}</span>` : ''}
       ${pictures ? `<span class="units">${pictures}</span>` : ''}</div>`);
     const fill = state === 'known' ? detail.color : state === 'researching' ? '#E2B659'
-      : state === 'available' ? '#5FCB8B' : '#2F3948';
+      : state === 'available' ? '#5FCB8B' : way || tech.id === goal ? '#B08B3A' : '#2F3948';
     mini.push(`<rect x="${at.column * 100 + 6}" y="${at.row * MINI_ROW}" width="88" height="6" rx="2" fill="${fill}"/>`);
     for (const pre of tech.prerequisites) {
       const from = layout.position[pre];
@@ -205,6 +229,7 @@ export function renderTech(container) {
       const mid = (x1 + at.x) / 2;
       const path = `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${at.x},${y2}`;
       if (known.has(pre) && known.has(tech.id)) links.known.push(path);
+      else if (onTheWay.has(tech.id) && (known.has(pre) || onTheWay.has(pre))) links.goal.push(path);
       else if (known.has(pre) && state) links.next.push(path);
       else links.locked.push(path);
     }
@@ -219,6 +244,7 @@ export function renderTech(container) {
             <svg width="${layout.width}" height="${layout.height}" fill="none">
               <path d="${links.locked.join(' ')}" stroke="#2A3342" stroke-width="1.25"/>
               <path d="${links.next.join(' ')}" stroke="#5FCB8B" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7"/>
+              <path d="${links.goal.join(' ')}" stroke="#E2B659" stroke-width="1.75" stroke-dasharray="5 4" opacity="0.85"/>
               <path d="${links.known.join(' ')}" stroke="${detail.color}" stroke-width="1.5" opacity="0.75"/>
             </svg>
             ${boxes.join('')}
@@ -242,6 +268,13 @@ export function renderTech(container) {
     box.addEventListener('click', research);
     box.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') research();
+    });
+  });
+  container.querySelectorAll('[data-goal]').forEach((box) => {
+    const aim = () => send({ cmd: 'action', action: 'research_goal', tech: box.dataset.goal });
+    box.addEventListener('click', aim);
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') aim();
     });
   });
   if (centredOn !== detail.id && tree.clientWidth > 0) {

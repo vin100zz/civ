@@ -191,3 +191,31 @@ def test_walls_are_kept_only_near_the_enemy(rules):
     game.add_unit("legion", 2, 7, 5)                     # in sight of the city
     visibility.refresh(game, player)
     assert budget.building_to_sell(game, player) == (city, "barracks")
+
+
+def test_research_heads_for_its_goal(rules):
+    game = make_game(rules)
+    game.current_player = 1
+    player = game.players[1]
+    path = research.goal_path(rules, player, "monarchy")
+    assert path == ["alphabet", "ceremonial_burial", "code_of_laws", "monarchy"]
+    assert not actions.apply(game, 1, actions.SetResearchGoal("future_tech")), "never reached"
+    assert actions.apply(game, 1, actions.SetResearchGoal("monarchy"))
+    assert player.research_goal == "monarchy" and player.researching == "alphabet"
+    assert research.goal_science(game, player) == sum(
+        research.research_cost_at(game, player, n) for n in range(4))
+    for step in path[1:]:
+        player.research_progress = research.research_cost(game, player) + 1
+        research.check_discovery(game, player)
+        assert player.researching == step, "each discovery heads for the next advance"
+    player.research_progress = research.research_cost(game, player) + 1
+    research.check_discovery(game, player)
+    assert "monarchy" in player.techs and player.research_goal is None
+    assert player.researching is None, "the goal reached, the person chooses again"
+
+    # A goal does not stop the research under way; an empty one gives it up.
+    player.researching = "pottery"
+    assert actions.apply(game, 1, actions.SetResearchGoal("currency"))
+    assert player.researching == "pottery"
+    assert actions.apply(game, 1, actions.SetResearchGoal(""))
+    assert player.research_goal is None

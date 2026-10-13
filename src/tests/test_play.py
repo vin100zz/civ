@@ -6,7 +6,7 @@ import json
 
 from server.ai.controller import AIController
 from server.engine import actions, persistence
-from server.engine.model.entities import PEACE, WAR
+from server.engine.model.entities import PEACE, WAR, Item
 from server.engine.systems import cities, city as city_rules, movement, research, turn
 from server.engine.view import PlayerView
 from server.human import orders, report
@@ -545,3 +545,31 @@ def test_the_treasury_warns_before_a_building_is_sold(rules):
     assert view.do(actions.SetRates(tax, luxury, science))
     assert report.treasury_alert(view) is None
     assert serialize.own_detail(view, game)["balance"] is None
+
+
+def test_settlers_wait_for_the_next_choice(rules):
+    game = make_game(rules)
+    settled = add_city(game, 1, 5, 5, size=3)
+    settled.production = Item("unit", "settlers")
+    settled.shields = rules.units["settlers"].cost
+    armed = add_city(game, 1, 10, 5, size=3)
+    armed.production = Item("unit", "militia")
+    armed.shields = rules.units["militia"].cost
+    controller, view = lead(game)
+    controller.begin_turn(game, game.players[1])
+    assert settled.last_completed == Item("unit", "settlers") and settled.production is None
+    assert armed.last_completed == Item("unit", "militia")
+    assert armed.production == Item("unit", "militia"), "other units are built again"
+
+
+def test_a_governor_leaves_the_queue_alone(rules):
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5, size=3)
+    city.production = Item("unit", "militia")
+    city.queue = [Item("unit", "militia")]
+    city.shields = rules.units["militia"].cost
+    controller, view = lead(game)                       # the first militia is built
+    controller.memory["governed"] = [city.id]
+    controller.begin_turn(game, game.players[1])
+    assert city.last_completed == Item("unit", "militia") and city.from_queue
+    assert city.production == Item("unit", "militia"), "the queued one, not the governor's choice"

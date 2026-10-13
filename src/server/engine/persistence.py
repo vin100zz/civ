@@ -88,9 +88,11 @@ def _player_to_data(player: Player) -> dict[str, Any]:
 
 def _city_to_data(city: City) -> dict[str, Any]:
     data = {f.name: getattr(city, f.name) for f in dataclasses.fields(city)
-            if f.name not in ("production", "buildings", "worked", "stats", "last_completed")}
+            if f.name not in ("production", "buildings", "worked", "stats", "last_completed",
+                              "queue")}
     data["production"] = _item_to_data(city.production)
     data["last_completed"] = _item_to_data(city.last_completed)
+    data["queue"] = [_item_to_data(item) for item in city.queue]
     data["buildings"] = sorted(city.buildings)
     data["worked"] = [list(offset) for offset in city.worked]
     return data
@@ -199,10 +201,12 @@ def _city_from_data(saved: dict[str, Any]) -> City:
     saved = dict(saved)
     production = saved.pop("production")
     completed = saved.pop("last_completed")
+    queue = saved.pop("queue", [])                  # absent from older saves
     city = City(**{**saved, "buildings": set(saved["buildings"]),
                    "worked": [tuple(offset) for offset in saved["worked"]]})
     city.production = Item(*production) if production else None
     city.last_completed = Item(*completed) if completed else None
+    city.queue = [Item(*item) for item in queue]
     return city
 
 

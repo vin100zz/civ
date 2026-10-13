@@ -214,7 +214,8 @@ function refreshPlayBar() {
     ? `<button class="chip-btn" data-chip="research" title="Research: ${me.research_progress} of ${me.research_cost}">
         <span class="sci">${icon('flask', 17)}</span><b>${techName(me.researching)}</b>
         <span class="bar thin"><span style="width:${progress}%;background:var(--sci)"></span></span>
-        <span class="muted">${turns === null ? 'no science' : plural(turns, 'turn')}</span></button>`
+        <span class="muted">${turns === null ? 'no science' : plural(turns, 'turn')}</span>${
+  me.research_goal ? `<span class="goal">${icon('flag', 14, 2)}${techName(me.research_goal)}</span>` : ''}</button>`
     : `<button class="chip-btn lead" data-chip="research"><span>${icon('flask', 17)}</span><b>Choose research</b></button>`;
   // A revolution lasts until the start of turn `anarchy_until`.
   const anarchy = me.government === 'anarchy';

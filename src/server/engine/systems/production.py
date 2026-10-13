@@ -150,12 +150,14 @@ def sell(game: Game, city: City, building_id: str) -> bool:
 
 
 def complete_if_ready(game: Game, city: City) -> Optional[Item]:
-    """Delivers the current production if the city has gathered enough shields."""
+    """Delivers the current production if the city has gathered enough shields. The next
+    item of its queue then takes over; without one a unit is built again, as in Civ 1."""
     item = city.production
     if item is None:
         return None
     if not can_build(game, city, item):
         city.production = None          # the wonder was built elsewhere, the unit is obsolete...
+        take_from_queue(game, city)
         return None
     cost = item_cost(game, item)
     if city.shields < cost:
@@ -170,7 +172,61 @@ def complete_if_ready(game: Game, city: City) -> Optional[Item]:
     else:
         city.shields -= cost
         _deliver_building(game, city, item.id)
+    take_from_queue(game, city)
     return item
+
+
+# ── The queue ─────────────────────────────────────────────────────────────────
+
+def take_from_queue(game: Game, city: City) -> bool:
+    """The first item of the queue the city can still build becomes its production; those
+    it can no longer build (a wonder built elsewhere, an obsolete unit) are dropped."""
+    while city.queue:
+        item = city.queue.pop(0)
+        if can_build(game, city, item):
+            city.production = item
+            city.from_queue = True
+            return True
+    city.from_queue = False
+    return False
+
+
+def can_queue(game: Game, city: City, item: Item) -> bool:
+    """A unit may be queued again and again; a building once, unless it is being built."""
+    if not can_build(game, city, item):
+        return False
+    if item.kind == "unit":
+        return True
+    return item != city.production and item not in city.queue
+
+
+def queue(game: Game, city: City, item: Item) -> bool:
+    """Adds an item at the end of the queue; a city building nothing starts on it at once."""
+    if not can_queue(game, city, item):
+        return False
+    city.queue.append(item)
+    if city.production is None or not can_build(game, city, city.production):
+        city.production = None
+        take_from_queue(game, city)
+    return True
+
+
+def unqueue(city: City, index: int) -> bool:
+    if not 0 <= index < len(city.queue):
+        return False
+    del city.queue[index]
+    return True
+
+
+def set_production(game: Game, city: City, item: Item) -> bool:
+    """Builds this now. The queue stays; a building chosen now leaves it."""
+    if not can_build(game, city, item):
+        return False
+    city.production = item
+    city.from_queue = False
+    if item.kind != "unit":
+        city.queue = [queued for queued in city.queue if queued != item]
+    return True
 
 
 def _deliver_unit(game: Game, city: City, unit_id: str) -> Unit:

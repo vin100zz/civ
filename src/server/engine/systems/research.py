@@ -26,8 +26,13 @@ def research_options(game: Game, player: Player) -> list[str]:
 
 def research_cost(game: Game, player: Player) -> int:
     """Science needed for the next advance: grows with the number of advances known."""
+    return research_cost_at(game, player, player.tech_count)
+
+
+def research_cost_at(game: Game, player: Player, tech_count: int) -> int:
+    """Science needed for an advance once the player knows `tech_count` advances."""
     settings = game.rules.game.research
-    known = player.tech_count + 1
+    known = tech_count + 1
     level = game.rules.game.difficulty.levels.get(player.level)
     base = level.research_cost_factor if level is not None else settings.cost_factor
     factor = max(base, settings.early_factor_base - known)
@@ -57,6 +62,62 @@ def check_discovery(game: Game, player: Player) -> Optional[str]:
     return tech_id
 
 
+# ── The goal ──────────────────────────────────────────────────────────────────
+
+def goal_path(rules: Rules, player: Player, goal: str) -> list[str]:
+    """The advances still to learn to reach the goal, the goal last: each one after its
+    prerequisites, in rules order among those ready at the same time."""
+    needed: set[str] = set()
+    stack = [goal]
+    while stack:
+        tech_id = stack.pop()
+        if tech_id in player.techs or tech_id in needed:
+            continue
+        needed.add(tech_id)
+        stack.extend(rules.techs[tech_id].prerequisites)
+    known = set(player.techs)
+    path: list[str] = []
+    while len(path) < len(needed):
+        ready = next(t for t in rules.techs if t in needed and t not in known
+                     and all(pre in known for pre in rules.techs[t].prerequisites))
+        path.append(ready)
+        known.add(ready)
+    return path
+
+
+def goal_science(game: Game, player: Player) -> int:
+    """Science still needed to reach the goal, at today's prices."""
+    path = goal_path(game.rules, player, player.research_goal) if player.research_goal else []
+    total = sum(research_cost_at(game, player, player.tech_count + i) for i in range(len(path)))
+    if path and player.researching == path[0]:
+        total -= player.research_progress
+    return max(0, total)
+
+
+def set_goal(game: Game, player: Player, tech_id: str) -> bool:
+    """An advance not known yet becomes the goal; with nothing being researched, the first
+    advance on the way to it is."""
+    tech = game.rules.techs[tech_id]
+    if tech.repeatable or tech_id in player.techs:
+        return False
+    player.research_goal = tech_id
+    follow_goal(game, player)
+    return True
+
+
+def follow_goal(game: Game, player: Player) -> None:
+    """Nothing being researched: the next advance on the way to the goal is. A goal
+    reached is forgotten."""
+    goal = player.research_goal
+    if goal is None:
+        return
+    if goal in player.techs:
+        player.research_goal = None
+        return
+    if player.researching is None:
+        player.researching = goal_path(game.rules, player, goal)[0]
+
+
 def give_tech(game: Game, player: Player, tech_id: str, how: str = "discover") -> None:
     """Adds an advance to a player, whatever the way it was obtained."""
     tech = game.rules.techs[tech_id]
@@ -66,6 +127,7 @@ def give_tech(game: Game, player: Player, tech_id: str, how: str = "discover") -
         player.techs.add(tech_id)
     if player.researching == tech_id and not tech.repeatable:
         player.researching = None
+    follow_goal(game, player)
     verbs = {"discover": "discover", "steal": "steal", "hut": "learn from ancient scrolls",
              "wonder": "acquire", "library": "learn from other civilizations"}
     game.emit("tech", f"The {player.civ.nation} {verbs.get(how, 'acquire')} {tech.name}.",

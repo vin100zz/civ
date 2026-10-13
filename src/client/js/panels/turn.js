@@ -1,7 +1,7 @@
 // "Turn" panel of the person playing: what needs a decision, what threatens, which units
 // still wait for orders, and how the cities are doing.
 
-import { store, U, emit, leader, turnsFor } from '../state.js';
+import { store, U, emit, leader, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
@@ -46,6 +46,12 @@ function cityRow(city, color) {
       : turns <= 1 ? '<span class="good">1</span>' : turns;
   const flags = [];
   if (city.governed) flags.push(`<span class="flag icon" title="Governor">${icon('cog', 12, 2)}</span>`);
+  if (city.queue && city.queue.length) {
+    // What comes next, and the turns before each is done, in its tooltip.
+    const next = queueGroups(city.queue).map((g) =>
+      `${g.name}${g.count > 1 ? ` ×${g.count}` : ''}${g.turns === null ? '' : ` (${g.turns})`}`).join(', ');
+    flags.push(`<span class="flag queued" title="Then: ${next}">+${city.queue.length}</span>`);
+  }
   if (city.buy !== null && !city.idle) flags.push(`<span class="flag gold" title="Buy">${city.buy}g</span>`);
   const cells = COLUMNS.map(([field, , kind]) => {
     const cause = wrong.find(([f]) => f === field);

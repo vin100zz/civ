@@ -84,6 +84,23 @@ export function turnsFor(missing, perTurn) {
   return perTurn > 0 ? Math.ceil(missing / perTurn) : null;
 }
 
+// A city's queue as shown: the same item several times in a row once, with its number,
+// the turns before the last of them is done and its place in the queue (`end`).
+export function queueGroups(queue) {
+  const groups = [];
+  (queue || []).forEach((item, index) => {
+    const last = groups[groups.length - 1];
+    if (last && last.kind === item.kind && last.id === item.id) {
+      last.count += 1;
+      last.end = index;
+      last.turns = item.turns;
+    } else {
+      groups.push({ ...item, count: 1, end: index });
+    }
+  });
+  return groups;
+}
+
 // Colors of the civilizations, tuned for the dark interface: the rules give the classic,
 // fully saturated ones, which glare on a dark panel and hide the text drawn on them.
 const PALETTE = {

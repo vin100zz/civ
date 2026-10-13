@@ -1,7 +1,9 @@
 """City rules: yields, trade, mood, growth."""
 from __future__ import annotations
 
-from server.engine import effects as fx
+import json
+
+from server.engine import actions, effects as fx, persistence
 from server.engine.model.entities import Item
 from server.engine.rules.schema import Effect, Yields
 from server.engine.systems import cities, city as city_rules, government, production
@@ -272,3 +274,73 @@ def test_wonder_is_unique(rules):
     assert game.wonders == {"colossus": None}
     assert fx.active_wonders(game, 1) == [] and fx.wonder_owner(game, "colossus") is None
     assert not production.can_build(game, rival, Item("building", "colossus"))
+
+
+# ── The production queue ─────────────────────────────────────────────────────
+
+def test_the_queue_takes_over_when_an_item_is_finished(rules):
+    game = make_game(rules)
+    game.current_player = 1
+    city = add_city(game, 1, 5, 5)
+    militia, barracks = Item("unit", "militia"), Item("building", "barracks")
+    act = lambda action: actions.apply(game, 1, action)
+    assert act(actions.SetProduction(city.id, "unit", "militia"))
+    assert act(actions.QueueProduction(city.id, "unit", "militia"))
+    assert act(actions.QueueProduction(city.id, "building", "barracks"))
+    assert not act(actions.QueueProduction(city.id, "building", "barracks")), "a building once"
+    assert act(actions.QueueProduction(city.id, "unit", "militia")), "a unit again and again"
+    assert city.queue == [militia, barracks, militia]
+
+    cost = rules.units["militia"].cost
+    city.shields = 2 * cost
+    cities.process_city(game, city)
+    assert city.last_completed == militia and city.production == militia and city.from_queue
+    assert city.queue == [barracks, militia]
+    assert city.shields >= cost, "what is left over goes to the next item"
+    cities.process_city(game, city)
+    assert city.production == barracks and city.queue == [militia]
+
+    # A click builds something else now: the queue stays, a building chosen leaves it.
+    assert act(actions.SetProduction(city.id, "unit", "settlers"))
+    assert city.production == Item("unit", "settlers") and not city.from_queue
+    assert city.queue == [militia]
+    city.queue.append(barracks)
+    assert act(actions.SetProduction(city.id, "building", "barracks"))
+    assert city.queue == [militia]
+    assert act(actions.UnqueueProduction(city.id, 0)) and city.queue == []
+    assert not act(actions.UnqueueProduction(city.id, 0))
+
+    # Without a queue a unit is built again, as in Civ 1; a building leaves the city idle.
+    city.production, city.shields = militia, cost
+    cities.process_city(game, city)
+    assert city.production == militia and not city.from_queue
+    # A city with nothing to build starts on what is queued at once.
+    city.production = None
+    assert act(actions.QueueProduction(city.id, "building", "barracks"))
+    assert city.production == barracks and city.queue == []
+
+
+def test_the_queue_drops_what_can_no_longer_be_built(rules):
+    game = make_game(rules)
+    for player in game.players[1:]:
+        player.techs.add("bronze_working")
+    city = add_city(game, 1, 5, 5)
+    rival = add_city(game, 2, 12, 5)
+    city.production = Item("unit", "militia")
+    city.queue = [Item("building", "colossus"), Item("building", "barracks")]
+    game.wonders["colossus"] = rival.id                # built elsewhere meanwhile
+    rival.buildings.add("colossus")
+    city.shields = rules.units["militia"].cost
+    cities.process_city(game, city)
+    assert city.production == Item("building", "barracks") and city.queue == []
+
+
+def test_the_queue_is_saved_and_lost_with_the_city(rules):
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5, size=3)
+    city.production = Item("unit", "militia")
+    city.queue = [Item("unit", "militia"), Item("building", "barracks")]
+    saved = json.loads(json.dumps(persistence.game_to_data(game)))
+    assert persistence.game_from_data(rules, saved).cities[city.id].queue == city.queue
+    cities.capture_city(game, game.add_unit("legion", 2, 6, 5), city)
+    assert city.owner == 2 and city.queue == []
