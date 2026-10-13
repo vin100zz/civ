@@ -81,7 +81,7 @@ def unit_orders(view: PlayerView, controller: HumanController, unit: Unit) -> li
 def route(view: PlayerView, unit: Unit, goal: Tile) -> Optional[list[tuple[Tile, int]]]:
     """The way to the goal the player knows, each tile with the turn it is reached on
     (1 = this turn, or the next one for a unit that cannot move any more)."""
-    path = pathfinding.find_path(view, unit, goal)
+    path = pathfinding.find_path(view, unit, goal, straight=True)
     if path is None:
         return None
     full = view.full_moves(unit)

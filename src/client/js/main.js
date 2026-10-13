@@ -21,7 +21,7 @@ import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
 import { hideTips } from './tips.js';
 import {
-  play, activate, endTurn, handleKey, clickTile, sendTo, hoverTile, queue, activeUnit, setMode,
+  play, activate, endTurn, handleKey, clickTile, aimAt, releaseAt, hoverTile, queue, activeUnit, setMode,
   pendingDecisions, whyNotEnd,
 } from './play.js';
 import {
@@ -584,11 +584,9 @@ $('zoom-fit').addEventListener('click', () => {
 
 // The person's orders on the map.
 mapView.onTileClick = clickTile;
-mapView.onTileContext = (tile) => {
-  if (leader() === null) return false;
-  sendTo(tile);
-  return true;                     // no browser menu over the map while playing
-};
+mapView.onTileContext = () => leader() !== null;     // no browser menu over the map while playing
+mapView.onAimStart = aimAt;
+mapView.onAimEnd = releaseAt;
 mapView.onTileHover = hoverTile;
 mapView.describeMove = describeMove;
 

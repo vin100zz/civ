@@ -45,10 +45,14 @@ def passable(view: PlayerView, unit: Unit, tile: Tile) -> bool:
 
 
 def find_path(view: PlayerView, unit: Unit, goal: Tile, *, adjacent: bool = False,
-              avoid: Optional[Callable[[Tile], bool]] = None) -> Optional[list[Tile]]:
+              avoid: Optional[Callable[[Tile], bool]] = None,
+              straight: bool = False) -> Optional[list[Tile]]:
     """Cheapest known route from the unit to the goal (A*), as the list of tiles to step on.
 
     With `adjacent`, stopping next to the goal is enough (to attack it, or to work beside it).
+    With `straight`, of the routes of the same cost, the one that keeps closest to the
+    straight line to the goal (a diagonal costs no more than a straight step: without it, the
+    route of a person's unit could zigzag for nothing).
     Returns an empty list if the unit is already there, None if no route is known.
     """
     world = view.map
@@ -56,8 +60,18 @@ def find_path(view: PlayerView, unit: Unit, goal: Tile, *, adjacent: bool = Fals
     if start is goal or (adjacent and goal in world.neighbors(start)):
         return []
 
+    line_x, line_y = world.dx(start.x, goal.x), goal.y - start.y
+
+    def drift(tile: Tile) -> int:
+        """How far the tile lies from the line to the goal, times the length of the line."""
+        return abs(line_x * (tile.y - start.y) - line_y * world.dx(start.x, tile.x))
+
+    # A move costs more than all the drift a route can gather: the drift only breaks ties.
+    scale = MAX_NODES * (abs(line_x) + abs(line_y)) * (world.width + world.height) + 1 \
+        if straight else 1
+
     def estimate(tile: Tile) -> int:
-        return world.steps(tile.x, tile.y, goal.x, goal.y)
+        return world.steps(tile.x, tile.y, goal.x, goal.y) * scale
 
     counter = 0
     frontier: list[tuple[int, int, Tile]] = [(estimate(start), counter, start)]
@@ -87,8 +101,10 @@ def find_path(view: PlayerView, unit: Unit, goal: Tile, *, adjacent: bool = Fals
                     continue
             elif not _can_stand_on_goal(view, unit, nxt):
                 continue
-            new_cost = base + max(1, view.move_cost(unit, current, nxt))
-            if new_cost < cost_so_far.get(nxt.index, 1 << 30):
+            new_cost = base + max(1, view.move_cost(unit, current, nxt)) * scale
+            if straight:
+                new_cost += drift(nxt)
+            if new_cost < cost_so_far.get(nxt.index, 1 << 62):
                 cost_so_far[nxt.index] = new_cost
                 came_from[nxt.index] = current
                 counter += 1

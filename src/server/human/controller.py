@@ -230,7 +230,7 @@ class HumanController:
 def travel(view: PlayerView, unit: Unit, goal: Tile) -> str:
     """Moves a unit along the route it knows as far as its movement allows. A unit on its way
     never starts a fight: it stops in front of foreign units and cities."""
-    path = pathfinding.find_path(view, unit, goal)
+    path = pathfinding.find_path(view, unit, goal, straight=True)
     if path is None:
         return BLOCKED
     for step in path:

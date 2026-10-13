@@ -198,6 +198,24 @@ def test_preview_of_a_move(rules):
     assert orders.preview(view, ship, game.map.tile(8, 8))["kind"] == "no_route"
 
 
+def test_a_journey_keeps_to_the_straight_line(rules):
+    # A diagonal costs no more than a straight step: of the routes of the same length, the
+    # person sees, and the unit follows, the one closest to the line, not a zigzag.
+    game = make_game(rules, relation=PEACE, width=30, height=20)
+    militia = game.add_unit("militia", 1, 3, 10)
+    controller, view = lead(game)
+
+    row = orders.preview(view, militia, game.map.tile(15, 10))
+    assert [step[:2] for step in row["steps"]] == [[x, 10] for x in range(4, 16)]
+    slope = orders.preview(view, militia, game.map.tile(15, 4))
+    assert len(slope["steps"]) == 12
+    for x, y, _ in slope["steps"]:
+        assert abs(y - (10 - (x - 3) / 2)) <= 0.5, "within half a tile of the line"
+
+    assert controller.send(view, militia, game.map.tile(15, 10)) == MOVING
+    assert (militia.x, militia.y) == (4, 10)
+
+
 def test_units_left_to_themselves(rules):
     game = make_game(rules, relation=PEACE, width=24, height=16)
     city = add_city(game, 1, 6, 6, size=3)

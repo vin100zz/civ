@@ -10,7 +10,8 @@ import { store, on, emit, U, leader, tileIndex, plural } from './state.js';
 export const play = {
   unit: null,           // id of the active unit
   detail: null,         // its detail from the server, with the orders it can take
-  mode: null,           // 'goto' while the person picks a destination
+  mode: null,           // 'goto' while the person picks a destination, 'aim' while the
+                        // right button is held down
   preview: null,        // what the server says a move to the hovered tile would do
   hovered: null,        // "x,y" of the tile the preview was asked for
   waiting: false,       // the turn was ended: the other civilizations are playing
@@ -65,6 +66,11 @@ export function queue() {
   return myUnits().filter(awaitsOrders).sort((a, b) => rank(a) - rank(b) || a[U.ID] - b[U.ID]);
 }
 
+// The person is choosing where the active unit goes: the way there shows.
+function picking() {
+  return play.mode === 'goto' || play.mode === 'aim';
+}
+
 function syncHud() {
   const unit = play.waiting ? null : activeUnit();     // nobody to give orders to meanwhile
   const preview = play.preview;
@@ -72,7 +78,7 @@ function syncHud() {
   store.hud.route = null;
   store.hud.target = null;
   if (unit && preview && preview.unit === unit[U.ID]) {
-    if (preview.kind === 'route' && play.mode === 'goto') store.hud.route = preview.steps;
+    if (preview.kind === 'route' && picking()) store.hud.route = preview.steps;
     if (preview.kind === 'attack' || preview.kind === 'capture') {
       store.hud.target = { x: preview.x, y: preview.y };
     }
@@ -353,13 +359,30 @@ export function clickTile(tile) {
   return false;
 }
 
-// A right click: the active unit goes there (one step, or a journey).
-export function sendTo(tile) {
+// The right button pressed on the map: as long as it is held, the way the active unit would
+// take to the tile under the pointer shows, as with Go to. Returns true when it shows.
+export function aimAt(tile) {
+  if (leader() === null || play.waiting || !activeUnit()) return false;
+  setMode('aim');
+  hoverTile(tile);
+  return true;
+}
+
+// The right button let go: the active unit goes there (one step, or a journey). Let go off
+// the map, or after Escape, it stays.
+export function releaseAt(tile) {
+  if (play.mode !== 'aim') return;
+  setMode(null);
   const unit = activeUnit();
-  if (leader() === null || play.waiting || !unit) return false;
+  if (!tile || !unit || play.waiting) return;
   if (adjacent(unit, tile)) act('move', { unit: unit[U.ID], x: tile.x, y: tile.y });
   else goTo(unit, tile);
-  return true;
+}
+
+function dropPreview() {
+  play.preview = null;
+  syncHud();
+  emit('play-preview');
 }
 
 // The pointer is over a tile: asks the server what going there would do, when it matters.
@@ -368,16 +391,19 @@ export function hoverTile(tile) {
   const key = tile ? `${tile.x},${tile.y}` : null;
   if (key === play.hovered) return;
   play.hovered = key;
-  if (!unit || !tile || play.waiting) return;
+  if (!unit || play.waiting) return;
+  if (!tile) {
+    // Off the map, the right button let go gives no order: the way shown goes away.
+    if (play.mode === 'aim' && play.preview) dropPreview();
+    return;
+  }
   const index = tileIndex(tile.x, tile.y);
   const foreign = (store.unitsAt.get(index) || []).some((other) => other[U.OWNER] !== unit[U.OWNER]);
   const strangerCity = store.cityAt.get(index) && store.cityAt.get(index).owner !== unit[U.OWNER];
-  if (play.mode === 'goto' || (adjacent(unit, tile) && (foreign || strangerCity))) {
+  if (picking() || (adjacent(unit, tile) && (foreign || strangerCity))) {
     send({ cmd: 'preview', unit: unit[U.ID], x: tile.x, y: tile.y });
   } else if (play.preview) {
-    play.preview = null;
-    syncHud();
-    emit('play-preview');
+    dropPreview();
   }
 }
 
@@ -438,7 +464,8 @@ on('unit', (detail) => {
 });
 
 on('preview', (preview) => {
-  if (preview.unit !== play.unit) return;
+  // An answer for a tile the pointer has left since comes too late.
+  if (preview.unit !== play.unit || `${preview.x},${preview.y}` !== play.hovered) return;
   play.preview = preview;
   syncHud();
   emit('play-preview');

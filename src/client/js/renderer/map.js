@@ -58,6 +58,10 @@ export class MapView {
     this.onTileClick = () => false;
     this.onTileContext = () => false;
     this.onTileHover = () => {};
+    // The right button held down aims at a tile, let go it gives the order (tile null: off
+    // the map).
+    this.onAimStart = () => false;
+    this.onAimEnd = () => {};
     // Html about sending the active unit to a tile: null for the usual tooltip, '' for none.
     this.describeMove = () => null;
     this.slides = new Map();            // unit id -> {path: [[x, y], ...], start, leg}
@@ -250,7 +254,13 @@ export class MapView {
   _bind() {
     const canvas = this.canvas;
     let drag = null;
+    let aiming = false;
     canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 2) {
+        const tile = this._eventTile(e);
+        aiming = Boolean(tile) && this.onAimStart(tile);
+        if (aiming) return;
+      }
       drag = { x: e.clientX, y: e.clientY, moved: false };
       canvas.classList.add('dragging');
     });
@@ -274,6 +284,11 @@ export class MapView {
       }
     });
     window.addEventListener('mouseup', (e) => {
+      if (aiming && e.button === 2) {
+        aiming = false;
+        this.onAimEnd(e.target === canvas ? this._eventTile(e) : null);
+        return;
+      }
       if (drag && !drag.moved && e.target === canvas) this._click(e);
       drag = null;
       canvas.classList.remove('dragging');
