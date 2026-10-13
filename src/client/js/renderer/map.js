@@ -13,6 +13,11 @@ const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const INK = '#0B0E13';
 const GOLD = '#E2B659';
 const RIVER = '#3D8FD6';
+const ROAD = '#8A6A3A';
+const RAIL = '#22262D';
+const STONE = '#D9D1BE';      // city walls
+const WALL_BAND = 0.055;      // width of the walls around the city square, in tiles
+const WALL_MERLON = 0.065;    // how far the merlons stand out of them
 const FONT = 'Geist, "Segoe UI", system-ui, sans-serif';
 export const MISSION_COLORS = {
   found_city: '#7bdc6a', improve: '#c9a25b', defend: '#6ab0ff', attack_city: '#ff5a4a',
@@ -38,6 +43,25 @@ function roundRect(ctx, x, y, w, h, radius) {
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x, y, w, h, radius);
   else ctx.rect(x, y, w, h);
+}
+
+// Distances from the tile centre of evenly spaced points along a half link `length`
+// long, about `step` apart, none closer to the centre than `skip`. They are placed from
+// the tile edge inwards, so the neighbour's half of the link keeps the same rhythm.
+function spaced(length, step, skip) {
+  const count = Math.max(1, Math.round(length / step));
+  const gap = length / count;
+  const out = [];
+  for (let k = 0; k < count; k++) {
+    const t = length - (k + 0.5) * gap;
+    if (t >= skip) out.push(t);
+  }
+  return out;
+}
+
+// The width of city walls, merlons included, at `size` pixels per tile.
+function wallsWidth(size) {
+  return Math.max(1.5, size * WALL_BAND) + Math.max(1.5, size * WALL_MERLON);
 }
 
 export class MapView {
@@ -463,6 +487,8 @@ export class MapView {
 
     // Terrain and what lies on it.
     const painted = this._drawGround(ctx, range);
+    const network = [];       // tiles with a road or a railroad: [tx, ty, px, py, size]
+    const above = [];         // tiles with something standing on the roads: [flags, px, py, size]
     for (let ty = range.y0; ty <= range.y1; ty++) {
       for (let tx = range.x0; tx <= range.x1; tx++) {
         const index = tileIndex(tx, ty);
@@ -475,9 +501,16 @@ export class MapView {
           continue;
         }
         if (!painted(tx, ty)) this._drawFlat(ctx, index, px, py, size);
-        this._drawFeatures(ctx, index, tx, ty, px, py, size);
+        this._drawUnderRoads(ctx, index, tx, ty, px, py, size);
+        if (size < 14) continue;      // too small for details
+        const flags = map.flags[index];
+        if (flags & (F.ROAD | F.RAILROAD)) network.push([tx, ty, px, py, size]);
+        if (flags & (F.FORTRESS | F.POLLUTION | F.HUT)) above.push([flags, px, py, size]);
       }
     }
+    // Roads and railroads in a pass of their own, so that railroads lie over every road.
+    this._drawNetwork(ctx, network, ts);
+    for (const [flags, px, py, size] of above) this._drawOverRoads(ctx, flags, px, py, size);
     // Territory, on top of the terrain but under cities and units.
     if (store.options.territory && store.owner) this._drawTerritory(ctx, range, explored);
     if (store.options.grid && ts >= 16) this._drawGrid(ctx, range);
@@ -703,9 +736,14 @@ export class MapView {
     return (tx, ty) => !missing.has(`${Math.floor(tx / tiles)}:${Math.floor(ty / tiles)}`);
   }
 
+  // One tile on its own (the city view): its roads and railroads come with it.
   _drawTerrain(ctx, index, tx, ty, px, py, size) {
     this._drawFlat(ctx, index, px, py, size);
-    this._drawFeatures(ctx, index, tx, ty, px, py, size);
+    this._drawUnderRoads(ctx, index, tx, ty, px, py, size);
+    if (size < 14) return;
+    const flags = store.map.flags[index];
+    if (flags & (F.ROAD | F.RAILROAD)) this._drawNetwork(ctx, [[tx, ty, px, py, size]], size);
+    this._drawOverRoads(ctx, flags, px, py, size);
   }
 
   // The plain square tile: what the map shows until its ground is painted.
@@ -722,7 +760,8 @@ export class MapView {
     }
   }
 
-  _drawFeatures(ctx, index, tx, ty, px, py, size) {
+  // What lies under the roads: river, resource, irrigation, mine.
+  _drawUnderRoads(ctx, index, tx, ty, px, py, size) {
     const { map } = store;
     const terrain = store.terrains[map.terrain[index]];
     const flags = map.flags[index];
@@ -738,7 +777,11 @@ export class MapView {
     }
     if (flags & F.IRRIGATION) this._overlay(ctx, sprite('terrain', 'irrigation'), px, py, size, 0.86, 0.3);
     if (flags & F.MINE) this._overlay(ctx, sprite('terrain', 'mine'), px, py, size, 0.64, 0.8);
-    if (flags & (F.ROAD | F.RAILROAD)) this._drawRoad(ctx, tx, ty, px, py, size, flags);
+  }
+
+  // What stands on the roads: fortress, pollution, hut.
+  _drawOverRoads(ctx, flags, px, py, size) {
+    ctx.imageSmoothingEnabled = true;
     if (flags & F.FORTRESS) {
       ctx.strokeStyle = '#f2d16b';
       ctx.lineWidth = Math.max(1.5, size / 16);
@@ -815,31 +858,71 @@ export class MapView {
     }
   }
 
-  _drawRoad(ctx, tx, ty, px, py, size, flags) {
+  // Roads and railroads of the given tiles ([tx, ty, px, py, size]). Each tile draws half
+  // of each link, from its centre to the edge or corner it shares with the neighbour; a
+  // link is a railroad only when both tiles have one, a road otherwise. Every road comes
+  // first, so railroads lie on top.
+  _drawNetwork(ctx, tiles, size) {
     const { map } = store;
-    const rail = (flags & F.RAILROAD) !== 0;
-    const cx = px + size / 2;
-    const cy = py + size / 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = rail ? '#3b3b3b' : '#8a6a3a';
-    ctx.lineWidth = Math.max(1.5, size * (rail ? 0.1 : 0.08));
-    let links = 0;
-    ctx.beginPath();
-    for (const [dx, dy] of DIRS8) {
-      const y = ty + dy;
-      if (y < 0 || y >= map.height) continue;
-      const other = map.flags[tileIndex(tx + dx, y)];
-      if (other & (F.ROAD | F.RAILROAD)) {
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + dx * size / 2, cy + dy * size / 2);
+    const roads = [];
+    const rails = [];
+    for (const [tx, ty, px, py, side] of tiles) {
+      const flags = map.flags[tileIndex(tx, ty)];
+      const cx = px + side / 2;
+      const cy = py + side / 2;
+      let links = 0;
+      for (const [dx, dy] of DIRS8) {
+        const y = ty + dy;
+        if (y < 0 || y >= map.height) continue;
+        const other = map.flags[tileIndex(tx + dx, y)];
+        if (!(other & (F.ROAD | F.RAILROAD))) continue;
+        (flags & other & F.RAILROAD ? rails : roads).push([cx, cy, cx + dx * side / 2, cy + dy * side / 2]);
         links++;
       }
+      // Alone, it shows as a dot.
+      if (!links) (flags & F.RAILROAD ? rails : roads).push([cx, cy, cx, cy]);
     }
-    if (links) ctx.stroke();
-    else {
-      ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1.5, size * 0.08);
+    this._strokeLinks(ctx, roads, ROAD, size);
+    // A railroad as maps draw it: a thin dark line crossed by short ties.
+    ctx.lineWidth = Math.max(1.2, size * 0.045);
+    this._strokeLinks(ctx, rails, RAIL, size);
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    const half = size * 0.1;
+    ctx.beginPath();
+    for (const [x0, y0, x1, y1] of rails) {
+      const length = Math.hypot(x1 - x0, y1 - y0);
+      if (!length) continue;
+      const ux = (x1 - x0) / length;
+      const uy = (y1 - y0) / length;
+      for (const t of spaced(length, size * 0.18, size * 0.07)) {
+        const x = x0 + ux * t;
+        const y = y0 + uy * t;
+        ctx.moveTo(x - uy * half, y + ux * half);
+        ctx.lineTo(x + uy * half, y - ux * half);
+      }
+    }
+    ctx.stroke();
+  }
+
+  // Strokes the half links ([x0, y0, x1, y1]) with the current line width; those of no
+  // length are dots.
+  _strokeLinks(ctx, links, color, size) {
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (const [x0, y0, x1, y1] of links) {
+      if (x0 === x1 && y0 === y1) continue;
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+    }
+    ctx.stroke();
+    for (const [x0, y0, x1, y1] of links) {
+      if (x0 !== x1 || y0 !== y1) continue;
       ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(1.5, size * 0.09), 0, Math.PI * 2);
+      ctx.arc(x0, y0, Math.max(1.5, size * 0.09), 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -915,19 +998,20 @@ export class MapView {
     const color = player(city.owner).color;
     const inset = Math.max(1, Math.round(size * 0.08));
     const box = size - 2 * inset;
+    const walls = city.walls ? this._drawWalls(ctx, px + inset, py + inset, box, size) : 0;
     roundRect(ctx, px + inset, py + inset, box, box, size * 0.2);
     ctx.fillStyle = color;
     ctx.fill();
-    // Walls show as a heavier outline.
-    const outline = Math.max(1.5, size * (city.walls ? 0.1 : 0.045));
+    const outline = Math.max(1.5, size * 0.045);
     ctx.lineWidth = outline;
     ctx.strokeStyle = INK;
     ctx.stroke();
     if (city.disorder) {
       // A city in civil disorder is ringed in red, whatever the zoom: the names are not
       // drawn from afar. The ring is edged in black to show on a red city and on any land.
+      // It goes around the walls.
       const ring = Math.max(2, size * 0.06);
-      const out = (outline + ring) / 2;
+      const out = (outline + ring) / 2 + walls;
       roundRect(ctx, px + inset - out, py + inset - out, box + 2 * out, box + 2 * out, size * 0.2 + out);
       ctx.lineWidth = ring + 2;
       ctx.stroke();
@@ -945,9 +1029,46 @@ export class MapView {
       ctx.fillText(String(city.size), px + size / 2, py + size / 2 + 1);
     }
     if (size >= 22) {
+      // Off the corner tower of a city with walls.
       const garrison = units ? units.length : 0;
-      if (garrison) this._badge(ctx, px + size - inset + 2, py + inset - 2, String(garrison), size);
+      const shift = walls / 2;
+      if (garrison) this._badge(ctx, px + size - inset + 2 + shift, py + inset - 2 - shift, String(garrison), size);
     }
+  }
+
+  // City walls: a ring of stone around the city square, crenellated, with a square tower
+  // at each corner. Returns how far they reach out of the square.
+  _drawWalls(ctx, x, y, box, size) {
+    const band = Math.max(1.5, size * WALL_BAND);
+    const merlon = Math.max(1.5, size * WALL_MERLON);
+    const half = box / 2 + band;
+    const parts = size >= 44 ? 7 : 5;         // merlons and gaps along a side, towers included
+    const part = 2 * half / parts;
+    // The top side, from the outer corner of the top left tower. The three other sides
+    // are the same, turned around the centre.
+    const side = [[-half - merlon, -half - merlon]];
+    for (let i = 0; i < parts - 1; i++) {
+      const end = -half + (i + 1) * part;
+      if (i % 2 === 0) side.push([end, -half - merlon], [end, -half]);
+      else side.push([end, -half], [end, -half - merlon]);
+    }
+    const cx = x + box / 2;
+    const cy = y + box / 2;
+    ctx.beginPath();
+    for (let turn = 0; turn < 4; turn++) {
+      for (let [sx, sy] of side) {
+        for (let i = 0; i < turn; i++) [sx, sy] = [-sy, sx];
+        ctx.lineTo(cx + sx, cy + sy);
+      }
+    }
+    ctx.closePath();
+    ctx.fillStyle = STONE;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, size * 0.03);
+    ctx.strokeStyle = INK;
+    ctx.lineJoin = 'miter';
+    ctx.stroke();
+    return band + merlon;
   }
 
   // The name under the city, in a dark pill: civilization dot, star for a capital. A city in
@@ -966,8 +1087,9 @@ export class MapView {
     const dot = riot ? fontSize : Math.round(fontSize * 0.56);
     const w = pad + dot + 5 + starWidth + nameWidth + pad;
     const x = Math.round(px + size / 2 - w / 2);
-    // The red ring around the city takes a little room of its own.
-    const y = Math.round(py + size + (riot ? 3 : 1));
+    // The red ring around the city takes a little room of its own, and so do walls.
+    const walls = city.walls ? wallsWidth(size) : 0;
+    const y = Math.round(py + size + (riot ? 3 : 1) + walls * 0.7);
     const selected = store.selectedCity === city.id;
     const ink = riot ? '#1B0705' : '#F0F2F6';
     roundRect(ctx, x, y, w, h, h / 2);

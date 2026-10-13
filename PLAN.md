@@ -268,10 +268,10 @@ Les sprites de `resources/` suffisent : terrains et surcouches en 60×60 avec tr
 
 Dessinés au canvas, sans sprite :
 
-- carré à la couleur de la civ derrière l'unité et la ville, taille de la ville, étoile de la capitale ;
+- carré à la couleur de la civ derrière l'unité et la ville, taille de la ville, étoile de la capitale, enceinte de pierre crénelée autour d'une ville à murailles ;
 - marqueurs d'ordre (F fortifiée, S sentinelle, R route, I irrigation, M mine, P dépollution), point jaune des vétérans ;
 - sentinelle grisée et hachurée, unité fortifiée à bordure épaisse ;
-- rivières et routes, reliées de case en case (les sprites `river_overlay` et `route` ne se raccordent pas) ;
+- rivières, routes et voies ferrées, reliées de case en case (les sprites `river_overlay` et `route` ne se raccordent pas) ; une voie ferrée est un trait fin barré de traverses, comme sur les cartes, tracé par-dessus les routes ;
 - huttes, forteresses, territoires, brouillard.
 
 En mer, la case montre le navire et non ses passagers. Les transitions de côte ne sont pas traitées.
