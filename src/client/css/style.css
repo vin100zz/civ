@@ -480,17 +480,19 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .ring { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; flex: none; display: inline-block; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 
-/* The active unit: what it is and the orders it can take. */
+/* The active unit, on one line: who it is, its figures, its orders, the units of its tile and
+   the turn buttons. A window too narrow for it wraps it rather than cutting it. */
 #unit-bar {
   position: absolute;
   left: 368px;
   right: 16px;
   bottom: 16px;
-  border-radius: 14px;
-  padding: 14px 16px;
+  border-radius: 12px;
+  padding: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
   z-index: 2;
 }
 #unit-bar:empty, body.sheet-open #unit-bar { display: none; }
@@ -522,48 +524,48 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 #unit-bar.idle .btn { margin-left: auto; }
 #unit-bar .mark { display: flex; color: var(--mute); }
 #unit-bar .mark.good { color: var(--good); }
-.unit-head { display: flex; align-items: center; gap: 14px; }
 .unit-portrait { width: 36px; height: 36px; border-radius: 9px; border: 1.5px solid var(--bg); display: grid; place-items: center; flex: none; }
 .unit-portrait img { width: 92%; height: 86%; object-fit: contain; }
-.unit-head .unit-portrait { border-radius: 12px; border-width: 2px; box-shadow: 0 0 0 2px var(--gold); }
-.unit-head .titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.unit-head .name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.unit-head h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
-.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
-.tag.gold { color: var(--gold); border-color: rgba(226, 182, 89, 0.4); }
-.tag.gold i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
-.unit-stats { display: flex; gap: 8px; margin-left: 10px; }
-.unit-stats div { min-width: 66px; padding: 5px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; }
-.unit-stats span { font-size: 11px; color: var(--mute); }
-.unit-stats b { font-size: 15px; font-weight: 600; white-space: nowrap; }
-.unit-turn { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.unit-turn .sub { white-space: nowrap; margin-right: 4px; }
-.unit-orders { display: flex; gap: 6px; flex-wrap: wrap; }
+.unit-who { display: flex; align-items: center; gap: 10px; min-width: 156px; max-width: 280px; flex: none; }
+.unit-who .unit-portrait { width: 40px; height: 40px; border-radius: 10px; border-width: 2px; box-shadow: 0 0 0 2px var(--gold); }
+.unit-who .titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.unit-who h2 { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; }
+.unit-who .vet { display: flex; color: var(--gold); }
+.unit-who .sub { display: flex; align-items: center; gap: 5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unit-who .sub i { font-style: normal; }
+.unit-who .home { display: inline-flex; align-items: center; gap: 4px; }
+/* The groups after the name, each behind a short hairline. */
+.unit-group { position: relative; display: flex; align-items: center; gap: 4px; padding-left: 11px; flex: none; }
+.unit-group::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 1px; background: var(--hair); }
+.unit-stats { gap: 12px; min-width: 112px; }
+.unit-stat { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.unit-stat svg { color: var(--mute); }
+/* An order: its icon, its key in the corner; its name and what it costs in the tooltip. */
 .unit-order {
-  height: 44px;
-  padding: 0 9px 0 11px;
-  border-radius: 10px;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
   background: var(--raise);
   border: 1px solid var(--line);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  place-items: center;
   color: var(--soft);
 }
 .unit-order:hover { background: var(--hover); border-color: #3A4556; color: var(--text); }
-.unit-order .what { display: flex; flex-direction: column; line-height: 1.25; }
-.unit-order b { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
-.unit-order small { font-size: 11px; color: var(--mute); white-space: nowrap; }
+.unit-order .key { position: absolute; right: 3px; bottom: 2px; font-family: var(--mono); font-size: 9px; font-weight: 500; line-height: 1; color: var(--mute); }
 .unit-order.lead { border-color: rgba(226, 182, 89, 0.55); background: rgba(226, 182, 89, 0.10); color: var(--gold); }
 .unit-order.on { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
-.unit-order.on b { color: var(--gold-ink); }
-.unit-order.on small { color: rgba(27, 20, 5, 0.72); }
-.unit-order.on .kbd { background: rgba(27, 20, 5, 0.14); color: inherit; }
-.mates { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--hair); padding-top: 10px; }
-.mate { height: 32px; padding: 0 10px 0 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--raise); display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
-.mate:hover { border-color: var(--line-3); }
-.mate img { width: 22px; height: 22px; object-fit: contain; }
-.mate small { font-size: 11px; color: var(--mute); }
+.unit-order.on .key { color: rgba(27, 20, 5, 0.65); }
+.unit-turn .queue { font-family: var(--mono); font-size: 12px; color: var(--mute); padding: 0 5px 0 1px; white-space: nowrap; }
+/* The other units of the tile, in the colour of their civilization, a badge for what they do. */
+.mates { display: flex; align-items: center; gap: 5px; flex: none; }
+.mate { position: relative; width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--bg); display: grid; place-items: center; }
+.mate:hover { box-shadow: 0 0 0 1.5px var(--line-3); }
+.mate img { width: 90%; height: 84%; object-fit: contain; }
+.mate.spent img { opacity: 0.5; }
+.mate .badge { position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid #3A4556; color: var(--soft); display: grid; place-items: center; }
+.mate.more { width: auto; padding: 0 7px; border-color: var(--line); background: var(--raise); font-size: 12px; font-weight: 600; color: var(--soft); }
 
 /* Picking a destination. */
 #map-banner {
@@ -849,6 +851,8 @@ body.play #notice { bottom: auto; top: 72px; }
 /* A tooltip that only names what is under the pointer. */
 #panel-tip:has(> .tip-name:only-child) { width: auto; padding: 7px 11px; }
 .tip-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.tip-name .kbd { margin-left: 8px; }
+.tip-name small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--soft); }
 
 /* ── Wonders panel ───────────────────────────────────────────────────────── */
 

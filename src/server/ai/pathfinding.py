@@ -153,14 +153,15 @@ def road_route(view: PlayerView, start: Tile, goal: Tile,
 
 
 def _can_stand_on_goal(view: PlayerView, unit: Unit, tile: Tile) -> bool:
-    """The goal may hold an enemy (we go there to fight) but must suit the unit's domain."""
+    """The goal may hold an enemy (we go there to fight) but must suit the unit's domain.
+    A land unit may also end its way at sea, aboard one of its own ships that has room."""
     domain = view.rules.units[unit.type].domain
     if domain == "air":
         return True
     if not view.explored(tile):
         return False
     if domain == "land":
-        return view.is_land(tile)
+        return view.is_land(tile) or view.transport_at(unit, tile) is not None
     return not view.is_land(tile) or view.my_city_at(tile.x, tile.y) is not None
 
 

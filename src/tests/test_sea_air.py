@@ -49,6 +49,23 @@ def test_land_units_board_travel_and_land(rules):
     assert game.cargo_of(ship) == []
 
 
+def test_coming_ashore_takes_the_rest_of_the_turn(rules):
+    game = sea_game(rules)
+    add_city(game, 1, 5, 5)
+    ship = game.add_unit("sail", 1, 8, 5)
+    landing = game.add_unit("armor", 1, 8, 5)
+    landing.aboard = ship.id
+    port = game.add_unit("sail", 1, 5, 5)
+    leaving = game.add_unit("armor", 1, 5, 5)
+    leaving.aboard = port.id
+    start(game, 1)
+    assert actions.apply(game, 1, actions.MoveUnit(landing.id, 9, 5)).outcome == "moved"
+    assert landing.moves_left == 0
+    # Aboard a ship in port, the unit already stands on land: it just walks out of the city.
+    assert actions.apply(game, 1, actions.MoveUnit(leaving.id, 4, 5)).outcome == "moved"
+    assert leaving.moves_left == movement.full_moves(game, leaving) - 3
+
+
 def test_a_ship_carries_no_more_than_its_capacity(rules):
     game = sea_game(rules)
     game.add_unit("trireme", 1, 6, 5)                      # capacity 2

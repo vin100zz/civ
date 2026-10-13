@@ -93,6 +93,8 @@ def route(view: PlayerView, unit: Unit, goal: Tile) -> Optional[list[tuple[Tile,
         if left <= 0:
             turn, left = turn + 1, full
         left = max(0, left - view.move_cost(unit, here, tile))
+        if view.comes_ashore(unit, here, tile):
+            left = 0
         steps.append((tile, turn))
         here = tile
     return steps

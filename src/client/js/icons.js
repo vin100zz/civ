@@ -56,6 +56,10 @@ const PATHS = {
   temple: '<path d="M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10l9-6 9 6z"/>',
   route: '<path d="M5 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 16c4 0 6-8 10-8"/>',
   trash: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+  // The figures of a unit: moves, veteran, fuel.
+  boot: '<path d="M7 3h6v9l4.500 1.500a3.500 3.500 0 0 1 2.500 3.300V18H6v-3.500L7 12zM7 6.500h6"/>',
+  rank: '<path d="M6 13l6-4.500 6 4.500M6 18.500l6-4.500 6 4.500"/>',
+  fuel: '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M7 8h4M14 10h2a2 2 0 0 1 2 2v4a1.500 1.500 0 0 0 3 0V8l-3-3"/>',
   // The city sheet: what a city makes and where it goes.
   food: '<path d="M12 21v-9M12 12c0-4 3-6.500 8-6.500 0 4.500-3 7-8 6.500zM12 15c0-3-2.500-5-7-5 0 3.500 2.500 5.500 7 5z"/>',
   trade: '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>',

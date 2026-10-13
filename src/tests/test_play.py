@@ -216,6 +216,40 @@ def test_a_journey_keeps_to_the_straight_line(rules):
     assert (militia.x, militia.y) == (4, 10)
 
 
+def test_a_land_unit_goes_aboard_a_distant_ship(rules):
+    # A transport waits off the coast: a unit inland is sent onto its tile and boards it.
+    sea = {(x, y): "ocean" for x in range(10, 16) for y in range(12)}
+    game = make_game(rules, relation=PEACE, patches=sea)
+    chariot = game.add_unit("chariot", 1, 7, 5)
+    ship = game.add_unit("trireme", 1, 10, 5)
+    controller, view = lead(game)
+
+    boarding = orders.preview(view, chariot, game.map.tile(10, 5))
+    assert boarding["kind"] == "route" and boarding["steps"][-1] == [10, 5, 2]
+    assert orders.preview(view, chariot, game.map.tile(11, 5))["kind"] == "no_route"
+
+    assert controller.send(view, chariot, game.map.tile(10, 5)) == MOVING
+    chariot.moves_left = view.full_moves(chariot)
+    assert controller.send(view, chariot, game.map.tile(10, 5)) == ARRIVED
+    assert chariot.aboard == ship.id and controller.task(chariot.id) == ""
+
+    for _ in range(view.room_left(ship)):
+        game.add_unit("militia", 1, 10, 5).aboard = ship.id
+    other = game.add_unit("chariot", 1, 7, 5)
+    assert orders.preview(view, other, game.map.tile(10, 5))["kind"] == "no_route", "ship full"
+
+
+def test_a_journey_from_a_ship_waits_a_turn_ashore(rules):
+    sea = {(x, y): "ocean" for x in range(10, 16) for y in range(12)}
+    game = make_game(rules, relation=PEACE, patches=sea)
+    ship = game.add_unit("trireme", 1, 10, 5)
+    chariot = game.add_unit("chariot", 1, 10, 5)
+    chariot.aboard = ship.id
+    controller, view = lead(game)
+    journey = orders.preview(view, chariot, game.map.tile(7, 5))
+    assert journey["steps"] == [[9, 5, 1], [8, 5, 2], [7, 5, 2]]
+
+
 def test_units_left_to_themselves(rules):
     game = make_game(rules, relation=PEACE, width=24, height=16)
     city = add_city(game, 1, 6, 6, size=3)

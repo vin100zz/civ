@@ -206,6 +206,9 @@ class PlayerView:
     def move_cost(self, unit: Unit, origin: Tile, target: Tile) -> int:
         return movement.move_cost(self._game, unit, origin, target)
 
+    def comes_ashore(self, unit: Unit, origin: Tile, target: Tile) -> bool:
+        return movement.comes_ashore(self._game, unit, origin, target)
+
     def full_moves(self, unit: Unit) -> int:
         return movement.full_moves(self._game, unit)
 

@@ -5,8 +5,8 @@ restrictions around line 1400, ships carrying units around line 1800, fuel and s
 at sea around line 2370, settler work in the 'i', 'm', 'r', 'f', 'p' commands).
 
 Transport: a land unit that steps onto a ship is `aboard` it and travels with it; it leaves
-by stepping onto land. Aircraft land the same way on a carrier. A ship entering a city puts
-its passengers ashore.
+by stepping onto land, which takes the rest of its turn. Aircraft land the same way on a
+carrier. A ship entering a city puts its passengers ashore.
 """
 from __future__ import annotations
 
@@ -52,6 +52,12 @@ def move_cost(game: Game, unit: Unit, origin: Tile, target: Tile) -> int:
     if origin.road and target.road:
         return settings.road_cost
     return game.terrain(target).move_cost * settings.points_per_move
+
+
+def comes_ashore(game: Game, unit: Unit, origin: Tile, target: Tile) -> bool:
+    """A land unit stepping from its ship onto land: that takes the rest of its turn."""
+    return game.rules.units[unit.type].domain == "land" \
+        and not game.terrain(origin).is_land and game.terrain(target).is_land
 
 
 # ── Zones of control ──────────────────────────────────────────────────────────
@@ -181,6 +187,8 @@ def _step(game: Game, unit: Unit, origin: Tile, target: Tile) -> str:
             unit.moves_left = 0
             return STALLED
     unit.moves_left = max(0, unit.moves_left - cost)
+    if comes_ashore(game, unit, origin, target):
+        unit.moves_left = 0
     _relocate(game, unit, target)
 
     if hostile and target.city_id is not None:
