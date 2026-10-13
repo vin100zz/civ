@@ -30,7 +30,7 @@ TRADE = "trade"
 # expedition take no mission: they decide by themselves (unit_ai/aircraft.py, ship.py).
 ROLE_MISSIONS: dict[str, tuple[str, ...]] = {
     "settler": (FOUND_CITY, EMBARK, IMPROVE),
-    "defense": (DEFEND, EMBARK, EXPLORE),
+    "defense": (DEFEND, ATTACK_UNIT, EMBARK, EXPLORE),
     "attack": (ATTACK_UNIT, ATTACK_CITY, EMBARK, EXPLORE, DEFEND),
     "neutral": (HELP_WONDER, TRADE),
     "sea_attack": (ATTACK_UNIT, ATTACK_CITY, EXPLORE_SEA),
@@ -39,6 +39,7 @@ ROLE_MISSIONS: dict[str, tuple[str, ...]] = {
 # Settings (ai.yaml, strategy) giving how well a role fits a mission that is not its first choice.
 ROLE_FIT: dict[tuple[str, str], str] = {
     ("defense", EXPLORE): "fit_defense_explore",
+    ("defense", ATTACK_UNIT): "fit_defense_attack",
     ("attack", DEFEND): "fit_attack_defend",
     ("attack", EXPLORE): "fit_attack_explore",
 }
@@ -167,7 +168,14 @@ def _suits(view: PlayerView, unit: Unit, mission: Mission) -> bool:
     if mission.kind in (ATTACK_CITY, ATTACK_UNIT):
         if definition.attack <= 0:
             return False
-        on_land = view.is_land(view.map.tile(mission.x, mission.y))
+        target = view.map.tile(mission.x, mission.y)
+        on_land = view.is_land(target)
+        if definition.role == "defense":
+            # A defender leaves its post for an invader it is likely to beat, nothing else.
+            if mission.kind != ATTACK_UNIT or not on_land:
+                return False
+            odds = view.attack_odds(unit, target)
+            return odds is not None                 and odds.win_chance >= view.rules.ai.get("military", "defend_min_odds")
         if definition.domain == "land":
             return on_land
         return not (on_land and definition.can("no_shore_attack"))

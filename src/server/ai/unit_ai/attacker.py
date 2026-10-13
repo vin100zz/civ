@@ -25,7 +25,7 @@ def act(ctx: Context, unit: Unit, mission: Mission | None) -> None:
     elif mission.kind == M.EXPLORE:
         explorer.act(ctx, unit, mission)
     elif mission.kind == M.ATTACK_UNIT:
-        _hunt(ctx, unit, mission)
+        hunt(ctx, unit, mission)
     elif mission.kind == M.ATTACK_CITY:
         _siege(ctx, unit, mission)
     elif mission.kind == M.DEFEND:
@@ -37,7 +37,7 @@ def act(ctx: Context, unit: Unit, mission: Mission | None) -> None:
         go_home(ctx, unit)
 
 
-def _hunt(ctx: Context, unit: Unit, mission: Mission) -> None:
+def hunt(ctx: Context, unit: Unit, mission: Mission) -> None:
     """Closes in on an enemy unit seen near one of our cities."""
     view = ctx.view
     target = view.map.tile(mission.x, mission.y)

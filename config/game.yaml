@@ -124,6 +124,21 @@ city:
     shields_low: 2.2         # shield surplus below 3
     shields: 1.4
     trade: 1.0
+  # own: a treasury that cannot pay the upkeep sells the building the empire misses least,
+  # the one whose worth to its city, less its upkeep, is lowest (Civ 1 sells the building
+  # whose upkeep falls due). Worth of what a building brings, in gold per turn.
+  sale_weights:
+    food: 1.0
+    shields: 1.0
+    trade: 1.0               # one more gold or one more bulb
+    citizen: 2.0             # one citizen less unhappy, or more happy
+    disorder: 10.0           # the city would riot without it
+    defense: 8.0             # walls with an enemy city or unit within reach
+    danger_radius: 6         # "within reach", in steps
+    growth: 4.0              # the city could not grow any more without it (aqueduct)
+    growth_lead: 3           # ...counted in part from this many citizens short of that size
+    veterans: 2.0            # barracks while the city builds a military unit
+    pollution: 0.1           # per point of pollution risk avoided (percent per turn)
 
 production:
   # Cost in gold to finish production, r = remaining shields (CityWorker.cs L4bf7)

@@ -2,7 +2,8 @@
 
 Two civilizations that have met are at war until they sign a peace treaty, as in Civ 1.
 A treaty forbids attacks and entering the other's cities. Governments with a senate cannot
-declare war and always accept peace.
+declare war and always accept peace. A declaration of war breaks a treaty: the civilization
+that breaks it keeps that on its record (Player.broken_treaties), for others to remember.
 """
 from __future__ import annotations
 
@@ -25,6 +26,8 @@ def declare_war(game: Game, a: int, b: int) -> bool:
     if not can_declare_war(game, a, b):
         return False
     relation = game.relation(a, b)
+    # War is only declared on a civilization at peace: a treaty is broken, and remembered.
+    game.players[a].broken_treaties.append([b, game.turn, game.turn - relation.since_turn])
     relation.state = WAR
     relation.since_turn = game.turn
     relation.pending_from = None

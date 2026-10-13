@@ -101,7 +101,7 @@ def _maybe_start(view: PlayerView, know: Knowledge, plan, memory: dict) -> None:
     if SETTLE not in kinds and plan.local_sites == 0:
         choice = _best_colony(view, know)
     if choice is None and INVADE not in kinds and plan.at_war and not plan.war_targets:
-        choice = _best_invasion(view, know)
+        choice = _best_invasion(view, know, {entry[0] for entry in memory.get("lost_cities", [])})
     if choice is None:
         return
     kind, port, goal, target = choice
@@ -134,8 +134,9 @@ def _best_colony(view: PlayerView, know: Knowledge):
     return SETTLE, best[1], best[2], None
 
 
-def _best_invasion(view: PlayerView, know: Knowledge):
-    """An enemy city across the sea worth an invasion, if we are strong enough."""
+def _best_invasion(view: PlayerView, know: Knowledge, lost: set[int] = frozenset()):
+    """An enemy city across the sea worth an invasion, if we are strong enough; less
+    strength will do to take back a city that was ours (`lost`)."""
     get = lambda name: view.rules.ai.get("overseas", name)
     world = view.map
     best = None
@@ -143,7 +144,9 @@ def _best_invasion(view: PlayerView, know: Knowledge):
     for memory in know.foreign_cities:
         if not view.at_war(memory.owner) or view.is_barbarian(memory.owner):
             continue
-        if mine < diplomacy.their_power(view, memory.owner) * get("invade_strength_ratio"):
+        ours = memory.city_id in lost
+        ratio = get("invade_retake_ratio" if ours else "invade_strength_ratio")
+        if mine < diplomacy.their_power(view, memory.owner) * ratio:
             continue
         tile = world.tile(memory.x, memory.y)
         port = _port_for(view, know, know.region_of[tile.index], tile)
@@ -153,6 +156,8 @@ def _best_invasion(view: PlayerView, know: Knowledge):
                                                                           tile.x, tile.y)
         if memory.has_walls:
             value -= 2.0
+        if ours:
+            value += view.rules.ai.get("strategy", "retake_bonus")
         if best is None or value > best[0]:
             best = (value, port, tile, memory.city_id)
     if best is None:

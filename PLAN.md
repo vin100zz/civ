@@ -67,7 +67,8 @@ src/
       rules/            schema.py (structures typées), loader.py (chargement + validation)
       model/            worldmap, entities (Unit, City, Player, Spaceship), game (état complet)
       mapgen/           generator (les 8 étapes d'origine), continents, sites (score de site)
-      systems/          city, cities, production, research, movement (terre, mer, air, transport),
+      systems/          city, cities, budget (ce que vaut un bâtiment, lequel vendre),
+                        production, research, movement (terre, mer, air, transport),
                         combat, visibility, diplomacy, government, trade, huts, barbarians,
                         pollution, nuclear, spaceship, calendar, turn
       effects.py        effets typés des bâtiments et merveilles
@@ -102,7 +103,7 @@ src/
          renderer/      map (carte), ground (sol), minimap, sprites
          panels/        turn (tour du joueur), civs (monde, empire d'une IA), empire (empire du
                         joueur), city, tech, chart, log, unitbar (barre de l'unité active)
-  tests/                169 tests : config, carte, villes, unités, empire, mer et air,
+  tests/                186 tests : config, carte, villes, unités, empire, mer et air,
                         fin de partie et sauvegardes, IA, joueur humain, API
 ```
 
@@ -172,8 +173,8 @@ Les unités suivent le même principe : `domain` (terre, mer, air), `abilities` 
 ### Déroulement d'un tour (`ai/controller.py`)
 
 1. **Connaissance.** Régions connues (terres explorées contiguës ; une ville étrangère ferme le passage), mers connues et leurs ports, frontières de l'inconnu, menaces près des villes, sites de ville classés.
-2. **Diplomatie.** Propositions de paix et déclarations de guerre, selon la personnalité et le rapport de forces estimé.
-3. **Plan.** Missions publiées avec une priorité : défendre une ville, intercepter un ennemi, prendre une ville (ralliement puis assaut), fonder une ville, aménager ou dépolluer une case, explorer la terre ou la mer, embarquer pour une expédition, aider une merveille. Puis affectation des unités et calcul de ce qui manque à l'empire (défenseurs, colons, ouvriers, attaquants, explorateurs, navires, avions).
+2. **Diplomatie.** Propositions de paix et déclarations de guerre, selon la personnalité et le rapport de forces estimé. Une déclaration de guerre rompt un traité : le moteur l'inscrit au dossier de la civilisation qui la déclare (`Player.broken_treaties`), et l'IA s'en méfie d'autant, sa victime surtout, les civilisations qui l'ont appris un peu moins ; la méfiance s'efface en 60 tours et compte double pour un traité rompu moins de 16 tours après sa signature. Une civilisation connue bien plus forte que toutes les autres voit les autres se liguer : elles font moins volontiers la paix avec elle, plus volontiers entre ennemis de cette civilisation, et lui déclarent la guerre en comptant les forces de ses autres ennemis.
+3. **Plan.** Missions publiées avec une priorité : défendre une ville, intercepter un ennemi, prendre une ville (ralliement puis assaut ; une ville qu'on a perdue passe en premier pendant 80 tours), fonder une ville, aménager ou dépolluer une case, explorer la terre ou la mer, embarquer pour une expédition, aider une merveille. Puis affectation des unités et calcul de ce qui manque à l'empire (défenseurs, colons, ouvriers, attaquants, explorateurs, navires, avions). Un ennemi débarqué près d'une ville appelle une contre-attaque : un attaquant de plus par envahisseur, même sans ville ennemie à portée, et les défenseurs en surnombre qui ont de bonnes chances (60 %) vont le frapper.
 4. **Recherche, impôts, gouvernement.**
 5. **Gouverneurs de ville.** Chaque production possible reçoit un score = poids du besoin × urgence × efficacité. Les meilleurs candidats sont conservés pour l'observateur. Lancement du vaisseau spatial quand il est prêt.
 6. **Unités.** Chaque unité exécute sa mission selon son rôle. Les avions frappent d'abord, les navires bougent en dernier, une fois leurs passagers à bord.
@@ -185,7 +186,7 @@ Tous les poids et seuils sont dans `ai.yaml`. Les trois traits de `civilizations
 ### Mer et air (`ai/overseas.py`, `unit_ai/ship.py`, `unit_ai/aircraft.py`)
 
 - **Exploration.** Un navire par mer connue tant qu'il reste des rivages inconnus. Les trirèmes longent les côtes connues (elles peuvent se perdre au large).
-- **Expéditions.** Une expédition rassemble des passagers dans un port, les transporte jusqu'à un rivage proche de son but et les débarque ; l'IA terrestre prend ensuite le relais. Deux sortes : *colonie* (un colon et une escorte, quand il n'y a plus de site accessible à pied) et *invasion* (un groupe d'attaquants vers une ville ennemie qu'on ne peut atteindre que par mer). Étapes : `gather` (trouver ou faire construire un navire, appeler les passagers par des missions `embark`), `sail`, débarquement. Les expéditions vivent dans la mémoire du contrôleur et dans les sauvegardes.
+- **Expéditions.** Une expédition rassemble des passagers dans un port, les transporte jusqu'à un rivage proche de son but et les débarque ; l'IA terrestre prend ensuite le relais. Deux sortes : *colonie* (un colon et une escorte, quand il n'y a plus de site accessible à pied) et *invasion* (un groupe d'attaquants vers une ville ennemie qu'on ne peut atteindre que par mer ; pour reprendre une ville perdue, il suffit d'être à moitié aussi fort). Étapes : `gather` (trouver ou faire construire un navire, appeler les passagers par des missions `embark`), `sail`, débarquement. Les expéditions vivent dans la mémoire du contrôleur et dans les sauvegardes.
 - **Marine.** En guerre, des navires de combat chassent les navires ennemis en vue et bombardent les défenseurs des villes côtières assiégées.
 - **Aviation.** Les avions ne prennent pas de mission : chacun frappe la meilleure cible à portée de sa base en gardant de quoi rentrer, sinon se rapproche du front. L'arme nucléaire vise la plus grande ville ennemie à portée.
 - **Fin de partie.** Les colons dépolluent en priorité ; les villes polluantes construisent transports en commun, centrale propre ou recyclage ; les grandes villes construisent une défense SDI quand l'arme nucléaire existe. Une fois le Programme Apollo construit, les villes productives fabriquent les pièces d'un vaisseau minimal avec quelques moteurs de plus.
@@ -228,7 +229,7 @@ Une IA qui propose la paix au joueur n'obtient pas de réponse immédiate : la p
 
 ### Interface
 
-Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Le tour se termine de lui-même quand la dernière unité a reçu son ordre ; sans unité à déplacer, c'est au joueur de le finir. Tant qu'une décision attend (ville sans production, recherche à choisir, proposition de paix), le tour ne peut pas finir : le bouton est grisé et dit pourquoi. Chaque demande de fin de tour nomme le tour qu'elle clôt, pour que deux fenêtres ouvertes sur la même partie ne puissent pas en sauter un. L'unité active clignote, comme dans l'original (pas de clignotement si le système demande de réduire les animations). Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran le long du chemin suivi. Au début du tour, les pas et les combats des autres civilisations vus par le joueur sont rejoués un par un, caméra à l'appui (Échap pour passer) ; un combat se voit : l'attaquant s'élance, le perdant disparaît dans un éclair. La caméra ne quitte jamais un mouvement en cours : elle attend sa fin avant d'aller à l'unité suivante, et les touches d'ordre sont ignorées pendant ce court instant.
+Barre du haut : trésor, recherche, taux, fin de tour. Panneau « Turn » : décisions en attente, alertes, unités sans ordre, villes, nouvelles. Quand le trésor sera vide d'ici cinq tours, une alerte dit quel bâtiment serait vendu (`human/report.py`), la pastille du trésor passe à l'ambre puis au rouge, et le bouton « Balance » (dans l'alerte et dans Empire) applique les taux que propose le serveur : l'impôt monte, la science cède d'abord, le luxe ensuite tant qu'aucune ville ne se révolte. Barre de l'unité active avec les ordres possibles et leurs raccourcis. Le tour se termine de lui-même quand la dernière unité a reçu son ordre ; sans unité à déplacer, c'est au joueur de le finir. Tant qu'une décision attend (ville sans production, recherche à choisir, proposition de paix), le tour ne peut pas finir : le bouton est grisé et dit pourquoi. Chaque demande de fin de tour nomme le tour qu'elle clôt, pour que deux fenêtres ouvertes sur la même partie ne puissent pas en sauter un. L'unité active clignote, comme dans l'original (pas de clignotement si le système demande de réduire les animations). Sur la carte : clic pour choisir une unité ou avancer d'une case, clic droit pour y envoyer l'unité, aperçu des chances au survol d'un ennemi, trajet et durée d'un « aller à ». Fiche de ville : production, achat, citoyens placés à la main, spécialistes, vente, gouverneur. Empire : budget, révolution, affaires étrangères, vaisseau. Les unités qui changent de case glissent à l'écran le long du chemin suivi. Au début du tour, les pas et les combats des autres civilisations vus par le joueur sont rejoués un par un, caméra à l'appui (Échap pour passer) ; un combat se voit : l'attaquant s'élance, le perdant disparaît dans un éclair. La caméra ne quitte jamais un mouvement en cours : elle attend sa fin avant d'aller à l'unité suivante, et les touches d'ordre sont ignorées pendant ce court instant.
 
 ## 6. Jalons
 
@@ -297,6 +298,7 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 | Une unité envoyée quelque part (« aller à ») n'attaque jamais d'elle-même | Le joueur décide de chaque combat |
 | Les niveaux de difficulté ne changent que la civilisation du joueur | L'IA reste sans bonus ni malus |
 | Vente d'un bâtiment : un or par bouclier, un bâtiment par ville et par tour | Même prix que la vente forcée de l'original |
+| Trésor vide : le bâtiment vendu est celui dont l'empire a le moins besoin (ce qu'il rapporte à sa ville, moins son entretien), pas celui dont l'entretien tombe | L'original vend celui dont l'entretien fait passer le trésor sous zéro, quel qu'il soit : des Universités et des Cathédrales partaient avant des Casernes inutiles |
 | Le maire replace tous les citoyens quand la ville grandit ou rétrécit | Les retouches à la main du joueur valent jusque-là |
 | En paix : pas d'attaque ni d'entrée dans les villes de l'autre, mais pas d'expulsion du territoire | Simplicité |
 | Zones de contrôle exercées seulement par les ennemis | Évite les blocages entre civs en paix |

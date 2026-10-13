@@ -11,7 +11,8 @@ from ..model.entities import City, Player, Unit
 from ..model.game import Game
 from ..model.worldmap import Tile
 from . import city as city_rules
-from . import government, nuclear, pollution, production, research, spaceship, visibility
+from . import (budget, government, nuclear, pollution, production, research, spaceship,
+               visibility)
 
 
 # ── Founding ──────────────────────────────────────────────────────────────────
@@ -195,23 +196,30 @@ def _disband_unsupported(game: Game, city: City, shortage: int) -> None:
 
 
 def _pay_maintenance(game: Game, city: City) -> None:
-    """Building upkeep. A building the treasury cannot pay for is sold."""
+    """Building upkeep. When the treasury cannot pay, it sells a building, the one the
+    empire misses least (systems/budget.py), and gets its price back as in Civ 1."""
     player = game.players[city.owner]
     for building_id in sorted(city.buildings):
+        if building_id not in city.buildings:
+            continue                        # sold a moment ago to pay for another one
         cost = city_rules.building_upkeep(game, city, building_id)
         if cost == 0:
             continue
         player.gold -= cost
         player.expenses += cost
         if player.gold < 0:
-            building = game.rules.buildings[building_id]
-            if building.wonder or building.has_effect("capital"):
+            sale = budget.building_to_sell(game, player)
+            if sale is None:
                 player.gold = 0
                 continue
-            city.buildings.discard(building_id)
+            sold_in, sold_id = sale
+            building = game.rules.buildings[sold_id]
+            sold_in.buildings.discard(sold_id)
             player.gold = building.cost
-            game.emit("sold", f"{city.name} cannot maintain {building.name}: sold.",
-                      player=player.id, x=city.x, y=city.y, city=city.id)
+            if sold_in is not city:
+                sold_in.stats = city_rules.compute_city(game, sold_in)
+            game.emit("sold", f"{sold_in.name} cannot maintain {building.name}: sold.",
+                      player=player.id, x=sold_in.x, y=sold_in.y, city=sold_in.id)
 
 
 # ── Capture and destruction ───────────────────────────────────────────────────

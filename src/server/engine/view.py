@@ -11,11 +11,11 @@ from typing import Optional
 from . import actions
 from . import effects as fx
 from .mapgen.sites import site_score
-from .model.entities import City, CityMemory, CityStats, Item, Player, Unit
+from .model.entities import WAR, City, CityMemory, CityStats, Item, Player, Unit
 from .model.game import Game
 from .model.worldmap import Tile, WorldMap
 from .rules.schema import Effect, Rules, Yields
-from .systems import city as city_rules, combat, diplomacy, government, movement
+from .systems import budget, city as city_rules, combat, diplomacy, government, movement
 from .systems import production, research, spaceship, trade
 
 # Events every civilization hears of, wherever they happen.
@@ -145,6 +145,10 @@ class PlayerView:
 
     def can_sell(self, city: City, building_id: str) -> bool:
         return production.can_sell(self._game, city, building_id)
+
+    def building_to_sell(self) -> Optional[tuple[City, str]]:
+        """The building the treasury would sell if it could not pay the upkeep now."""
+        return budget.building_to_sell(self._game, self.player)
 
     def workable_offsets(self, city: City) -> set[tuple[int, int]]:
         """Offsets of the tiles around the city its citizens may work."""
@@ -289,6 +293,11 @@ class PlayerView:
     def known_foreign_cities(self) -> list[CityMemory]:
         return sorted(self.player.known_cities.values(), key=lambda m: m.city_id)
 
+    def founded_by_me(self, city_id: int) -> bool:
+        """Whether the player founded this city, whoever holds it now."""
+        city = self._game.cities.get(city_id)
+        return city is not None and city.founder == self.player.id
+
     def known_city_positions(self) -> list[tuple[int, int]]:
         positions = [(c.x, c.y) for c in self.my_cities()]
         positions += [(m.x, m.y) for m in self.player.known_cities.values()]
@@ -358,6 +367,23 @@ class PlayerView:
     def known_strength(self, other: int) -> int:
         """Rough power of another civilization from what is known: size of its known cities."""
         return sum(m.size for m in self.player.known_cities.values() if m.owner == other)
+
+    def wars_of(self, other: int) -> list[int]:
+        """The civilizations another one is at war with, among those the player has met:
+        wars between civilizations it knows are public."""
+        return [p.id for p in self._game.civilizations
+                if p.id not in (other, self.player.id) and self.in_contact(p.id)
+                and self.in_contact(other) and self._game.relation(other, p.id).state == WAR]
+
+    def treaties_broken_by(self, other: int) -> list[tuple[int, int, int]]:
+        """The peace treaties another civilization broke that the player heard of, as
+        (victim, turn, age of the treaty in turns): those it broke with the player, and those
+        it broke with civilizations the player has met, like any declaration of war."""
+        if not self.in_contact(other):
+            return []
+        me = self.player.id
+        return [(victim, turn, age) for victim, turn, age in self._game.players[other].broken_treaties
+                if victim == me or self.in_contact(victim)]
 
     # ── Science and government ────────────────────────────────────────────────
 

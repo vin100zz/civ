@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from server.engine import actions
 from server.engine.model.entities import PEACE, WAR
-from server.engine.systems import cities, city as city_rules, diplomacy, government, research, turn
-from server.engine.systems import visibility
+from server.engine.systems import budget, cities, city as city_rules, diplomacy, government
+from server.engine.systems import research, turn, visibility
 
 from .conftest import add_city, make_game
 
@@ -164,3 +164,30 @@ def test_maintenance_sells_what_cannot_be_paid(rules):
     cities.process_city(game, city)
     assert len(city.buildings & {"temple", "library"}) < 2
     assert any(e["type"] == "sold" for e in game.events)
+
+
+def test_the_treasury_sells_the_building_missed_least(rules):
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5, size=5)              # one citizen born unhappy
+    city.buildings.update({"temple", "barracks"})
+    player = game.players[1]
+    # Without its temple the city would riot; its barracks make no veteran.
+    assert budget.building_worth(game, city, "temple") > budget.building_worth(game, city, "barracks")
+    assert budget.building_to_sell(game, player) == (city, "barracks")
+    player.gold = 0
+    player.tax_rate, player.science_rate = 0, 100
+    cities.process_city(game, city)
+    assert "barracks" not in city.buildings and "temple" in city.buildings
+    # Its price comes back, as in Civ 1, and the temple is paid for out of it.
+    assert player.gold == rules.buildings["barracks"].cost - rules.buildings["temple"].upkeep
+
+
+def test_walls_are_kept_only_near_the_enemy(rules):
+    game = make_game(rules, relation=WAR)
+    city = add_city(game, 1, 5, 5, size=3)
+    city.buildings.update({"city_walls", "barracks"})
+    player = game.players[1]
+    assert budget.building_to_sell(game, player) == (city, "city_walls")   # the dearest useless one
+    game.add_unit("legion", 2, 7, 5)                     # in sight of the city
+    visibility.refresh(game, player)
+    assert budget.building_to_sell(game, player) == (city, "barracks")

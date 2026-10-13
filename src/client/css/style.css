@@ -311,6 +311,11 @@ button.chip:hover { border-color: var(--line-3); }
 .chip-btn .bar { width: 72px; background: var(--line); }
 .chip-btn.lead { border-color: rgba(226, 182, 89, 0.55); background: rgba(226, 182, 89, 0.10); color: var(--gold); }
 .chip-btn.anarchy { border-color: rgba(242, 117, 106, 0.45); background: rgba(242, 117, 106, 0.08); color: var(--bad); }
+/* The treasury is about to sell a building (Turn panel alert). */
+.chip-btn.alarm.bad { border-color: rgba(242, 117, 106, 0.55); background: rgba(242, 117, 106, 0.10); }
+.chip-btn.alarm.bad > span:first-child { color: var(--bad); }
+.chip-btn.alarm.warn { border-color: rgba(245, 154, 62, 0.55); background: rgba(245, 154, 62, 0.10); }
+.chip-btn.alarm.warn > span:first-child { color: var(--warn); }
 .chip-btn.split { gap: 12px; }
 .chip-btn.split > span { display: inline-flex; align-items: center; gap: 5px; }
 .chip-btn.split i { width: 8px; height: 8px; border-radius: 3px; }
@@ -724,6 +729,12 @@ body.play #notice { bottom: auto; top: 72px; }
 .alert:hover { background: rgba(242, 117, 106, 0.12); }
 .todo .mark, .alert .mark { display: flex; color: var(--gold); }
 .alert .mark { color: var(--bad); }
+.alert.warn { border-color: rgba(245, 154, 62, 0.4); background: rgba(245, 154, 62, 0.07); }
+.alert.warn:hover { background: rgba(245, 154, 62, 0.12); }
+.alert.warn .mark { color: var(--warn); }
+.alert-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
+.alert .body span { font-size: 12px; color: var(--mute); }
+.alert.treasury .btn { flex: none; }
 .todo > svg { color: var(--mute); }
 .todo .body, .alert .body, .unit-row .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .todo b, .alert b { font-size: 13px; font-weight: 600; }
@@ -982,6 +993,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .rates { display: flex; flex-direction: column; padding: 0 20px; flex: none; }
 .rate { display: flex; align-items: center; gap: 12px; height: 44px; }
 .rate .what { width: 60px; font-size: 13px; font-weight: 600; flex: none; }
+.rates-fix { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0 2px; font-size: 13px; font-weight: 600; }
 .gauge { position: relative; flex: 1; height: 16px; }
 .gauge::before { content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: var(--line-2); }
 .gauge i, .gauge b { position: absolute; left: 0; top: 6px; height: 4px; border-radius: 2px; }

@@ -331,6 +331,22 @@ class WorkerWeights:
 
 
 @dataclass(frozen=True)
+class SaleWeights:
+    """Worth of what a building brings its city, in gold per turn (systems/budget.py)."""
+    food: float
+    shields: float
+    trade: float                    # one more gold or one more bulb
+    citizen: float                  # one citizen less unhappy, or more happy
+    disorder: float                 # the city would riot without it
+    defense: float                  # walls (or a nuclear shield) with an enemy within reach
+    danger_radius: int              # steps within which an enemy city or unit is "within reach"
+    growth: float                   # the city could not grow any more without it
+    growth_lead: int                # citizens short of that size from which it starts to count
+    veterans: float                 # barracks while the city builds a military unit
+    pollution: float                # per point of pollution risk avoided, in percent
+
+
+@dataclass(frozen=True)
 class CitySettings:
     min_distance: int
     food_per_citizen: int
@@ -345,6 +361,7 @@ class CitySettings:
     capture_building_loss: float
     no_palace_distance: int
     worker_weights: WorkerWeights
+    sale_weights: SaleWeights
 
 
 @dataclass(frozen=True)

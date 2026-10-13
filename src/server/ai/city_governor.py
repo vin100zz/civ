@@ -267,7 +267,7 @@ class Governor:
                          key=lambda u: (u.attack * u.moves / u.cost, u.attack))
         if attacker is not None and self.attackers_open > 0 and defenders_here > 0:
             urgency = min(1.5, self.attackers_open / 3.0)
-            if self.plan.war_targets:
+            if self.plan.war_targets or self.plan.invaders:
                 urgency *= 1.5
             out.append((self.w("attack") * self.scale["attack"] * urgency, attacker,
                         f"offense: {self.attackers_open} attacker(s) missing"))

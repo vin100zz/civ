@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import pytest
 
+import json
+
 from server.ai.controller import AIController
 from server.ai.knowledge import Knowledge
-from server.ai import pathfinding, strategic
-from server.engine.model.entities import SPECIALISTS
-from server.engine.systems import turn
+from server.ai import diplomacy as ai_diplomacy, missions as M, pathfinding, strategic
+from server.engine import persistence
+from server.engine.model.entities import NO_CONTACT, PEACE, SPECIALISTS, WAR
+from server.engine.systems import cities, diplomacy, turn, visibility
 from server.engine.view import PlayerView
 from server.sim.metrics import Metrics
 from server.sim.runner import create_game
@@ -237,3 +240,105 @@ def test_settlers_link_the_cities_by_road_then_railroad(rules):
     jobs = settler_jobs(game, for_person=True)
     assert {(x, 7) for x in range(5, 10)} <= set(jobs) and set(jobs.values()) == {"railroad"}
     assert not set(jobs) & between
+
+
+# ── War and peace ─────────────────────────────────────────────────────────────
+
+def test_a_broken_treaty_is_remembered(rules):
+    game = make_game(rules, civ_ids=("romans", "greeks", "germans", "english"), relation=PEACE)
+    game.relation(1, 4).state = NO_CONTACT                 # the English never met the Romans
+    game.relation(1, 2).since_turn = 25
+    game.turn = 30
+    greeks, germans, english = (PlayerView(game, game.players[i]) for i in (2, 3, 4))
+    trusting = ai_diplomacy.peace_willingness(greeks, Knowledge(greeks), 1)
+
+    assert diplomacy.declare_war(game, 1, 2)
+    assert game.players[1].broken_treaties == [[2, 30, 5]]
+    assert ai_diplomacy.distrust(greeks, 1) == 2.0, "broken with them, five turns after signing"
+    assert ai_diplomacy.distrust(germans, 1) == pytest.approx(0.7), "they heard of it"
+    assert ai_diplomacy.distrust(english, 1) == 0.0, "they know nothing of the Romans"
+    game.relation(1, 2).since_turn = 0                     # the same war weariness as before
+    assert ai_diplomacy.peace_willingness(greeks, Knowledge(greeks), 1) < trusting
+
+    game.turn += int(rules.ai.get("diplomacy", "distrust_memory"))
+    assert ai_diplomacy.distrust(greeks, 1) == 0.0, "forgotten in time"
+    saved = json.loads(json.dumps(persistence.game_to_data(game)))
+    assert persistence.game_from_data(rules, saved).players[1].broken_treaties == [[2, 30, 5]]
+
+
+def test_the_others_close_ranks_against_a_dominant_civilization(rules):
+    game = make_game(rules, civ_ids=("romans", "greeks", "germans"), relation=WAR)
+    add_city(game, 1, 2, 2, size=3)
+    add_city(game, 2, 8, 2, size=3)
+    for x in (2, 6, 10):
+        add_city(game, 3, x, 8, size=12)
+    romans = game.players[1]
+    for city in game.cities.values():
+        if city.owner != 1:
+            visibility.remember_city(game, romans, city)
+    view = PlayerView(game, romans)
+    know = Knowledge(view)
+    assert ai_diplomacy.dominant(view, know) == 3
+    willing = lambda other, leader: ai_diplomacy.peace_willingness(view, know, other, leader)
+    assert willing(3, 3) < willing(3, None), "no peace with the dominant civilization"
+    assert willing(2, 3) > willing(2, None), "peace with its other enemy"
+
+
+# ── Counter-attack ────────────────────────────────────────────────────────────
+
+def test_ai_goes_back_for_a_city_it_lost(rules):
+    game = make_game(rules, width=24)
+    home = add_city(game, 1, 4, 5, size=4)
+    lost = add_city(game, 1, 8, 5, size=2)
+    other = add_city(game, 2, 8, 9, size=4)                # bigger, and just as close
+    ai = game.players[1]
+    ai.explored = bytearray([1]) * len(game.map.tiles)
+    visibility.remember_city(game, ai, other)
+    controller = AIController()
+    controller.memory["my_cities"] = [home.id, lost.id]
+    cities.capture_city(game, game.add_unit("legion", 2, 9, 5), lost)
+    game.add_unit("phalanx", 2, lost.x, lost.y)            # and now defended
+
+    def target():
+        view = PlayerView(game, ai)
+        controller._note_losses(view)
+        return strategic.make_plan(view, Knowledge(view), {}, controller.memory).war_targets[0]
+
+    assert controller.memory.get("lost_cities") is None
+    assert target().city_id == lost.id
+    assert controller.memory["lost_cities"] == [[lost.id, game.turn]]
+    controller.memory = {"my_cities": [home.id]}           # had it never been ours
+    assert target().city_id == other.id
+
+
+def test_invaders_call_for_a_counter_attack(rules):
+    """An enemy that lands next to a city is fought, even with no enemy city within reach."""
+    width, height = 24, 12
+    patches = {(x, y): "ocean" for x in range(width) for y in range(height)}
+    patches.update({(x, y): "grassland" for x in range(2, 9) for y in range(2, 9)})     # home
+    patches.update({(x, y): "grassland" for x in range(15, 20) for y in range(3, 8)})  # the enemy
+    game = make_game(rules, width=width, height=height, patches=patches)
+    city = add_city(game, 1, 5, 5, size=4)
+    add_city(game, 2, 17, 5, size=4)
+    ai = game.players[1]
+    ai.explored = bytearray([1]) * len(game.map.tiles)
+
+    def plan():
+        visibility.refresh(game, ai)
+        view = PlayerView(game, ai)
+        return strategic.make_plan(view, Knowledge(view), {}, {})
+
+    calm = plan()
+    assert calm.invaders == 0 and not calm.war_targets
+    for _ in range(2):
+        game.add_unit("legion", 2, 6, 6)
+    landed = plan()
+    assert landed.invaders == 2
+    assert landed.attackers_wanted == calm.attackers_wanted + 2
+
+    # A strong defender with comrades to hold the city goes for an invader it can beat.
+    for _ in range(3):
+        game.add_unit("mech_inf", 1, city.x, city.y)
+    landed = plan()
+    hunters = [m for m in landed.assignment.values() if m.kind == M.ATTACK_UNIT]
+    assert hunters and all(game.units[uid].type == "mech_inf" for m in hunters for uid in m.assigned)

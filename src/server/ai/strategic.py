@@ -37,6 +37,7 @@ class Plan:
     explorers_wanted: int = 0         # more explorers needed
     enemies: list[int] = field(default_factory=list)                   # civs we are fighting
     war_targets: list[CityMemory] = field(default_factory=list)
+    invaders: int = 0                 # enemy units seen on our land, near our cities
     at_war: bool = False
     wonder_city: Optional[int] = None  # the city allowed to build wonders
     notes: list[str] = field(default_factory=list)
@@ -55,9 +56,10 @@ def make_plan(view: PlayerView, know: Knowledge, previous: dict[int, tuple],
     plan = Plan()
     memory = memory if memory is not None else {}
     plan.enemies = [p.id for p in view.contacts() if view.at_war(p.id)]
+    lost = {entry[0] for entry in memory.get("lost_cities", [])}
     _defense_missions(view, know, plan)
     _intercept_missions(view, know, plan)
-    _attack_missions(view, know, plan)
+    _attack_missions(view, know, plan, lost)
     plan.local_sites = _settle_missions(view, know, plan)
     jobs = improve_missions(view, know, plan)
     explore_capacity = _explore_missions(view, know, plan)
@@ -123,8 +125,11 @@ def _intercept_missions(view: PlayerView, know: Knowledge, plan: Plan) -> None:
                 continue
             seen.add(unit.id)
             # Units inside a city are dealt with by the assault on that city.
-            if view.foreign_city_at(view.map.tile(unit.x, unit.y)) is not None:
+            tile = view.map.tile(unit.x, unit.y)
+            if view.foreign_city_at(tile) is not None:
                 continue
+            if view.is_land(tile):
+                plan.invaders += 1
             plan.missions.append(Mission(M.ATTACK_UNIT, unit.x, unit.y, weight * 2.5,
                                          capacity=2, target=unit.id,
                                          note=f"enemy near {city.name}"))
@@ -132,8 +137,10 @@ def _intercept_missions(view: PlayerView, know: Knowledge, plan: Plan) -> None:
 
 # ── War ───────────────────────────────────────────────────────────────────────
 
-def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan) -> None:
-    """One enemy city per region is chosen as the target of all attackers there.
+def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan,
+                     lost: frozenset[int] | set[int] = frozenset()) -> None:
+    """One enemy city per region is chosen as the target of all attackers there. A city
+    that was ours (`lost`, see AIController._note_losses) is taken back first.
 
     A region where we have no city counts too once our attackers have landed in it.
     """
@@ -161,6 +168,8 @@ def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan) -> None:
             seen = view.city_defenders_seen(memory)
             if seen is not None:
                 value += 4.0 if seen == 0 else -0.5 * seen
+            if memory.city_id in lost:
+                value += get("retake_bonus")
             return value
 
         target = max(targets, key=lambda m: (appeal(m), -m.city_id))
@@ -465,6 +474,8 @@ def _count_needs(view: PlayerView, know: Knowledge, plan: Plan, sites: int, jobs
     per_city *= 1.0 + personality.mood * bend("aggressive_attack") \
         - personality.ideology * bend("militarist_attack")
     wanted = math.ceil(len(know.cities) * max(0.0, per_city))
+    # Enemies who landed near our cities call for a counter-attack, war target or not.
+    wanted += math.ceil(plan.invaders * strategy("attackers_per_invader"))
     plan.attackers_wanted = max(0, wanted - attackers)
     plan.attackers_surplus = max(0, attackers - math.ceil(wanted * strategy("attackers_excess")))
 

@@ -42,6 +42,7 @@ class AIController:
         know = Knowledge(view)
 
         notes = diplomacy.review(view, know, self.memory)
+        self._note_losses(view)
         plan = strategic.make_plan(view, know, self.unit_missions, self.memory)
         plan.notes.extend(notes)
 
@@ -156,6 +157,25 @@ class AIController:
                 view.do(actions.Disband(unit.id))
                 plan.notes.append(f"disbanded {rules.units[unit.type].name} of {city.name}")
 
+    def _note_losses(self, view: PlayerView) -> None:
+        """Our cities an enemy took since our last turn are remembered for a while, as
+        [city id, turn]: taking them back comes first (strategic.py, overseas.py). A city is
+        forgotten once ours again, destroyed, or lost too long ago."""
+        foreign = {m.city_id for m in view.known_foreign_cities()}
+        keep = view.rules.ai.get("strategy", "retake_memory")
+        lost = [entry for entry in self.memory.get("lost_cities", [])
+                if entry[0] in foreign and view.turn - entry[1] <= keep]
+        known = {entry[0] for entry in lost}
+        if "my_cities" in self.memory:
+            ours = self.memory["my_cities"]
+        else:
+            # A game saved before this memory existed: the cities we founded will do.
+            ours = [city_id for city_id in sorted(foreign) if view.founded_by_me(city_id)]
+        for city_id in ours:
+            if city_id in foreign and city_id not in known:
+                lost.append([city_id, view.turn])
+        self.memory["lost_cities"] = lost
+
     # ── Observer information ──────────────────────────────────────────────────
 
     def _remember(self, view: PlayerView, know: Knowledge, plan: strategic.Plan) -> None:
@@ -165,6 +185,7 @@ class AIController:
         self.decisions = {cid: d for cid, d in self.decisions.items() if cid in alive_cities}
         self.memory["busy_work"] = [cid for cid in self.memory.get("busy_work", [])
                                     if cid in alive_cities]
+        self.memory["my_cities"] = sorted(alive_cities)
         self.debug = {
             "turn": view.turn,
             "needs": {

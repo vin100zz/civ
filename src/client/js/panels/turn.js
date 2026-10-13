@@ -2,6 +2,7 @@
 // still wait for orders, and how the cities are doing.
 
 import { store, U, emit, leader, turnsFor } from '../state.js';
+import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
 import { movesText } from './unitbar.js';
@@ -84,6 +85,31 @@ function decisionRows() {
   return decisions().map((d) => todo(d.text, d.detail, target[d.kind](d), d.glyph));
 }
 
+// The rates the server proposes to stop the treasury losing gold, for a tooltip.
+export function balanceText(balance) {
+  const [tax, luxury, science] = balance.rates;
+  const gold = balance.gold >= 0 ? `+${balance.gold}` : balance.gold;
+  return `Tax ${tax}% · Lux ${luxury}% · Sci ${science}%: ${gold} gold per turn`;
+}
+
+export function balanceButton(balance) {
+  return `<button class="btn small" data-balance title="${balanceText(balance)}">${balance.gold >= 0 ? 'Balance' : 'Raise taxes'}</button>`;
+}
+
+export function applyBalance(balance) {
+  const [tax, luxury, science] = balance.rates;
+  send({ cmd: 'action', action: 'rates', tax, luxury, science });
+}
+
+// The treasury is about to sell a building: where, and the rates that would avoid it.
+function treasuryRow(alert, me) {
+  return `<div class="alert treasury ${alert.level}">
+    <button class="alert-main" data-x="${alert.x}" data-y="${alert.y}">
+      <span class="mark">${icon('coin', 18)}</span>
+      <span class="body"><b>${alert.text}</b><span>${alert.detail}</span></span></button>
+    ${me.balance ? balanceButton(me.balance) : ''}</div>`;
+}
+
 // What is worth a look but does not hold the turn.
 function adviceRows(me) {
   const rows = [];
@@ -113,7 +139,7 @@ export function renderTurn(container) {
 
   const toDecide = decisionRows();
   const advice = adviceRows(me);
-  const alerts = (state.alerts || []).map((alert) => `
+  const alerts = (state.alerts || []).map((alert) => alert.kind === 'treasury' ? treasuryRow(alert, me) : `
     <button class="alert" data-x="${alert.x}" data-y="${alert.y}">
       <span class="mark">${icon('alert', 18)}</span><span class="body"><b>${alert.text}</b></span>
       <span class="link">Show</span></button>`);
@@ -167,6 +193,8 @@ export function renderTurn(container) {
   container.querySelectorAll('[data-proposal]').forEach((row) => {
     row.addEventListener('click', () => emit('open-proposal', Number(row.dataset.proposal)));
   });
+  const balance = container.querySelector('[data-balance]');
+  if (balance) balance.addEventListener('click', () => applyBalance(me.balance));
   const research = container.querySelector('[data-research]');
   if (research) research.addEventListener('click', () => emit('open-research'));
   container.querySelectorAll('[data-empire]').forEach((row) => {

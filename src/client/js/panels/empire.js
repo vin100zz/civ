@@ -5,6 +5,7 @@ import { store, emit, player, leader, plural, inkOn } from '../state.js';
 import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { governmentName } from './civs.js';
+import { balanceButton, applyBalance } from './turn.js';
 
 const RATES = [['tax', 'Tax', 'var(--trade)'], ['luxury', 'Luxury', '#C79BF2'], ['science', 'Science', 'var(--sci)']];
 // When a rate moves, the others give or take in this order.
@@ -46,8 +47,10 @@ function budget(me) {
         <button data-rate="${kind}" data-delta="10" aria-label="${label} up 10%" ${shifted(me, kind, 10) ? '' : 'disabled'}>${icon('plus', 14, 2)}</button>
       </span></div>`;
   });
+  // The treasury loses gold: the rates that would stop it, one click away.
+  const fix = me.balance ? `<div class="rates-fix"><span class="bad">${me.forecast.gold} gold per turn</span>${balanceButton(me.balance)}</div>` : '';
   return `${heading('Budget', `no rate above ${me.max_rate}% under ${governmentName(me.government)}`)}
-    <div class="rates">${rows.join('')}</div>`;
+    <div class="rates">${rows.join('')}${fix}</div>`;
 }
 
 function government(me) {
@@ -98,6 +101,8 @@ function renderOwn(container, me) {
   container.querySelectorAll('[data-revolution]').forEach((button) => {
     button.addEventListener('click', () => act('revolution', { government: button.dataset.revolution }));
   });
+  const balance = container.querySelector('[data-balance]');
+  if (balance) balance.addEventListener('click', () => applyBalance(me.balance));
   const launch = container.querySelector('[data-launch]');
   if (launch) launch.addEventListener('click', () => act('launch'));
 }

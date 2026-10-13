@@ -1,10 +1,12 @@
-"""Defenders: reach the city they are assigned to and dig in."""
+"""Defenders: reach the city they are assigned to and dig in, or strike an invader they
+are likely to beat."""
 from __future__ import annotations
 
 from ...engine import actions
 from ...engine.model.entities import Unit
 from .. import missions as M
 from ..missions import Mission
+from . import attacker
 from .common import Context, alive, embark, enemies_adjacent, fortify, go_home, go_to, step_to
 
 
@@ -12,6 +14,9 @@ def act(ctx: Context, unit: Unit, mission: Mission | None) -> None:
     view = ctx.view
     if mission is not None and mission.kind == M.EMBARK:
         embark(ctx, unit, mission)
+        return
+    if mission is not None and mission.kind == M.ATTACK_UNIT:
+        attacker.hunt(ctx, unit, mission)
         return
     if mission is None or mission.kind != M.DEFEND:
         go_home(ctx, unit)

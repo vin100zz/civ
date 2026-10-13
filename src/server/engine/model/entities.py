@@ -173,6 +173,8 @@ class Player:
     destroyed_turn: Optional[int] = None
     spaceship: Spaceship = field(default_factory=Spaceship)
     level: Optional[str] = None             # difficulty level of a human player (game.yaml)
+    # Peace treaties this civilization broke by declaring war: [victim, turn, treaty age].
+    broken_treaties: list[list[int]] = field(default_factory=list)
     # last turn totals, for display and for the AI
     income: int = 0
     expenses: int = 0

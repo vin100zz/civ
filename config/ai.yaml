@@ -27,12 +27,17 @@ strategy:
   attackers_excess: 1.5           # idle attackers beyond wanted x this are disbanded
   target_distance_weight: 0.5     # how much distance reduces the appeal of a target city
   siege_group_size: 3             # attackers gathered before assaulting a city
+  # Counter-attack
+  attackers_per_invader: 1.0      # attack units wanted per enemy unit seen on our land, near a city
+  retake_bonus: 4.0               # appeal of an enemy city that was ours (a target, an invasion)
+  retake_memory: 80               # turns a lost city is remembered as ours to take back
   # Missions
   mission_stickiness: 1.5         # bonus for keeping last turn's mission
   mission_distance_scale: 6       # a mission this many steps away is worth half
   fit_defense_explore: 0.6        # how well a defensive unit does as an explorer
   fit_attack_defend: 0.5          # how well an attack unit does as a city defender
   fit_attack_explore: 0.8
+  fit_defense_attack: 0.5         # how well a defensive unit hunts an invader (when its odds are good)
 
 overseas:
   # Seas
@@ -48,6 +53,7 @@ overseas:
   invade_group: 4                 # attackers wanted aboard for an invasion
   invade_min_group: 2
   invade_strength_ratio: 1.2      # own strength / theirs needed to invade
+  invade_retake_ratio: 0.6        # the same, to take back a city that was ours
   invade_distance_weight: 0.3     # how much distance reduces the appeal of a target city
   # Navy and air force
   navy_per_port: 0.34             # warships wanted per port when there is an enemy at sea
@@ -143,6 +149,17 @@ diplomacy:
   weaker_ratio: 1.2               # they are "stronger" above this power ratio
   stronger_ratio: 1.5             # we are "stronger" above this power ratio
   peace_unreachable: 0.2          # added when we know none of their cities
+  # Broken treaties (a declaration of war breaks one): trust comes back slowly.
+  distrust_memory: 60             # turns until a broken treaty is forgotten (it fades linearly)
+  distrust_perfidy_turns: 16      # a treaty broken this soon after its signature counts double
+  distrust_rumour: 0.35           # weight of a treaty broken with another civilization we know
+  distrust_peace: 0.4             # peace willingness lost per broken treaty
+  distrust_war: 0.04              # chance of war per turn added per broken treaty
+  # A civilization much stronger than any other: the others close ranks against it.
+  dominance_ratio: 1.6            # its known power / the next strongest one (ours included)
+  coalition_peace: 0.3            # less peace with it; more with the others at war with it
+  coalition_war: 0.04             # chance of war on it added per turn
+  coalition_strength_ratio: 1.0   # (own + its other enemies' power) / its power needed for war
 
 military:
   attack_min_odds: 0.45           # minimum chance to win before attacking a unit

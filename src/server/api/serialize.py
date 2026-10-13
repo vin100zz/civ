@@ -224,6 +224,8 @@ def own_detail(view: PlayerView, game: Game) -> dict[str, Any]:
     detail.update({
         # What the next turn should bring with the rates as they are now.
         "forecast": {"gold": gold, "science": science, "disorder": disorder},
+        # Rates that would stop the treasury losing gold, when it does.
+        "balance": report.balancing_rates(view) if gold < 0 else None,
         "governments": view.available_governments(),
         "max_rate": government.max_rate,
         "senate": government.senate,

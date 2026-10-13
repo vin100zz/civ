@@ -205,6 +205,8 @@ function refreshPlayBar() {
   const me = store.state.me;
   if (leader() === null || !me) return;
   const gold = me.forecast.gold;
+  // A building is about to be sold for want of gold (human/report.py).
+  const treasury = (store.state.alerts || []).find((alert) => alert.kind === 'treasury');
   const turns = me.researching
     ? turnsFor(me.research_cost + 1 - me.research_progress, me.forecast.science) : null;
   const progress = me.research_cost ? Math.min(100, 100 * me.research_progress / me.research_cost) : 0;
@@ -220,8 +222,8 @@ function refreshPlayBar() {
   $('empire-chips').innerHTML = `
     <button class="chip-btn${anarchy ? ' anarchy' : ''}" data-chip="empire" title="Government">
       <span>${icon('crown', 17)}</span><b>${governmentName(me.government)}</b>${turnsLeft > 0 ? `<span>${plural(turnsLeft, 'turn')}</span>` : ''}</button>
-    <button class="chip-btn" data-chip="empire" title="Treasury, and what the next turn should bring">
-      <span class="trade">${icon('coin', 17)}</span><b class="num">${me.gold}</b><span class="muted">gold</span>
+    <button class="chip-btn${treasury ? ` alarm ${treasury.level}` : ''}" data-chip="empire" title="${treasury ? `${treasury.text} · ${treasury.detail}` : 'Treasury, and what the next turn should bring'}">
+      <span class="trade">${icon(treasury ? 'alert' : 'coin', 17)}</span><b class="num">${me.gold}</b><span class="muted">gold</span>
       <span class="${gold < 0 ? 'bad' : 'soft'}">${gold >= 0 ? '+' : ''}${gold}</span></button>
     ${research}
     <button class="chip-btn split" data-chip="empire" title="Share of trade going to taxes, luxuries and science">
@@ -337,7 +339,9 @@ function openTurn(message) {
   const carried = play.carry || [];
   play.carry = null;
   clearToasts();
-  for (const alert of state.alerts || []) toast({ text: alert.text, tone: 'bad', x: alert.x, y: alert.y });
+  for (const alert of state.alerts || []) {
+    toast({ text: alert.text, detail: alert.detail || '', tone: 'bad', x: alert.x, y: alert.y });
+  }
   for (const note of state.notes || []) toast({ text: note.text, tone: 'info', x: note.x, y: note.y });
   announce(carried, true);
   announce(message.events, true);

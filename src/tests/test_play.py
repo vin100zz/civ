@@ -515,3 +515,33 @@ def test_alerts(rules):
     alerts = report.alerts(view)
     assert [a["kind"] for a in alerts] == ["threat"]
     assert alerts[0]["text"] == f"2 Greek Legion near {city.name}" and alerts[0]["city"] == city.id
+
+
+def test_the_treasury_warns_before_a_building_is_sold(rules):
+    game = make_game(rules, relation=PEACE, patches={(x, 5): "ocean" for x in range(16)})
+    city = add_city(game, 1, 6, 6, size=5)
+    city.buildings.update({"temple", "barracks"})
+    player = game.players[1]
+    player.gold = 100                                       # nothing sold at the start of the turn
+    controller, view = lead(game)
+    city.size = 5
+    city.specialists = {"entertainer": 0, "taxman": 0, "scientist": 0}
+    city_rules.set_worked(game, city, [(dx, -1) for dx in (-2, -1, 0, 1, 2)])  # the sea's trade
+    player.tax_rate, player.luxury_rate, player.science_rate = 0, 40, 60
+    forecast, _, _ = view.budget_with_rates(0, 40, 60)
+    assert forecast < 0
+    assert report.treasury_alert(view) is None              # the treasury holds for a while
+
+    player.gold = 0
+    alert = report.alerts(view)[0]
+    assert alert["kind"] == "treasury" and alert["level"] == "bad" and alert["turns"] == 1
+    assert alert["building"] == "barracks" and alert["city"] == city.id
+    assert alert["detail"] == f"{city.name} would sell its Barracks"
+
+    balance = report.balancing_rates(view)
+    assert serialize.own_detail(view, game)["balance"] == balance
+    tax, luxury, science = balance["rates"]
+    assert tax > 0 and luxury == 40 and balance["gold"] >= 0, "science gives way first"
+    assert view.do(actions.SetRates(tax, luxury, science))
+    assert report.treasury_alert(view) is None
+    assert serialize.own_detail(view, game)["balance"] is None
