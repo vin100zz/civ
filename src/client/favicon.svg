@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- A gold temple on the page background colour, so the header shows the temple alone.
+       Bars and columns sit on whole pixels at 16 px (4 units per pixel). -->
+  <rect width="64" height="64" rx="13" fill="#0B0E13"/>
+  <g fill="#E2B659">
+    <path d="M8 18L32 5L56 18Z"/>
+    <rect x="10" y="20" width="44" height="4"/>
+    <rect x="12" y="28" width="4" height="16"/>
+    <rect x="24" y="28" width="4" height="16"/>
+    <rect x="36" y="28" width="4" height="16"/>
+    <rect x="48" y="28" width="4" height="16"/>
+    <rect x="8" y="48" width="48" height="4"/>
+    <rect x="4" y="52" width="56" height="4"/>
+  </g>
+  <path d="M21 15.3L32 9.3L43 15.3Z" fill="#0B0E13"/>
+</svg>

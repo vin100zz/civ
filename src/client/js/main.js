@@ -198,7 +198,6 @@ function syncMode() {
   } else {
     pill.textContent = 'Observer';
   }
-  document.title = me !== null ? `Civilization — ${player(me).nation}` : 'Civilization — observer';
 }
 
 function refreshPlayBar() {

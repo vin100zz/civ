@@ -269,7 +269,7 @@ button.chip:hover { border-color: var(--line-3); }
 }
 
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { color: var(--gold); }
+.brand-mark { flex: none; }
 .brand-name { font-size: 13px; font-weight: 600; letter-spacing: 0.22em; }
 .vr { width: 1px; height: 24px; background: var(--line); flex: none; }
 
