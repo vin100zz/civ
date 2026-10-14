@@ -38,6 +38,19 @@ export function trimmedSprite(folder, name, afloat) {
   return trimmed.get(key);
 }
 
+// How a unit sits on its card, the same on the map and in every panel: the cut sprite fits a
+// box this many times the card's width and height, centred on the card. A wide unit (a ship,
+// a plane, a tank) spills a little over the sides of its card, a standing one keeps within
+// its height.
+export const UNIT_FIT = { width: 1.18, height: 0.96 };
+
+// A unit's picture for a card in the panels (the panel draws the card, class `unit-pic` in
+// style.css centres the picture on it).
+export function unitImage(definition) {
+  return `<img class="unit-pic" src="${unitPicture(definition)}" alt=""`
+    + ` style="width:${UNIT_FIT.width * 100}%;height:${UNIT_FIT.height * 100}%">`;
+}
+
 // The same cut sprite for an <img> in the panels. Until it is ready this gives the image as
 // it is, and the load handler runs once it is, so the panels can show it again.
 const pictures = new Map();  // sprite name -> object URL, or null while it is being made

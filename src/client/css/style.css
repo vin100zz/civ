@@ -530,10 +530,9 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 #unit-bar.idle .btn { margin-left: auto; }
 #unit-bar .mark { display: flex; color: var(--mute); }
 #unit-bar .mark.good { color: var(--good); }
-.unit-portrait { width: 36px; height: 36px; border-radius: 9px; border: 1.5px solid var(--bg); display: grid; place-items: center; flex: none; }
-.unit-portrait img { width: 92%; height: 86%; object-fit: contain; }
+.unit-portrait { position: relative; width: 36px; height: 36px; border-radius: 22%; border: 1.5px solid var(--bg); flex: none; }
 .unit-who { display: flex; align-items: center; gap: 10px; min-width: 156px; max-width: 280px; flex: none; }
-.unit-who .unit-portrait { width: 40px; height: 40px; border-radius: 10px; border-width: 2px; box-shadow: 0 0 0 2px var(--gold); }
+.unit-who .unit-portrait { width: 40px; height: 40px; border-width: 2px; box-shadow: 0 0 0 2px var(--gold); }
 .unit-who .titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .unit-who h2 { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; }
 .unit-who .vet { display: flex; color: var(--gold); }
@@ -566,11 +565,10 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .unit-turn .queue { font-family: var(--mono); font-size: 12px; color: var(--mute); padding: 0 5px 0 1px; white-space: nowrap; }
 /* The other units of the tile, in the colour of their civilization, a badge for what they do. */
 .mates { display: flex; align-items: center; gap: 5px; flex: none; }
-.mate { position: relative; width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--bg); display: grid; place-items: center; }
+.mate { position: relative; width: 32px; height: 32px; border-radius: 22%; border: 1.5px solid var(--bg); display: grid; place-items: center; }
 .mate:hover { box-shadow: 0 0 0 1.5px var(--line-3); }
-.mate img { width: 90%; height: 84%; object-fit: contain; }
-.mate.spent img { opacity: 0.5; }
-.mate .badge { position: absolute; right: -5px; bottom: -5px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid #3A4556; color: var(--soft); display: grid; place-items: center; }
+.mate.spent .unit-pic { opacity: 0.5; }
+.mate .badge { position: absolute; z-index: 1; right: -5px; bottom: -5px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 1px solid #3A4556; color: var(--soft); display: grid; place-items: center; }
 .mate.more { width: auto; padding: 0 7px; border-color: var(--line); background: var(--raise); font-size: 12px; font-weight: 600; color: var(--soft); }
 
 /* Picking a destination. */
@@ -857,9 +855,8 @@ body.play #notice { bottom: auto; top: 72px; }
 #panel-cities .mood { width: 20px; flex: none; display: flex; justify-content: flex-end; }
 /* Room for the veteran dot, taken back by the margin so the rows keep the height of the others. */
 #panel-cities .units { flex: 1; min-width: 0; padding: 3px 0 3px 3px; margin: -3px 0; display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: 12px; }
-#panel-cities .units .unit-card { width: 22px; height: 22px; border-radius: 5px; }
+#panel-cities .units .unit-card { width: 22px; height: 22px; }
 #panel-cities .units .unit-card.fortified { border-width: 2px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8); }
-#panel-cities .units .unit-card.sentry::after { border-radius: 3px; }
 #panel-cities .units .unit-card .vet { left: -3px; top: -3px; width: 7px; height: 7px; }
 /* A tooltip that only names what is under the pointer. */
 #panel-tip:has(> .tip-name:only-child) { width: auto; padding: 7px 11px; }
@@ -1076,11 +1073,13 @@ body.play #notice { bottom: auto; top: 72px; }
 
 /* Units drawn as on the map: a heavy outline when fortified, greyed and hatched on sentry. */
 .unit-tray { display: flex; gap: 10px; flex-wrap: wrap; padding: 9px; border-radius: 12px; background: var(--hover); }
-.unit-card { position: relative; width: 40px; height: 40px; border-radius: 7px; border: 1.5px solid var(--bg); display: grid; place-items: center; flex: none; }
-.unit-card img { width: 92%; height: 86%; object-fit: contain; }
+/* A unit's picture on its card (unitImage in sprites.js): centred, a wide unit spilling over
+   the sides as on the map. */
+.unit-pic { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: none; object-fit: contain; pointer-events: none; }
+.unit-card { position: relative; width: 40px; height: 40px; border-radius: 22%; border: 1.5px solid var(--bg); display: grid; place-items: center; flex: none; }
 .unit-card.fortified { border-width: 3px; box-shadow: 0 0 0 2px var(--bg), inset 0 0 0 1.5px rgba(255, 255, 255, 0.8); }
-.unit-card.sentry img { position: relative; z-index: 1; filter: grayscale(1); opacity: 0.85; }
-.unit-card.sentry::after { content: ""; position: absolute; inset: 0; border-radius: 5px; background: repeating-linear-gradient(135deg, rgba(11, 14, 19, 0.34) 0 1.5px, rgba(11, 14, 19, 0) 1.5px 5px), rgba(92, 100, 112, 0.52); }
+.unit-card.sentry .unit-pic { z-index: 1; filter: grayscale(1); opacity: 0.85; }
+.unit-card.sentry::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(135deg, rgba(11, 14, 19, 0.34) 0 1.5px, rgba(11, 14, 19, 0) 1.5px 5px), rgba(92, 100, 112, 0.52); }
 .unit-card .mark { position: absolute; left: 2px; bottom: 0; z-index: 1; font-size: 11px; font-weight: 700; line-height: 1; color: #FFFFFF; text-shadow: -1px 0 var(--bg), 1px 0 var(--bg), 0 -1px var(--bg), 0 1px var(--bg); }
 .unit-card .mark small { margin-left: 1px; font-size: 9px; font-weight: 700; }
 .unit-card .mark.task { left: auto; right: 2px; }
@@ -1088,7 +1087,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-card .count { position: absolute; right: -7px; top: -7px; z-index: 1; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--bg); border: 1px solid rgba(233, 236, 241, 0.85); color: #FFFFFF; font-size: 11px; font-weight: 700; line-height: 1; display: grid; place-items: center; }
 button.unit-card { cursor: pointer; }
 button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
-.unit-card.small, .tip-title > span.unit-card:first-child { display: grid; width: 28px; height: 28px; border-radius: 6px; }
+.unit-card.small, .tip-title > span.unit-card:first-child { display: grid; width: 28px; height: 28px; }
 /* A supported unit and, under it, what it costs its city each turn. */
 .unit-slot { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 40px; }
 .unit-slot .pips { display: flex; align-items: center; gap: 4px; height: 12px; }
@@ -1116,8 +1115,7 @@ button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .card.making .big { font-size: 18px; line-height: 1.2; }
 .making-head { display: flex; align-items: center; gap: 12px; }
 .making-head .titles { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.making-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--hover); color: var(--soft); }
-.making-icon img { width: 92%; height: 86%; object-fit: contain; }
+.making-icon { position: relative; width: 36px; height: 36px; border-radius: 22%; display: grid; place-items: center; flex: none; background: var(--hover); color: var(--soft); }
 .progress-row { display: flex; align-items: center; gap: 14px; }
 
 /* A stock filling up, in three shades: what is there, what the next turn brings, the rest. */
@@ -1187,8 +1185,7 @@ button.specialist:hover { background: var(--hover); }
 .queue-chip b { font-size: 13px; font-weight: 600; white-space: nowrap; }
 .queue-chip .count { font-size: 12px; font-weight: 700; color: var(--gold); }
 .queue-chip .when { min-width: 22px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--raise); color: var(--soft); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
-.queue-pic { width: 20px; height: 18px; border-radius: 5px; display: grid; place-items: center; flex: none; }
-.queue-pic img { width: 92%; height: 86%; object-fit: contain; }
+.queue-pic { position: relative; width: 20px; height: 20px; border-radius: 22%; flex: none; }
 .queue-glyph { display: flex; color: var(--soft); }
 .queue-drop { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--mute); opacity: 0.6; }
 .queue-chip:hover .queue-drop { opacity: 1; }

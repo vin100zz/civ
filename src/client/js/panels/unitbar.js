@@ -9,7 +9,7 @@ import {
   play, activeUnit, queue, give, keyOf, wait, skip, activate, endTurn, pendingDecisions, whyNotEnd,
 } from '../play.js';
 import { replaying, skipReplay } from '../replay.js';
-import { unitPicture } from '../renderer/sprites.js';
+import { unitImage } from '../renderer/sprites.js';
 
 // Order id -> [label, icon].
 const LOOK = {
@@ -62,7 +62,7 @@ function shortKey(key) {
 function portrait(unit) {
   const definition = store.unitDefs[unit[U.TYPE]];
   return `<span class="unit-portrait" style="background:${player(unit[U.OWNER]).color}">
-    <img src="${unitPicture(definition)}" alt=""></span>`;
+    ${unitImage(definition)}</span>`;
 }
 
 function orderButton(order, tips) {
@@ -103,7 +103,7 @@ function mate(unit, tips) {
   const spent = !glyph && !(unit[U.MOVES] > 0);
   return `<button class="mate${spent ? ' spent' : ''}" data-unit="${unit[U.ID]}" data-tip="${key}"
       aria-label="${definition.name} — ${state}" style="background:${player(unit[U.OWNER]).color}">
-    <img src="${unitPicture(definition)}" alt="">${glyph ? `<span class="badge">${icon(glyph, 10, 2.2)}</span>` : ''}</button>`;
+    ${unitImage(definition)}${glyph ? `<span class="badge">${icon(glyph, 10, 2.2)}</span>` : ''}</button>`;
 }
 
 function stat(glyph, value, tip, key, tips) {

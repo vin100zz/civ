@@ -6,7 +6,7 @@ import { send } from '../net.js';
 import { icon } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
 import { movesText } from './unitbar.js';
-import { unitPicture } from '../renderer/sprites.js';
+import { unitImage } from '../renderer/sprites.js';
 
 // The columns of the city table after its production: [field, icon, class, title].
 const COLUMNS = [
@@ -156,7 +156,7 @@ export function renderTurn(container) {
     const place = !near ? '' : near.distance === 0 ? `In ${near.city.name}` : `Near ${near.city.name}`;
     const on = unit[U.ID] === play.unit;
     return `<button class="unit-row${on ? ' on' : ''}" data-unit="${unit[U.ID]}">
-      <span class="unit-portrait" style="background:${me.color}"><img src="${unitPicture(definition)}" alt=""></span>
+      <span class="unit-portrait" style="background:${me.color}">${unitImage(definition)}</span>
       <span class="body"><b>${definition.name}${unit[U.VETERAN] ? ' <small>veteran</small>' : ''}</b>
         ${place ? `<span>${place}</span>` : ''}</span>
       ${on ? '<span class="state">Active</span>' : `<span class="sub">${movesText(unit[U.MOVES])}</span>`}</button>`;

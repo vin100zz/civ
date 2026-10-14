@@ -5,7 +5,7 @@
 import { store, U, emit, leader, player, tileIndex, turnsFor } from '../state.js';
 import { icon } from '../icons.js';
 import { setTips } from '../tips.js';
-import { unitPicture } from '../renderer/sprites.js';
+import { unitImage } from '../renderer/sprites.js';
 
 // The tabs: their colour, the buildings that serve them [id, header] and their wonders.
 // 'power' stands for the Power, Hydro and Nuclear Plants, which all do the same for a factory.
@@ -223,7 +223,7 @@ function militaryWidget(city, color) {
     if (order === 'fortified' || order === 'fortify') classes.push('fortified');
     if (order === 'sentry') classes.push('sentry');
     return `<span class="${classes.join(' ')}" style="background:${color}" title="${definition.name}${unit[U.VETERAN] ? ', veteran' : ''}">
-      <img src="${unitPicture(definition)}" alt="">${unit[U.VETERAN] ? '<i class="vet"></i>' : ''}</span>`;
+      ${unitImage(definition)}${unit[U.VETERAN] ? '<i class="vet"></i>' : ''}</span>`;
   });
   return `<span class="units">${cards.join('') || '<span class="faint">None</span>'}</span>`
     + fig(34, num(city.units_away, city.units_away ? 'soft' : 'faint', true));

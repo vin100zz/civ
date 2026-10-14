@@ -2,7 +2,7 @@
 // with drag to pan and wheel to zoom. The world wraps horizontally.
 
 import { F, U, store, tileIndex, player, leader, emit, inkOn, swatch } from '../state.js';
-import { sprite, trimmedSprite } from './sprites.js';
+import { sprite, trimmedSprite, UNIT_FIT } from './sprites.js';
 import { Ground } from './ground.js';
 
 const MIN_TILE = 10;
@@ -1196,11 +1196,10 @@ export class MapView {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.stroke();
     }
-    // The unit itself, over its card and as big as the tile allows: a wide one (a ship, a
-    // plane, a tank) spills over the sides of the card, a standing one fills its height.
+    // The unit itself, over its card, sized as in the panels (UNIT_FIT).
     const image = trimmedSprite('unit', definition.sprite, definition.domain === 'sea');
     if (image && size >= 14) {
-      const scale = Math.min(size * 0.94 / image.width, box * 1.06 / image.height);
+      const scale = Math.min(box * UNIT_FIT.width / image.width, box * UNIT_FIT.height / image.height);
       const w = image.width * scale;
       const h = image.height * scale;
       ctx.save();
