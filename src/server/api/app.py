@@ -34,6 +34,7 @@ def create_app(config_dir: Path | None = None, saves_dir: Path | None = None) ->
         task = asyncio.create_task(app.state.session.run())
         yield
         task.cancel()
+        await app.state.session.flush()     # a save being written is finished
 
     app = FastAPI(title="Civilization", lifespan=lifespan)
 

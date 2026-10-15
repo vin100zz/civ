@@ -133,7 +133,7 @@ export function resetGameDialog() {
 export function openGameDialog(focus) {
   const dialog = $('game-dialog');
   choice.tab = focus === 'save' ? 'saves' : 'new';
-  if (store.state) $('save-name').value = `seed${store.state.seed}-turn${store.state.turn}`;
+  if (store.state) $('save-name').value = store.saveName || `seed${store.state.seed}-turn${store.state.turn}`;
   setDialogStatus(`Map ${store.map.width} × ${store.map.height} · a new or loaded game replaces the current one.`);
   refreshChoices();
   show(dialog);

@@ -81,6 +81,11 @@ export function icon(name, size = 18, stroke = 1.75) {
     + `aria-hidden="true">${PATHS[name] || ''}</svg>`;
 }
 
+// The gold chevrons of a veteran, after a unit's name, as in the unit bar.
+export function vetMark(size = 14) {
+  return `<span class="vet-mark" role="img" aria-label="veteran" title="Veteran">${icon('rank', size, 2)}</span>`;
+}
+
 // Fills every static element marked data-icon="name" (index.html) with its icon.
 export function mountIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach((element) => {

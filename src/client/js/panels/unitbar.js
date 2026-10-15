@@ -3,7 +3,7 @@
 // the other units on its tile and the turn buttons. Without a unit, how the turn stands.
 
 import { store, U, player, leader, plural } from '../state.js';
-import { icon } from '../icons.js';
+import { icon, vetMark } from '../icons.js';
 import { setTips } from '../tips.js';
 import {
   play, activeUnit, queue, give, keyOf, wait, skip, activate, endTurn, pendingDecisions, whyNotEnd,
@@ -98,7 +98,7 @@ function mate(unit, tips) {
   const definition = store.unitDefs[unit[U.TYPE]];
   const [state, glyph] = mateState(unit);
   const key = `unit:${unit[U.ID]}`;
-  tips.set(key, `<div class="tip-name">${definition.name}${unit[U.VETERAN] ? ' · Veteran' : ''}
+  tips.set(key, `<div class="tip-name">${definition.name}${unit[U.VETERAN] ? vetMark() : ''}
     <small>${state}</small></div>`);
   const spent = !glyph && !(unit[U.MOVES] > 0);
   return `<button class="mate${spent ? ' spent' : ''}" data-unit="${unit[U.ID]}" data-tip="${key}"

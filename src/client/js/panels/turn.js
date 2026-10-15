@@ -3,7 +3,7 @@
 
 import { store, U, emit, leader, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
-import { icon } from '../icons.js';
+import { icon, vetMark } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
 import { movesText } from './unitbar.js';
 import { unitImage } from '../renderer/sprites.js';
@@ -157,7 +157,7 @@ export function renderTurn(container) {
     const on = unit[U.ID] === play.unit;
     return `<button class="unit-row${on ? ' on' : ''}" data-unit="${unit[U.ID]}">
       <span class="unit-portrait" style="background:${me.color}">${unitImage(definition)}</span>
-      <span class="body"><b>${definition.name}${unit[U.VETERAN] ? ' <small>veteran</small>' : ''}</b>
+      <span class="body"><b>${definition.name}${unit[U.VETERAN] ? vetMark() : ''}</b>
         ${place ? `<span>${place}</span>` : ''}</span>
       ${on ? '<span class="state">Active</span>' : `<span class="sub">${movesText(unit[U.MOVES])}</span>`}</button>`;
   });

@@ -9,7 +9,10 @@ includes the steps the units take in its sight: its own, and those of the others
 play, which the browser shows one after the other.
 
 Turns are played in a worker thread, so the web server stays responsive. The session also
-saves the game to the `saves` folder and loads it back.
+saves the game to the `saves` folder and loads it back. A played game saves itself every few
+turns under the name it was loaded or saved under; the save it replaces is kept as
+`name-<its year>`, and the backup before that one goes. Only the copy of the game holds the
+others up: the files are written, renamed and deleted in the background.
 """
 from __future__ import annotations
 
@@ -40,8 +43,20 @@ MAX_LOG = 600
 HISTORY_FIELDS = ("cities", "population", "techs", "score", "gold", "units")
 DEFAULT_SAVES_DIR = PROJECT_ROOT / "saves"
 SAVE_NAME = re.compile(r"[A-Za-z0-9_-]{1,40}")
-AUTOSAVE = "autosave"
+SAVED_NAME = re.compile(r"[A-Za-z0-9_-]{1,48}")    # a backup adds the year to the name
+AUTOSAVE = "autosave"                          # where a game that has no name yet saves itself
 AUTOSAVE_EVERY = 5                             # turns between two automatic saves of a played game
+
+
+def year_tag(year: int) -> str:
+    """The year of the game a backup holds, as its name ends: 1915, 3000BC."""
+    return f"{-year}BC" if year < 0 else str(year)
+
+
+def base_name(name: str, year: int) -> str:
+    """The name a loaded game goes on saving itself under: that of the game, for a backup."""
+    suffix = f"-{year_tag(year)}"
+    return name[:-len(suffix)] if name.endswith(suffix) and len(name) > len(suffix) else name
 
 
 class Session:
@@ -59,6 +74,8 @@ class Session:
         self._events_read = 0                  # events of game.events already in the logs
         self._known = bytearray()              # tiles the person's browser already holds
         self._steps: list[dict] = []           # steps the person saw since its last order
+        self.save_name: Optional[str] = None   # the name the game was loaded or saved under
+        self._writing: Optional[asyncio.Task] = None    # the last save asked for
         self._busy = asyncio.Lock()
         self.new_game(random.randrange(1, 100000))
 
@@ -99,6 +116,7 @@ class Session:
         self.playing = False
         self.game = create_game(self.rules, seed, player_count=players,
                                 map_settings=map_settings, human_civ=civ, level=level)
+        self.save_name = None
         self._reset(humans=[p.id for p in self.game.players if turn.is_interactive(self.game, p)])
         self.history = [self._history_row()]
         if self.in_play():
@@ -156,20 +174,93 @@ class Session:
     def saved_games(self) -> list[str]:
         if not self.saves_dir.is_dir():
             return []
-        files = sorted(self.saves_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-        return [f.stem for f in files if SAVE_NAME.fullmatch(f.stem)]
+        files = []
+        for path in self.saves_dir.glob("*.json"):
+            try:
+                files.append((path.stat().st_mtime, path.stem))
+            except OSError:
+                continue                       # just renamed or deleted by a save being written
+        return [stem for _, stem in sorted(files, reverse=True) if SAVED_NAME.fullmatch(stem)]
+
+    def _path(self, name: str) -> Path:
+        return self.saves_dir / f"{name}.json"
 
     def save(self, name: str) -> None:
-        """Writes the game, with the charts and the logs."""
-        persistence.save_game(self.game, self.saves_dir / f"{name}.json",
-                              extra={"history": self.history, "log": list(self.log),
-                                     "heard": list(self.heard)})
+        """Writes the game, with the charts and the logs (what `_save` does in two steps)."""
+        self._write(name, *self._snapshot())
+
+    def _snapshot(self) -> tuple[str, dict[str, int]]:
+        """The game as the text of its save, and the turn it is at."""
+        game = self.game
+        text = persistence.dump_game(game, extra={"history": self.history, "log": list(self.log),
+                                                  "heard": list(self.heard)})
+        return text, {"seed": game.seed, "turn": game.turn, "year": game.year}
+
+    def _write(self, name: str, text: str, moment: dict[str, int]) -> None:
+        """Writes a save over the one of that name, which is kept as `name-<its year>`
+        (unless it holds the same turn of the same game); the backup before it goes."""
+        path = self._path(name)
+        if not path.exists():
+            persistence.write_save(path, text)
+            return
+        previous = persistence.save_header(path)
+        if previous is None:                   # not a game this one can date: set aside as is
+            persistence.write_save(path, text, keep=self._path(f"{name}-old"))
+        elif (previous["seed"], previous["turn"]) == (moment["seed"], moment["turn"]):
+            persistence.write_save(path, text)  # the same turn again: the backup stays
+        else:
+            keep = self._path(f"{name}-{year_tag(previous['year'])}")
+            persistence.write_save(path, text, keep)
+            for backup in self._backups(name):
+                if backup != keep:
+                    backup.unlink(missing_ok=True)
+
+    def _backups(self, name: str) -> list[Path]:
+        """The backups of a save: the files `name-<year>` holding the game of that year."""
+        backups = []
+        for path in self.saves_dir.glob(f"{name}-*.json"):
+            header = persistence.save_header(path)
+            if header is not None and path.stem == f"{name}-{year_tag(header['year'])}":
+                backups.append(path)
+        return backups
+
+    async def _save(self, name: str, client: Optional[WebSocket] = None) -> None:
+        """Saves the game; the caller holds `_busy`. Only the copy of the game is waited
+        for: the files are written after the saves asked for before, in the background."""
+        text, moment = await asyncio.to_thread(self._snapshot)
+        self._writing = asyncio.create_task(self._store(self._writing, name, text, moment, client))
+
+    async def _store(self, previous: Optional[asyncio.Task], name: str, text: str,
+                     moment: dict[str, int], client: Optional[WebSocket]) -> None:
+        if previous is not None:
+            await asyncio.wait([previous])
+        try:
+            await asyncio.to_thread(self._write, name, text, moment)
+        except OSError as error:
+            notice = {"type": "notice", "text": f"Cannot save {name}: {error}", "ok": False}
+            if client is not None:
+                await self._send(client, notice)
+            else:
+                await self._broadcast(lambda pov: notice)
+            return
+        if client is not None:
+            await self._notice(client, f"Game saved as {name}.", True)
+        await self._broadcast(lambda pov: self._saves_message())
+
+    async def flush(self) -> None:
+        """Waits until the saves asked for so far are on disk."""
+        if self._writing is not None:
+            await asyncio.wait([self._writing])
+
+    def _saves_message(self) -> dict:
+        return {"type": "saves", "saves": self.saved_games(), "save_name": self.save_name}
 
     def load(self, name: str) -> None:
-        data = persistence.read_save(self.saves_dir / f"{name}.json")
+        data = persistence.read_save(self._path(name))
         game = restore_game(self.rules, data)
         self.playing = False
         self.game = game
+        self.save_name = base_name(name, game.year)
         self._reset(humans=data.get("humans", []))
         extra = data.get("extra", {})
         self.history = extra.get("history") or [self._history_row()]
@@ -290,8 +381,7 @@ class Session:
                 "type": "turn", "state": self._state(pov), "tile_changes": changes,
                 "events": known, "steps": self._steps, "history": row, "playing": False})
             if game.turn != before and game.turn % AUTOSAVE_EVERY == 0:
-                await asyncio.to_thread(self.save, AUTOSAVE)
-                await self._broadcast(lambda pov: {"type": "saves", "saves": self.saved_games()})
+                await self._save(self.save_name or AUTOSAVE)
 
     async def run(self) -> None:
         """Background loop: plays turns while the game is in "play" mode."""
@@ -408,6 +498,7 @@ class Session:
             "playing": self.playing,
             "delay": self.delay,
             "saves": self.saved_games(),
+            "save_name": self.save_name,
         }
 
     async def _broadcast(self, build) -> None:
@@ -447,20 +538,20 @@ class Session:
                 await self._notice(client, "Use letters, digits, - and _ for the name.", False)
                 return
             async with self._busy:
-                await asyncio.to_thread(self.save, name)
-            await self._notice(client, f"Game saved as {name}.", True)
-            await self._broadcast(lambda pov: {"type": "saves", "saves": self.saved_games()})
+                self.save_name = name          # the game now saves itself there
+                await self._save(name, client)
         elif command == "load":
             name = message.get("name")
-            if not isinstance(name, str) or name not in self.saved_games():
-                await self._notice(client, "No such saved game.", False)
-                return
-            try:
-                async with self._busy:
+            async with self._busy:
+                await self.flush()             # the saves asked for before it are on disk
+                if not isinstance(name, str) or name not in self.saved_games():
+                    await self._notice(client, "No such saved game.", False)
+                    return
+                try:
                     await asyncio.to_thread(self.load, name)
-            except persistence.SaveError as error:
-                await self._notice(client, f"Cannot load {name}: {error}", False)
-                return
+                except persistence.SaveError as error:
+                    await self._notice(client, f"Cannot load {name}: {error}", False)
+                    return
             await self.broadcast_init()
             await self._notice(client, f"Game {name} loaded.", True)
         elif command == "end_turn":

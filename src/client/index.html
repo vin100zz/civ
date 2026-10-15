@@ -60,8 +60,8 @@
       <button id="btn-game" class="btn ghost play-only" title="New game, save, load">
         <span data-icon="folder" data-size="17"></span><span>Game</span>
       </button>
-      <div id="connection" class="status off" title="Connection to the server">
-        <span class="dot"></span><span id="connection-label">Offline</span>
+      <div id="connection" class="status" title="No connection to the server">
+        <span class="dot"></span><span>Offline</span>
       </div>
       <div class="vr play-only"></div>
       <span id="turn-status" class="turn-status play-only"></span>
@@ -217,8 +217,9 @@
             <input id="save-name" class="input mono" type="text" maxlength="40" autocomplete="off">
             <button id="btn-do-save" class="btn tall"><span data-icon="save" data-size="16"></span>Save</button>
           </div>
-          <span class="sub">Letters, digits, - and _ · 40 characters at most. A game you play is also saved
-            by itself every few turns, as "autosave".</span>
+          <span class="sub">Letters, digits, - and _ · 40 characters at most. A game you play also saves
+            itself every 5 turns under that name ("autosave" until it has one); the save it replaces
+            is kept as name-year, and the one before goes.</span>
         </div>
       </section>
       <section class="dialog-col alt">

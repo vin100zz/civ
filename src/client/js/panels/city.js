@@ -4,7 +4,7 @@
 
 import { store, U, player, leader, emit, inkOn, plural, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
-import { icon } from '../icons.js';
+import { icon, vetMark } from '../icons.js';
 import { setTips } from '../tips.js';
 import { ORDER_MARK, TASK_MARK } from '../renderer/map.js';
 import { unitImage } from '../renderer/sprites.js';
@@ -216,7 +216,7 @@ function unitTip(unit, count, rows) {
   const definition = store.unitDefs[unit[U.TYPE]];
   const doing = doingText(unit);
   const title = `${spriteBox(definition, player(unit[U.OWNER]).color)}<span>${definition.name}${
-    unit[U.VETERAN] ? ' <small>veteran</small>' : ''}</span>`;
+    unit[U.VETERAN] ? vetMark() : ''}</span>`;
   return tipTitle(title, count > 1 ? `×${count}` : '') + tipStats(definition)
     + tipRows(doing ? [['Orders', doing], ...rows] : rows, true);
 }

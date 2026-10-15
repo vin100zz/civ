@@ -628,7 +628,7 @@ document.addEventListener('click', (e) => {
   if (button && e.detail > 0 && !button.closest('dialog')) button.blur();
 });
 
+// The top bar only speaks of the connection once it is lost.
 connect(receive, (online) => {
-  $('connection').className = `status ${online ? 'on' : 'off'}`;
-  $('connection-label').textContent = online ? 'Live' : 'Offline';
+  $('connection').hidden = online;
 });

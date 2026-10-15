@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,7 @@ from .systems import city as city_rules
 VERSION = 1
 TILE_FLAGS = ("special", "pattern", "hut", "road", "railroad", "irrigation", "mine", "fortress",
               "pollution")
+HEADER = re.compile(rb'"seed":\s*(-?\d+),\s*"turn":\s*(-?\d+),\s*"year":\s*(-?\d+)')
 
 
 class SaveError(Exception):
@@ -102,15 +105,40 @@ def _item_to_data(item) -> Any:
     return [item.kind, item.id] if item is not None else None
 
 
-def save_game(game: Game, path: Path, extra: dict[str, Any] | None = None) -> None:
-    """Writes the game to a file. `extra` is stored as is (the observer's charts and log)."""
+def dump_game(game: Game, extra: dict[str, Any] | None = None) -> str:
+    """The text of the saved game. `extra` is stored as is (the observer's charts and log)."""
     data = game_to_data(game)
     if extra:
         data["extra"] = extra
+    return json.dumps(data, separators=(",", ":"))
+
+
+def write_save(path: Path, text: str, keep: Path | None = None) -> None:
+    """Writes a saved game in one go: a file cut short never replaces the previous one.
+    With `keep`, the file it replaces is moved there instead of being lost."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, separators=(",", ":"))
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    if keep is not None and path.exists():
+        os.replace(path, keep)
+    os.replace(temporary, path)
+
+
+def save_game(game: Game, path: Path, extra: dict[str, Any] | None = None) -> None:
+    """Writes the game to a file. `extra` is stored as is (the observer's charts and log)."""
+    write_save(path, dump_game(game, extra))
+
+
+def save_header(path: Path) -> dict[str, int] | None:
+    """The seed, turn and year of a saved game, read from the first bytes of its file (they
+    come first), or None if it does not begin like a saved game."""
+    try:
+        with open(path, "rb") as fh:
+            match = HEADER.search(fh.read(256))
+    except OSError:
+        return None
+    return dict(zip(("seed", "turn", "year"), map(int, match.groups()))) if match else None
 
 
 # ── Loading ───────────────────────────────────────────────────────────────────

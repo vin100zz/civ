@@ -325,7 +325,6 @@ button.chip:hover { border-color: var(--line-3); }
 .turn-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
 .turn-status.ready i { background: var(--good); }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px rgba(242, 117, 106, 0.18); }
-.status.on .dot { background: var(--good); box-shadow: 0 0 0 3px rgba(95, 203, 139, 0.18); }
 
 #topbar { overflow: hidden; }
 @media (max-width: 1800px) {
@@ -536,6 +535,8 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 .unit-who .titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .unit-who h2 { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; white-space: nowrap; }
 .unit-who .vet { display: flex; color: var(--gold); }
+/* The same chevrons after a name in running text: the turn list, the tooltips. */
+.vet-mark { display: inline-flex; margin-left: 4px; vertical-align: -2px; color: var(--gold); }
 .unit-who .sub { display: flex; align-items: center; gap: 5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .unit-who .sub i { font-style: normal; }
 .unit-who .home { display: inline-flex; align-items: center; gap: 4px; }
@@ -743,7 +744,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-row.on { border-color: rgba(226, 182, 89, 0.45); background: rgba(226, 182, 89, 0.08); }
 .unit-row b { font-size: 14px; font-weight: 600; }
 .unit-row b small { font-size: 11px; font-weight: 400; color: var(--mute); }
-.unit-row .body span { font-size: 12px; color: var(--mute); }
+.unit-row .body > span { font-size: 12px; color: var(--mute); }
 .unit-row .state { font-size: 11px; font-weight: 600; color: var(--gold); }
 /* The city table: size, name and its problem icons, production, turns left, then one column
    per figure. The name is red or amber after the worst problem; the figure at fault gets a chip. */

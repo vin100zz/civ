@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 
 from server.api import serialize
 from server.api.app import create_app
-from server.api.session import Session
+from server.api.session import Session, base_name, year_tag
+from server.engine import persistence
 from server.engine.systems import pollution
 
 from .conftest import add_city, make_game
@@ -88,7 +89,8 @@ def test_save_and_load(client):
 
         socket.send_json({"cmd": "save", "name": "my-game"})
         assert socket.receive_json() == {"type": "notice", "text": "Game saved as my-game.", "ok": True}
-        assert socket.receive_json() == {"type": "saves", "saves": ["my-game"]}
+        assert socket.receive_json() == {"type": "saves", "saves": ["my-game"],
+                                         "save_name": "my-game"}
 
         socket.send_json({"cmd": "new_game", "seed": 10, "players": 3})
         assert socket.receive_json()["state"]["turn"] == 0
@@ -281,6 +283,8 @@ def test_a_person_only_hears_what_it_may_know(client):
 
 
 def test_play_save_and_load(client):
+    # The saves the tests before left being written would tell their list in the middle.
+    client.portal.call(client.app.state.session.flush)
     with client.websocket_connect("/ws") as socket:
         init = start_playing(socket)
         settlers = next(u for u in init["state"]["units"] if u[1] == "settlers")
@@ -290,7 +294,8 @@ def test_play_save_and_load(client):
             message = socket.receive_json()
         # Turn 5: the game was saved by itself, in the middle of the person's turn.
         assert message["state"]["turn"] == 5
-        assert "autosave" in socket.receive_json()["saves"]
+        saves = socket.receive_json()
+        assert saves["saves"][0] == "autosave" and saves["save_name"] is None
         cities = message["state"]["cities"]
 
         socket.send_json({"cmd": "new_game", "seed": 10, "players": 3})
@@ -305,6 +310,17 @@ def test_play_save_and_load(client):
         assert socket.receive_json()["ok"] is True
         socket.send_json({"cmd": "end_turn"})
         assert socket.receive_json()["state"]["turn"] == 6
+
+        # Once named, the game saves itself under that name; the save it replaces is kept.
+        socket.send_json({"cmd": "save", "name": "mine"})
+        assert socket.receive_json()["ok"] is True
+        assert socket.receive_json()["save_name"] == "mine"
+        for _ in range(4):
+            socket.send_json({"cmd": "end_turn"})
+            message = socket.receive_json()
+        assert message["state"]["turn"] == 10
+        saves = socket.receive_json()
+        assert saves["save_name"] == "mine" and saves["saves"][:2] == ["mine", "mine-3880BC"]
 
 
 def test_a_destroyed_person_becomes_an_observer(client):
@@ -424,6 +440,34 @@ def test_wonders_payload(rules):
                               "builder": 1, "lost": True, "city": "Antium"}
     assert rows["great_wall"] == {"id": "great_wall", "built": False, "obsolete": False}
     assert serialize.state_payload(game)["wonders"] == list(rows.values())
+
+
+def test_a_save_keeps_the_one_it_replaces(rules, tmp_path):
+    session = Session(rules, saves_dir=tmp_path)
+    game = session.game
+
+    def save_in(year: int) -> set[str]:
+        game.turn, game.year = game.turn + 1, year
+        session.save("french")
+        return {path.stem for path in tmp_path.glob("*.json")}
+
+    (tmp_path / "french-2.json").write_text("{}")          # a save of its own, not a backup
+    assert save_in(1915) == {"french", "french-2"}
+    assert save_in(1925) == {"french", "french-1915", "french-2"}
+    assert save_in(1935) == {"french", "french-1925", "french-2"}
+    assert persistence.save_header(tmp_path / "french-1925.json")["year"] == 1925
+    assert persistence.save_header(tmp_path / "french.json")["year"] == 1935
+
+    session.save("french")                                 # the same turn again
+    assert {path.stem for path in tmp_path.glob("*.json")} == {"french", "french-1925", "french-2"}
+    assert not list(tmp_path.glob("*.tmp"))
+
+    # A backup, once loaded, saves itself under the name of its game.
+    session.load("french-1925")
+    assert session.game.year == 1925 and session.save_name == "french"
+    assert base_name("french-2", 1925) == "french-2"
+    assert year_tag(-3000) == "3000BC" and base_name("rome-3000BC", -3000) == "rome"
+    assert base_name("3000BC", -3000) == "3000BC"
 
 
 def test_wonder_origins_are_saved(rules, tmp_path):

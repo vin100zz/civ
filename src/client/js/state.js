@@ -24,6 +24,7 @@ export const store = {
   playing: false,
   delay: 0.4,
   saves: [],            // names of the saved games on the server
+  saveName: null,       // the name the game was loaded or saved under, where it saves itself
   selectedPlayer: null, // player id
   selectedCity: null,   // city id
   cityDetail: null,
@@ -293,6 +294,7 @@ export function handleMessage(message) {
       store.playing = message.playing;
       store.delay = message.delay;
       store.saves = message.saves || [];
+      store.saveName = message.save_name || null;
       store.selectedCity = null;
       store.cityDetail = null;
       store.hud = { unit: null, route: null, target: null };
@@ -350,6 +352,7 @@ export function handleMessage(message) {
       break;
     case 'saves':
       store.saves = message.saves;
+      store.saveName = message.save_name || null;
       emit('saves');
       break;
     case 'notice':
