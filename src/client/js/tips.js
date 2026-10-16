@@ -77,3 +77,74 @@ export function setTips(panel, tips) {
     else hideTips();
   }
 }
+
+// ── Hints ───────────────────────────────────────────────────────────────────
+// The name of a control, in place of the browser's title tooltip: an element marked
+// data-hint="label" shows it under itself (data-hint-side="left": on its left), with its key when
+// it has data-key. The lines after the first, if any, come below in a softer tone.
+
+let hint = null;               // the hint box, made the first time one is needed
+let hinted = null;             // the element it names
+let hintTimer = null;
+
+function showHint(target) {
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'hint';
+    hint.setAttribute('role', 'tooltip');
+    document.body.appendChild(hint);
+  }
+  const [first, ...more] = target.dataset.hint.split('\n');
+  const label = document.createElement('span');
+  label.className = 'hint-label';
+  label.textContent = first;
+  if (target.dataset.key) {
+    const key = document.createElement('span');
+    key.className = 'kbd';
+    key.textContent = target.dataset.key;
+    label.appendChild(key);
+  }
+  hint.replaceChildren(label, ...more.map((line) => {
+    const span = document.createElement('span');
+    span.className = 'hint-more';
+    span.textContent = line;
+    return span;
+  }));
+  hint.hidden = false;
+  const rect = target.getBoundingClientRect();
+  const width = hint.offsetWidth;
+  const height = hint.offsetHeight;
+  const left = target.dataset.hintSide === 'left';
+  const x = left ? rect.left - width - 8 : rect.left + (rect.width - width) / 2;
+  const y = left ? rect.top + (rect.height - height) / 2 : rect.bottom + 8;
+  hint.style.left = `${Math.round(Math.min(Math.max(8, x), window.innerWidth - width - 8))}px`;
+  hint.style.top = `${Math.round(Math.max(8, y))}px`;
+}
+
+export function hideHint() {
+  clearTimeout(hintTimer);
+  hinted = null;
+  if (hint) hint.hidden = true;
+}
+
+export function initHints() {
+  document.addEventListener('mouseover', (e) => {
+    const target = e.target.closest('[data-hint]');
+    if (target === hinted) return;
+    clearTimeout(hintTimer);
+    hinted = target;
+    if (!target) {
+      if (hint) hint.hidden = true;
+    } else if (hint && !hint.hidden) {
+      showHint(target);          // along the bar, from one control to the next: at once
+    } else {
+      hintTimer = setTimeout(() => showHint(target), 400);
+    }
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (!e.relatedTarget) hideHint();   // the pointer left the window
+  });
+  document.addEventListener('mousedown', hideHint, true);
+  document.addEventListener('keydown', hideHint, true);
+  window.addEventListener('blur', hideHint);
+}

@@ -11,12 +11,18 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Elements marked observer-only or play-only show in one mode only (see body.play). -->
+  <!-- Elements marked observer-only or play-only show in one mode only (see body.play).
+       data-hint names a control under the pointer (js/tips.js), in place of a title tooltip. -->
   <header id="topbar">
     <div class="brand">
       <img class="brand-mark" src="favicon.svg" width="22" height="22" alt="">
       <span class="brand-name">CIVILIZATION</span>
-      <span id="mode-pill" class="pill roomy">Observer</span>
+      <div class="brand-tools">
+        <button id="btn-game" class="btn ghost icon play-only" aria-label="Game" data-hint="New game, save, load">
+          <span data-icon="folder" data-size="18"></span></button>
+        <button id="btn-options" class="btn ghost icon" aria-label="Map display" data-hint="Map display"
+          aria-expanded="false" aria-controls="map-options"><span data-icon="gear" data-size="19" data-stroke="1.6"></span></button>
+      </div>
     </div>
     <div class="vr"></div>
     <div class="clock">
@@ -25,14 +31,14 @@
         <span id="turn">&nbsp;</span>
         <div class="progress"><span id="turn-progress"></span></div>
       </div>
-      <button id="gameover-pill" class="pill gold" title="Show the final standings" hidden>Game over</button>
+      <button id="gameover-pill" class="pill gold" data-hint="Final standings" hidden>Game over</button>
     </div>
     <div class="spacer"></div>
     <div class="transport observer-only">
-      <button id="btn-play" class="btn primary" title="Play / pause (Space)">
+      <button id="btn-play" class="btn primary" data-hint="Play / pause" data-key="Space">
         <span id="play-icon"></span><span id="play-label">Play</span><span class="kbd roomy">Space</span>
       </button>
-      <button id="btn-step" class="btn" title="Play one turn (N)">
+      <button id="btn-step" class="btn" data-hint="Play one turn" data-key="N">
         <span data-icon="step" data-size="16"></span><span>Step</span><span class="kbd roomy">N</span>
       </button>
       <div class="vr"></div>
@@ -44,32 +50,48 @@
         <button data-delay="0">Max</button>
       </div>
     </div>
-    <div id="empire-chips" class="empire-chips play-only"></div>
+    <div class="chip-row">
+      <div id="empire-chips" class="empire-chips play-only"></div>
+      <!-- The state of the planet, once pollution has appeared: polluted tiles, warming, spaceships in flight. -->
+      <div id="planet" class="chip-btn planet" data-tip="planet" aria-label="State of the planet" hidden></div>
+    </div>
     <div class="spacer"></div>
     <div class="game-actions">
       <span id="seed-label" class="mono sub roomy observer-only"></span>
-      <button id="btn-save" class="btn ghost observer-only" title="Save this game on the server">
+      <button id="btn-save" class="btn ghost observer-only" data-hint="Save this game">
         <span data-icon="save" data-size="17"></span><span>Save</span>
       </button>
-      <button id="btn-saves" class="btn ghost observer-only" title="Load a saved game">
+      <button id="btn-saves" class="btn ghost observer-only" data-hint="Load a saved game">
         <span data-icon="folder" data-size="17"></span><span>Saved games</span>
       </button>
       <button id="btn-new" class="btn observer-only">
         <span data-icon="plus" data-size="16"></span><span>New game</span>
       </button>
-      <button id="btn-game" class="btn ghost play-only" title="New game, save, load">
-        <span data-icon="folder" data-size="17"></span><span>Game</span>
-      </button>
-      <div id="connection" class="status" title="No connection to the server">
+      <div id="connection" class="status" data-hint="No connection to the server">
         <span class="dot"></span><span>Offline</span>
       </div>
-      <div class="vr play-only"></div>
-      <span id="turn-status" class="turn-status play-only"></span>
-      <button id="btn-end-turn" class="btn play-only" title="End your turn (Enter)">
+      <button id="btn-end-turn" class="btn play-only" data-hint="End your turn" data-key="Enter">
         <span data-icon="arrow" data-size="16" data-stroke="2"></span><span>End turn</span><span class="kbd">Enter</span>
       </button>
     </div>
   </header>
+
+  <!-- Opened by the gear of the top bar; a click elsewhere or Escape closes it. -->
+  <div id="map-options" class="map-options glass" role="dialog" aria-label="Map display" hidden>
+    <div class="map-options-head">Map</div>
+    <label class="map-option">
+      <span class="map-option-icon" data-icon="border"></span><b>Territory</b>
+      <span class="switch"><input type="checkbox" data-option="territory" checked><i></i></span>
+    </label>
+    <label class="map-option">
+      <span class="map-option-icon" data-icon="grid"></span><b>Grid</b>
+      <span class="switch"><input type="checkbox" data-option="grid"><i></i></span>
+    </label>
+    <label class="map-option observer-only">
+      <span class="map-option-icon" data-icon="target"></span><b>AI missions</b>
+      <span class="switch"><input type="checkbox" data-option="missions"><i></i></span>
+    </label>
+  </div>
 
   <main>
     <section id="map-area">
@@ -81,21 +103,15 @@
           <span class="muted">View as</span>
           <select id="pov"><option value="">Everything</option></select>
         </label>
-        <div class="toggles glass" role="group" aria-label="Map layers">
-          <button class="toggle" data-option="territory" aria-pressed="true"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>Territory</button>
-          <button class="toggle" data-option="grid" aria-pressed="false"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>Grid</button>
-          <button class="toggle observer-only" data-option="missions" aria-pressed="false"><span class="box" data-icon="check" data-size="14" data-stroke="2.4"></span>AI missions</button>
-        </div>
-        <div id="world"></div>
       </div>
 
       <div id="map-banner" class="glass" role="status" hidden></div>
       <div id="toasts" role="log" aria-label="Messages of this turn"></div>
 
       <div id="zoom" class="glass">
-        <button id="zoom-in" aria-label="Zoom in" title="Zoom in" data-icon="plus" data-stroke="2"></button>
-        <button id="zoom-out" aria-label="Zoom out" title="Zoom out" data-icon="minus" data-stroke="2"></button>
-        <button id="zoom-fit" aria-label="Fit the whole world" title="Fit the whole world" data-icon="fit" data-size="17" data-stroke="2"></button>
+        <button id="zoom-in" aria-label="Zoom in" data-hint="Zoom in" data-hint-side="left" data-icon="plus" data-stroke="2"></button>
+        <button id="zoom-out" aria-label="Zoom out" data-hint="Zoom out" data-hint-side="left" data-icon="minus" data-stroke="2"></button>
+        <button id="zoom-fit" aria-label="Fit the whole world" data-hint="Fit the whole world" data-hint-side="left" data-icon="fit" data-size="17" data-stroke="2"></button>
       </div>
 
       <div id="minimap-card" class="glass">

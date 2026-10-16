@@ -19,7 +19,7 @@ import { renderWonders } from './panels/wonders.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
-import { hideTips } from './tips.js';
+import { hideTips, setTips, initHints } from './tips.js';
 import {
   play, activate, endTurn, handleKey, clickTile, aimAt, releaseAt, hoverTile, queue, activeUnit, setMode,
   pendingDecisions, whyNotEnd,
@@ -31,6 +31,7 @@ import {
 
 const $ = (id) => document.getElementById(id);
 mountIcons();
+initHints();
 const mapView = new MapView($('map'), $('tooltip'));
 const minimap = new Minimap($('minimap'), mapView);
 // A sprite has loaded, or a unit picture of the panels is ready (several at once: one redraw).
@@ -131,19 +132,40 @@ function refreshClock() {
     gameOverSeen = `${state.seed}:${state.turn}`;
     showGameOver();
   }
-  // The state of the planet, once pollution has appeared.
-  const world = [];
-  if (state.polluted) world.push(`<b>${state.polluted}</b> polluted tile${state.polluted === 1 ? '' : 's'}`);
-  if (state.warming && (state.warming.level || state.warming.count)) {
-    world.push(`Global warming <b>${state.warming.level}/${state.warming.threshold}</b>`
-      + (state.warming.count ? ` · ${state.warming.count} so far` : ''));
-  }
+  refreshPlanet();
+}
+
+// The state of the planet in the top bar, once pollution has appeared: polluted tiles, a gauge of
+// the warming, the spaceships in flight. Its tooltip names each figure.
+function refreshPlanet() {
+  const state = store.state;
+  const warming = state.warming && (state.warming.level || state.warming.count) ? state.warming : null;
   const ships = state.players.filter((p) => p.spaceship && p.spaceship.arrival_turn !== null
     && p.spaceship.arrival_turn > state.turn);
-  for (const p of ships) {
-    world.push(`${p.name} spaceship lands in <b>${p.spaceship.arrival_turn - state.turn} turns</b>`);
+  const parts = [];
+  const tip = [];
+  const row = (name, label, value) => tip.push(`<span data-i>${icon(name, 15)}</span><span>${label}</span><b>${value}</b>`);
+  if (state.polluted) {
+    parts.push(`<span>${icon('cloud', 17)}<b>${state.polluted}</b></span>`);
+    row('cloud', 'Pollution', plural(state.polluted, 'tile'));
   }
-  $('world').innerHTML = world.map((text) => `<span class="world-chip">${text}</span>`).join('');
+  if (warming) {
+    const share = Math.min(1, warming.level / warming.threshold);
+    parts.push(`<span><span class="thermo">${icon('thermo', 17)}</span>`
+      + `<span class="bar"><span style="width:${Math.max(4, 100 * share)}%"></span></span></span>`);
+    row('thermo', 'Global warming', `${warming.level} / ${warming.threshold}`);
+  }
+  for (const p of ships) {
+    const turns = p.spaceship.arrival_turn - state.turn;
+    parts.push(`<span>${icon('rocket', 17)}<b>${turns}</b></span>`);
+    row('rocket', `${p.name} spaceship`, plural(turns, 'turn'));
+  }
+  $('planet').hidden = !parts.length;
+  const level = warming ? warming.level / warming.threshold : 0;
+  const chip = $('planet');
+  chip.className = `chip-btn planet${level >= 0.75 ? ' warm-2' : level >= 0.5 ? ' warm-1' : ''}`;
+  chip.innerHTML = parts.join('<i class="sep"></i>');
+  setTips($('topbar'), new Map([['planet', `<div class="tip-planet">${tip.join('')}</div>`]]));
 }
 
 let noticeTimer = null;
@@ -187,17 +209,9 @@ function requestDetails() {
 
 // ── The person's side of the screen ─────────────────────────────────────────
 
-// Observer or player: which controls show, and who the person is.
+// Observer or player: which controls show.
 function syncMode() {
-  const me = leader();
-  document.body.classList.toggle('play', me !== null);
-  const pill = $('mode-pill');
-  if (me !== null) {
-    const p = player(me);
-    pill.innerHTML = `<span class="swatch small" style="background:${p.color}"></span>${p.nation}`;
-  } else {
-    pill.textContent = 'Observer';
-  }
+  document.body.classList.toggle('play', leader() !== null);
 }
 
 function refreshPlayBar() {
@@ -210,23 +224,23 @@ function refreshPlayBar() {
     ? turnsFor(me.research_cost + 1 - me.research_progress, me.forecast.science) : null;
   const progress = me.research_cost ? Math.min(100, 100 * me.research_progress / me.research_cost) : 0;
   const research = me.researching
-    ? `<button class="chip-btn" data-chip="research" title="Research: ${me.research_progress} of ${me.research_cost}">
+    ? `<button class="chip-btn" data-chip="research" data-hint="Research">
         <span class="sci">${icon('flask', 17)}</span><b>${techName(me.researching)}</b>
         <span class="bar thin"><span style="width:${progress}%;background:var(--sci)"></span></span>
         <span class="muted">${turns === null ? 'no science' : plural(turns, 'turn')}</span>${
   me.research_goal ? `<span class="goal">${icon('flag', 14, 2)}${techName(me.research_goal)}</span>` : ''}</button>`
-    : `<button class="chip-btn lead" data-chip="research"><span>${icon('flask', 17)}</span><b>Choose research</b></button>`;
+    : `<button class="chip-btn lead" data-chip="research" data-hint="Research"><span>${icon('flask', 17)}</span><b>Choose research</b></button>`;
   // A revolution lasts until the start of turn `anarchy_until`.
   const anarchy = me.government === 'anarchy';
   const turnsLeft = anarchy && me.anarchy_until ? me.anarchy_until - store.state.turn : 0;
   $('empire-chips').innerHTML = `
-    <button class="chip-btn${anarchy ? ' anarchy' : ''}" data-chip="empire" title="Government">
+    <button class="chip-btn${anarchy ? ' anarchy' : ''}" data-chip="empire" data-hint="Government">
       <span>${icon('crown', 17)}</span><b>${governmentName(me.government)}</b>${turnsLeft > 0 ? `<span>${plural(turnsLeft, 'turn')}</span>` : ''}</button>
-    <button class="chip-btn${treasury ? ` alarm ${treasury.level}` : ''}" data-chip="empire" title="${treasury ? `${treasury.text} · ${treasury.detail}` : 'Treasury, and what the next turn should bring'}">
+    <button class="chip-btn${treasury ? ` alarm ${treasury.level}` : ''}" data-chip="empire" data-hint="Treasury">
       <span class="trade">${icon(treasury ? 'alert' : 'coin', 17)}</span><b class="num">${me.gold}</b><span class="muted">gold</span>
       <span class="${gold < 0 ? 'bad' : 'soft'}">${gold >= 0 ? '+' : ''}${gold}</span></button>
     ${research}
-    <button class="chip-btn split" data-chip="empire" title="Share of trade going to taxes, luxuries and science">
+    <button class="chip-btn split" data-chip="empire" data-hint="Tax rates">
       <span><i style="background:var(--trade)"></i><span class="muted">Tax</span><b>${me.rates[0]}</b></span>
       <span><i style="background:#C79BF2"></i><span class="muted">Lux</span><b>${me.rates[1]}</b></span>
       <span><i style="background:var(--sci)"></i><span class="muted">Sci</span><b>${me.rates[2]}</b></span></button>`;
@@ -239,15 +253,10 @@ function refreshPlayBar() {
   const why = whyNotEnd();
   button.classList.toggle('primary', ready);
   button.disabled = play.waiting || play.ending;
-  // Greyed out while a decision waits, but still hoverable: its tooltip says which one.
+  // Greyed out while a decision waits, but still hoverable: its hint says which one.
   button.setAttribute('aria-disabled', String(Boolean(why)));
-  button.title = why || 'End your turn (Enter)';
-  const status = $('turn-status');
-  status.className = `turn-status play-only${ready ? ' ready' : ''}`;
-  status.innerHTML = `<i></i>${play.waiting ? 'The others are playing…'
-    : play.ending ? 'Ending the turn…'
-      : left ? `${plural(left, 'unit')} waiting`
-        : pending ? `${plural(pending, 'decision')} to make` : 'End the turn when ready'}`;
+  button.dataset.hint = why || 'End your turn';
+  button.dataset.key = why ? '' : 'Enter';
 }
 
 function refreshBanner() {
@@ -570,15 +579,35 @@ for (const id of ['research-dialog', 'message-dialog']) {
   $(id).addEventListener('close', () => setTimeout(ask, 0));
 }
 
-document.querySelectorAll('.toggle').forEach((button) => {
-  button.addEventListener('click', () => {
-    const option = button.dataset.option;
-    store.options[option] = !store.options[option];
-    button.setAttribute('aria-pressed', String(store.options[option]));
-    refreshLegend();
-    mapView.invalidate();
-  });
+// The map layers, in a panel under the gear of the top bar.
+function showMapOptions(open) {
+  const panel = $('map-options');
+  const button = $('btn-options');
+  if (open) {
+    const rect = button.getBoundingClientRect();
+    panel.style.top = `${rect.bottom + 10}px`;
+    panel.style.left = `${Math.max(8, rect.left - 6)}px`;
+  } else if (panel.contains(document.activeElement)) {
+    document.activeElement.blur();        // the keys go back to the game
+  }
+  panel.hidden = !open;
+  button.setAttribute('aria-expanded', String(open));
+}
+$('btn-options').addEventListener('click', () => showMapOptions($('map-options').hidden));
+$('map-options').addEventListener('change', (e) => {
+  const option = e.target.dataset.option;
+  if (!option) return;
+  store.options[option] = e.target.checked;
+  refreshLegend();
+  mapView.invalidate();
 });
+// A click elsewhere closes the panel; on the map it does nothing more (no unit moves by mistake).
+window.addEventListener('mousedown', (e) => {
+  if ($('map-options').hidden || e.target.closest('#map-options, #btn-options')) return;
+  showMapOptions(false);
+  if (e.target === $('map')) e.stopPropagation();
+}, true);
+window.addEventListener('resize', () => showMapOptions(false));
 $('zoom-in').addEventListener('click', () => mapView.zoomBy(1.25));
 $('zoom-out').addEventListener('click', () => mapView.zoomBy(1 / 1.25));
 $('zoom-fit').addEventListener('click', () => {
@@ -595,6 +624,11 @@ mapView.onTileHover = hoverTile;
 mapView.describeMove = describeMove;
 
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('map-options').hidden) {
+    showMapOptions(false);
+    e.preventDefault();
+    return;
+  }
   if (document.querySelector('dialog[open]')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (replaying()) {

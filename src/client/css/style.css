@@ -270,7 +270,8 @@ button.chip:hover { border-color: var(--line-3); }
 
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark { flex: none; }
-.brand-name { font-size: 13px; font-weight: 600; letter-spacing: 0.22em; }
+.brand-name { font-size: 13px; font-weight: 600; letter-spacing: 0.22em; color: var(--gold); }   /* the temple's gold */
+.brand-tools { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
 .vr { width: 1px; height: 24px; background: var(--line); flex: none; }
 
 .clock { display: flex; align-items: center; gap: 14px; }
@@ -289,8 +290,7 @@ button.chip:hover { border-color: var(--line-3); }
 .status { display: flex; align-items: center; gap: 7px; margin-left: 14px; font-size: 12px; color: var(--soft); }
 
 /* The person's bar: treasury, research, rates, and the end of the turn. */
-#mode-pill { display: inline-flex; align-items: center; gap: 6px; color: var(--soft); }
-.empire-chips { display: flex; align-items: center; gap: 8px; }
+.chip-row, .empire-chips { display: flex; align-items: center; gap: 8px; }
 .chip-btn {
   height: 40px;
   padding: 0 12px;
@@ -320,10 +320,52 @@ button.chip:hover { border-color: var(--line-3); }
 .chip-btn.split { gap: 12px; }
 .chip-btn.split > span { display: inline-flex; align-items: center; gap: 5px; }
 .chip-btn.split i { width: 8px; height: 8px; border-radius: 3px; }
-.game-actions .vr { margin: 0 6px 0 12px; }
-.turn-status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--soft); margin-right: 6px; }
-.turn-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
-.turn-status.ready i { background: var(--good); }
+
+/* The state of the planet: polluted tiles, a gauge of the warming, spaceships in flight. Its tooltip
+   (js/tips.js) names each figure. Grey, then orange from half the threshold, red from three quarters. */
+.planet { gap: 10px; padding: 0 12px 0 11px; color: var(--soft); cursor: default; --warming: var(--soft); }
+.planet.warm-1 { --warming: var(--warn); }
+.planet.warm-2 { --warming: var(--bad); }
+.planet > span { display: inline-flex; align-items: center; gap: 6px; }
+.planet b { color: var(--text); }
+.planet .sep { width: 1px; height: 18px; background: var(--line); }
+.planet .thermo { color: var(--warming); }
+.planet .bar { width: 46px; height: 5px; border-radius: 3px; background: var(--line); }
+.planet .bar > span { background: var(--warming); border-radius: 3px; }
+.tip-planet { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px 9px; font-size: 13px; }
+.tip-planet [data-i] { display: inline-flex; color: var(--mute); }
+.tip-planet b { font-weight: 600; text-align: right; padding-left: 14px; }
+#panel-tip:has(.tip-planet) { width: auto; }
+
+/* The name of a control under the pointer (js/tips.js, data-hint), in place of a title tooltip. */
+#hint {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(11, 14, 19, 0.96);
+  border: 1px solid var(--hair);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+#hint .hint-label { display: flex; align-items: center; gap: 8px; }
+#hint .hint-more { font-weight: 400; color: var(--soft); }
+#hint .kbd { background: var(--raise); }
+
+/* The map layers, under the gear. */
+#btn-options[aria-expanded="true"] { background: var(--raise); color: var(--text); }
+.map-options { position: fixed; z-index: 25; width: 232px; padding: 6px; background: rgba(11, 14, 19, 0.96); }
+.map-options-head { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); padding: 6px 10px 4px; }
+.map-option { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.map-option:hover { background: rgba(255, 255, 255, 0.05); }
+.map-option b { flex: 1; font-size: 14px; font-weight: 600; }
+.map-option-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--raise); color: var(--soft); flex: none; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px rgba(242, 117, 106, 0.18); }
 
 #topbar { overflow: hidden; }
@@ -423,36 +465,6 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
   cursor: pointer;
   background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A95A5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 4px center;
 }
-
-.toggles { height: 44px; padding: 3px; display: flex; gap: 2px; align-items: center; }
-.toggle {
-  height: 36px;
-  padding: 0 12px 0 10px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--soft);
-}
-.toggle:hover { color: var(--text); }
-.toggle .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid #5A6678; color: transparent; }
-.toggle[aria-pressed="true"] { background: var(--hover); color: var(--text); }
-.toggle[aria-pressed="true"] .box { border-color: transparent; color: var(--gold); }
-
-#map-tools #world { flex-basis: 100%; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
-#world:empty { display: none; }
-#world .world-chip {
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--glass);
-  border: 1px solid var(--hair);
-  color: var(--soft);
-}
-#world .world-chip b { color: var(--text); font-weight: 600; }
 
 #zoom { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; }
 #zoom button { width: 40px; height: 40px; display: grid; place-items: center; }
