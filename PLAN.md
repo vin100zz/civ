@@ -52,9 +52,13 @@ Tout se trouve sous `C:\V\Abandonware-France\Civilization\OpenCivOne\src\Game`. 
 config/                 données de jeu (YAML)
   game.yaml             constantes : carte, calendrier, ville, combat, déplacements, barbares,
                         pollution, nucléaire, vaisseau spatial, score, victoire
-  terrains.yaml  units.yaml  buildings.yaml  wonders.yaml
-  technologies.yaml  governments.yaml  civilizations.yaml
+  terrains.yaml  governments.yaml  civilizations.yaml
   ai.yaml               poids, seuils et personnalités de l'IA
+  rulesets/             un dossier par jeu de règles, choisi à la création d'une partie
+    civ1/               Civilization I : ruleset.yaml (nom), technologies.yaml, units.yaml,
+                        buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
+    golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
+                        sans obsolescence (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
 resources/              sprites, servis tels quels
 saves/                  parties sauvegardées (JSON, hors dépôt)
 run.py  simulate.py     lanceurs (serveur, simulateur)

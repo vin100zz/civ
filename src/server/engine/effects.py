@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .model.entities import City, Player
+from .model.entities import City, Player, Unit
 from .model.game import Game
 from .rules.schema import BuildingDef, Effect
 
@@ -47,15 +47,22 @@ def _wonder_effect_reaches(game: Game, effect: Effect, wonder_city: City, city: 
     return wonder_city.id == city.id
 
 
-def effective_buildings(game: Game, city: City) -> set[str]:
-    """Buildings of the city, plus those a wonder provides (acts_as_building)."""
-    buildings = set(city.buildings)
+def given_buildings(game: Game, city: City) -> dict[str, str]:
+    """Buildings a wonder provides to the city (acts_as_building) that it has not built:
+    building id -> the wonder giving it."""
+    given: dict[str, str] = {}
     for wonder, wonder_city in active_wonders(game, city.owner):
         for effect in wonder.effects:
             if effect.type == "acts_as_building" and effect.building \
+                    and effect.building not in city.buildings \
                     and _wonder_effect_reaches(game, effect, wonder_city, city):
-                buildings.add(effect.building)
-    return buildings
+                given.setdefault(effect.building, wonder.id)
+    return given
+
+
+def effective_buildings(game: Game, city: City) -> set[str]:
+    """Buildings of the city, plus those a wonder provides (acts_as_building)."""
+    return set(city.buildings) | set(given_buildings(game, city))
 
 
 def city_effects(game: Game, city: City) -> list[Effect]:
@@ -91,6 +98,24 @@ def player_effects(game: Game, player: Player, effect_type: str) -> list[Effect]
             if effect.type == effect_type and effect.scope == "player":
                 if effect.requires_tech is None or effect.requires_tech in player.techs:
                     result.append(effect)
+    return result
+
+
+def unit_effects(game: Game, unit: Unit, effect_type: str) -> list[Effect]:
+    """Effects of the owner's wonders that reach a unit: the empire-wide ones, and those of a
+    continent for a unit standing on it (the Royal Road)."""
+    player = game.players[unit.owner]
+    continent = game.tile_of(unit).continent
+    result = []
+    for wonder, wonder_city in active_wonders(game, unit.owner):
+        for effect in wonder.effects:
+            if effect.type != effect_type:
+                continue
+            if effect.requires_tech is not None and effect.requires_tech not in player.techs:
+                continue
+            if effect.scope == "player" or (effect.scope == "continent"
+                                            and game.tile_of(wonder_city).continent == continent):
+                result.append(effect)
     return result
 
 

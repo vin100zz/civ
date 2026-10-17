@@ -21,7 +21,7 @@ from ..ai.barbarian import BarbarianController
 from ..ai.controller import AIController
 from ..engine import persistence
 from ..engine.model.game import Game
-from ..engine.rules.loader import load_rules
+from ..engine.rules.loader import DEFAULT_RULESET, load_rules, ruleset_ids
 from ..engine.rules.schema import MapSettings, Rules
 from ..engine.setup import new_game
 from ..engine.systems import turn
@@ -119,7 +119,10 @@ def main() -> None:
     parser.add_argument("--csv", type=str, default=None, help="write per-turn metrics here")
     parser.add_argument("--events", action="store_true", help="count events by type")
     parser.add_argument("--save", type=str, default=None, help="save the game here at the end")
-    parser.add_argument("--load", type=str, default=None, help="continue this saved game")
+    parser.add_argument("--load", type=str, default=None,
+                        help="continue this saved game (with the rules it is played with)")
+    parser.add_argument("--rules", type=str, default=DEFAULT_RULESET,
+                        help=f"set of rules, a folder of config/rulesets/ (default {DEFAULT_RULESET})")
     parser.add_argument("--shape", type=str, default=None,
                         help="map shape, one of map.shapes in config/game.yaml")
     for name in ("relief", "climate", "temperature"):
@@ -127,13 +130,17 @@ def main() -> None:
     args = parser.parse_args()
 
     seeds = args.seeds if args.seeds else [args.seed if args.seed is not None else 1]
-    rules = load_rules()
+    saved = persistence.read_save(args.load) if args.load else None
+    ruleset = persistence.saved_ruleset(saved) if saved is not None else args.rules
+    if ruleset not in ruleset_ids():
+        parser.error(f"unknown rules '{ruleset}' (known: {', '.join(ruleset_ids())})")
+    rules = load_rules(ruleset=ruleset)
     if args.shape is not None and args.shape not in rules.game.map.shapes:
         parser.error(f"unknown shape '{args.shape}' (known: {', '.join(rules.game.map.shapes)})")
     choices = {name: getattr(args, name) for name in ("shape", "relief", "climate", "temperature")}
     map_settings = dataclasses.replace(
         rules.game.map, **{name: value for name, value in choices.items() if value is not None})
-    loaded = restore_game(rules, persistence.read_save(args.load)) if args.load else None
+    loaded = restore_game(rules, saved) if saved is not None else None
     if loaded is not None:
         seeds = [loaded.seed]
     all_rows: list[dict] = []

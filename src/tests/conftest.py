@@ -7,13 +7,19 @@ from server.engine.mapgen.continents import label_continents
 from server.engine.model.entities import PEACE, WAR, Player
 from server.engine.model.game import Game
 from server.engine.model.worldmap import WorldMap
-from server.engine.rules.loader import load_rules
+from server.engine.rules.loader import load_rules, load_rulesets
 from server.engine.systems import cities, visibility
 
 
 @pytest.fixture(scope="session")
 def rules():
     return load_rules()
+
+
+@pytest.fixture(scope="session")
+def rulesets():
+    """Every set of rules of config/rulesets/, by id."""
+    return load_rulesets()
 
 
 def make_world(rules, width=16, height=12, terrain="grassland", patches=None):

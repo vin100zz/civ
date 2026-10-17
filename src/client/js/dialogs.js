@@ -13,7 +13,7 @@ const VICTORY = {
   score: ['Victory on score', 'have the greatest civilization', 'trophy'],
 };
 // The choices of the next new game. They survive from one game to the next.
-const choice = { mode: 'play', civ: null, level: null, players: 7, map: null, tab: 'new' };
+const choice = { mode: 'play', ruleset: null, civ: null, level: null, players: 7, map: null, tab: 'new' };
 
 // Pictogram of each map shape: [cx, cy, rx, ry] blobs in a 36 x 22 box. A blob drawn inside
 // another one is a hole (a lake, an inner sea).
@@ -57,6 +57,11 @@ function refreshChoices() {
     button.setAttribute('aria-pressed', String(button.dataset.mode === choice.mode));
   }
   document.querySelectorAll('[data-play-field]').forEach((field) => { field.hidden = !playing; });
+  for (const button of $('rulesets').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.ruleset === choice.ruleset));
+  }
+  const ruleset = store.rulesets.find((r) => r.id === choice.ruleset);
+  $('ruleset-hint').textContent = ruleset ? ruleset.description : '';
   for (const button of $('civ-grid').children) {
     button.setAttribute('aria-pressed', String(button.dataset.civ === choice.civ));
   }
@@ -119,6 +124,11 @@ export function resetGameDialog() {
   }
   if (!rules.levels.some((level) => level.id === choice.level)) choice.level = rules.defaults.level;
   if (!playableCivs().some((civ) => civ.id === choice.civ)) choice.civ = null;
+  // The rules of the game on screen, until the person picks others.
+  if (!store.rulesets.some((r) => r.id === choice.ruleset)) choice.ruleset = rules.ruleset.id;
+  $('ruleset-field').hidden = store.rulesets.length < 2;
+  $('rulesets').innerHTML = store.rulesets.map((r) =>
+    `<button data-ruleset="${r.id}">${r.name}</button>`).join('');
   $('civ-grid').innerHTML = playableCivs().map((civ) => `
     <button data-civ="${civ.id}">${swatch(civColor(civ.id, civ.color))}
       <span class="who"><b>${civ.nation}</b><small>${civ.leader}</small></span>${icon('check', 16, 2.4)}</button>`).join('');
@@ -134,7 +144,9 @@ export function openGameDialog(focus) {
   const dialog = $('game-dialog');
   choice.tab = focus === 'save' ? 'saves' : 'new';
   if (store.state) $('save-name').value = store.saveName || `seed${store.state.seed}-turn${store.state.turn}`;
-  setDialogStatus(`Map ${store.map.width} × ${store.map.height} · a new or loaded game replaces the current one.`);
+  const map = `${store.map.width} × ${store.map.height}`;
+  const current = store.rulesets.length > 1 ? `${store.rules.ruleset.name} rules, map ${map}` : `Map ${map}`;
+  setDialogStatus(`${current} · a new or loaded game replaces the current one.`);
   refreshChoices();
   show(dialog);
   const field = $(focus === 'save' ? 'save-name' : 'seed');
@@ -145,7 +157,7 @@ export function openGameDialog(focus) {
 function startNewGame() {
   const seed = parseInt($('seed').value, 10);
   const message = { cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null,
-    players: choice.players, map: choice.map };
+    players: choice.players, map: choice.map, ruleset: choice.ruleset };
   if (choice.mode === 'play') {
     const civs = playableCivs();
     message.mode = 'play';
@@ -190,6 +202,7 @@ export function initDialogs() {
   }
   pick($('game-tabs'), 'data-game-tab', (button) => { choice.tab = button.dataset.gameTab; });
   pick($('game-mode'), 'data-mode', (button) => { choice.mode = button.dataset.mode; });
+  pick($('rulesets'), 'data-ruleset', (button) => { choice.ruleset = button.dataset.ruleset; });
   pick($('civ-grid'), 'data-civ', (button) => {
     choice.civ = choice.civ === button.dataset.civ ? null : button.dataset.civ;
   });

@@ -25,7 +25,7 @@ EFFECT_MODES = ("additive", "compound")
 # Effects the rules engine understands (see engine/effects.py and the config files).
 EFFECT_TYPES = (
     "capital", "veteran_units", "food_box_keep", "content", "happy", "no_unhappy",
-    "yield_bonus", "tile_trade_bonus", "corruption_percent", "defense_multiplier",
+    "yield_bonus", "tile_trade_bonus", "tile_food_bonus", "corruption_percent", "defense_multiplier",
     "allow_size_above", "acts_as_building", "free_government", "free_techs",
     "shared_knowledge", "military_unhappiness", "peace_keeper", "unit_moves",
     "no_population_pollution", "pollution_percent", "meltdown_risk", "nuclear_shield",
@@ -168,6 +168,7 @@ class BuildingDef:
     effects: tuple[Effect, ...] = ()
     upkeep_increase_techs: tuple[str, ...] = ()
     description: str = ""
+    short: str = ""           # a few letters for narrow columns (the Cities panel)
     enabled: bool = True
     wonder: bool = False      # set by the loader: true for entries of wonders.yaml
 
@@ -557,7 +558,16 @@ class AISettings:
 # ── Everything ────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
+class RulesetInfo:
+    """A set of rules, as config/rulesets/<id>/ruleset.yaml names it. Saved games keep its id."""
+    id: str
+    name: str
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class Rules:
+    ruleset: RulesetInfo
     game: GameSettings
     terrains: dict[str, TerrainDef]
     units: dict[str, UnitDef]
