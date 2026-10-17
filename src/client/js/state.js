@@ -22,6 +22,7 @@ export const store = {
   history: [],
   historyFields: [],
   log: [],
+  replay: null,         // the replay of the game, once asked for: {since, cities, events, battles}
   playing: false,
   delay: 0.4,
   saves: [],            // names of the saved games on the server
@@ -180,10 +181,14 @@ function rebuildIndexes() {
   map.ground = groundTerrain();
   for (const city of state.cities) store.cityAt.set(tileIndex(city.x, city.y), city);
   indexUnits();
-  // Land owned by each civilization: the tiles its cities can work. First city wins.
+  store.owner = territoryOf(state.cities);
+}
+
+// Land owned by each civilization: the tiles its cities can work. First city wins.
+export function territoryOf(cities) {
+  const { map } = store;
   const owner = new Int16Array(map.width * map.height).fill(-1);
-  const cities = [...state.cities].sort((a, b) => a.id - b.id);
-  for (const city of cities) {
+  for (const city of [...cities].sort((a, b) => a.id - b.id)) {
     for (const [dx, dy] of CITY_OFFSETS) {
       const y = city.y + dy;
       if (y < 0 || y >= map.height) continue;
@@ -191,7 +196,7 @@ function rebuildIndexes() {
       if (owner[index] === -1) owner[index] = city.owner;
     }
   }
-  store.owner = owner;
+  return owner;
 }
 
 // A step some unit took, told by the server ahead of the state it belongs to (replay.js):
@@ -293,6 +298,7 @@ export function handleMessage(message) {
       store.history = message.history;
       store.historyFields = message.history_fields;
       store.log = message.log;
+      store.replay = null;
       store.playing = message.playing;
       store.delay = message.delay;
       store.saves = message.saves || [];
@@ -359,6 +365,10 @@ export function handleMessage(message) {
       break;
     case 'notice':
       emit('notice', message);
+      break;
+    case 'replay':
+      store.replay = message;
+      emit('replay');
       break;
     default:
       break;
