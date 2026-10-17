@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -468,6 +469,28 @@ def test_a_save_keeps_the_one_it_replaces(rules, tmp_path):
     assert base_name("french-2", 1925) == "french-2"
     assert year_tag(-3000) == "3000BC" and base_name("rome-3000BC", -3000) == "rome"
     assert base_name("3000BC", -3000) == "3000BC"
+
+
+def test_the_server_can_start_on_the_save_written_last(rules, tmp_path):
+    session = Session(rules, saves_dir=tmp_path)
+    assert session.resume() is None                        # nothing saved yet
+    session.game.turn = 12
+    session.save("rome")
+    session.game.turn = 30
+    session.save("athens")
+    (tmp_path / "broken.json").write_text("{}")            # not a game: passed over
+    for age, name in enumerate(("broken", "athens", "rome")):
+        os.utime(tmp_path / f"{name}.json", (1e9 - 60 * age,) * 2)
+
+    with TestClient(create_app(saves_dir=tmp_path, resume=True)) as test_client:
+        with test_client.websocket_connect("/ws") as socket:
+            init = socket.receive_json()
+    assert init["state"]["turn"] == 30 and init["save_name"] == "athens"
+
+    with TestClient(create_app(saves_dir=tmp_path)) as test_client:
+        with test_client.websocket_connect("/ws") as socket:
+            init = socket.receive_json()
+    assert init["state"]["turn"] == 0 and init["save_name"] is None
 
 
 def test_wonder_origins_are_saved(rules, tmp_path):
