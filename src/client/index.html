@@ -18,7 +18,7 @@
       <img class="brand-mark" src="favicon.svg" width="22" height="22" alt="">
       <span class="brand-name">CIVILIZATION</span>
       <div class="brand-tools">
-        <button id="btn-game" class="btn ghost icon play-only" aria-label="Game" data-hint="New game, save, load">
+        <button id="btn-game" class="btn ghost icon" aria-label="Game" data-hint="New game, save, load">
           <span data-icon="folder" data-size="18"></span></button>
         <button id="btn-options" class="btn ghost icon" aria-label="Map display" data-hint="Map display"
           aria-expanded="false" aria-controls="map-options"><span data-icon="gear" data-size="19" data-stroke="1.6"></span></button>
@@ -34,22 +34,6 @@
       <button id="gameover-pill" class="pill gold" data-hint="Final standings" hidden>Game over</button>
     </div>
     <div class="spacer"></div>
-    <div class="transport observer-only">
-      <button id="btn-play" class="btn primary" data-hint="Play / pause" data-key="Space">
-        <span id="play-icon"></span><span id="play-label">Play</span><span class="kbd roomy">Space</span>
-      </button>
-      <button id="btn-step" class="btn" data-hint="Play one turn" data-key="N">
-        <span data-icon="step" data-size="16"></span><span>Step</span><span class="kbd roomy">N</span>
-      </button>
-      <div class="vr"></div>
-      <span class="sub roomy">Speed</span>
-      <div id="speed" class="seg" role="group" aria-label="Speed">
-        <button data-delay="1.5">Slow</button>
-        <button data-delay="0.4">Normal</button>
-        <button data-delay="0.1">Fast</button>
-        <button data-delay="0">Max</button>
-      </div>
-    </div>
     <div class="chip-row">
       <div id="empire-chips" class="empire-chips play-only"></div>
       <!-- The state of the planet, once pollution has appeared: polluted tiles, warming, spaceships in flight. -->
@@ -57,18 +41,23 @@
     </div>
     <div class="spacer"></div>
     <div class="game-actions">
-      <span id="seed-label" class="mono sub roomy observer-only"></span>
-      <button id="btn-save" class="btn ghost observer-only" data-hint="Save this game">
-        <span data-icon="save" data-size="17"></span><span>Save</span>
-      </button>
-      <button id="btn-saves" class="btn ghost observer-only" data-hint="Load a saved game">
-        <span data-icon="folder" data-size="17"></span><span>Saved games</span>
-      </button>
-      <button id="btn-new" class="btn observer-only">
-        <span data-icon="plus" data-size="16"></span><span>New game</span>
-      </button>
       <div id="connection" class="status" data-hint="No connection to the server">
         <span class="dot"></span><span>Offline</span>
+      </div>
+      <!-- The observer's turns, in the place of the person's End turn: speed, one turn, play / pause. -->
+      <div class="transport observer-only">
+        <div id="speed" class="seg" role="group" aria-label="Speed" data-hint="Speed">
+          <button data-delay="1.5">Slow</button>
+          <button data-delay="0.4">Normal</button>
+          <button data-delay="0.1">Fast</button>
+          <button data-delay="0">Max</button>
+        </div>
+        <button id="btn-step" class="btn" data-hint="Play one turn" data-key="N">
+          <span data-icon="step" data-size="16"></span><span>Step</span>
+        </button>
+        <button id="btn-play" class="btn primary" data-hint="Play / pause" data-key="Space">
+          <span id="play-icon"></span><span id="play-label">Play</span>
+        </button>
       </div>
       <button id="btn-end-turn" class="btn play-only" data-hint="End your turn" data-key="Enter">
         <span data-icon="arrow" data-size="16" data-stroke="2"></span><span>End turn</span><span class="kbd">Enter</span>
