@@ -11,7 +11,9 @@ from server.api import serialize
 from server.api.app import create_app
 from server.api.session import Session, base_name, year_tag
 from server.engine import persistence
-from server.engine.systems import pollution
+from server.engine.model.entities import NO_CONTACT, Item
+from server.engine.systems import pollution, spaceship
+from server.human.controller import HumanController
 
 from .conftest import add_city, make_game
 
@@ -421,6 +423,46 @@ def test_city_sheet_tells_what_each_unit_costs(rules):
     detail = serialize.city_detail(game, city)
     assert detail["unit_costs"][legion.id] == [1, 0, 1]
     assert detail["support"]["unhappy"] == 1 and detail["stats"]["unhappy"] == 1
+
+
+def test_spaceship_payload(rules):
+    game = make_game(rules, civ_ids=("romans", "greeks", "russians"))
+    add_city(game, 1, 2, 2)
+    athens = add_city(game, 2, 10, 5, size=8)
+    add_city(game, 3, 6, 9)
+    game.relation(1, 3).state = NO_CONTACT
+    for player in game.players[1:]:
+        player.techs.update({"space_flight", "plastics", "robotics"})
+    game.wonders["apollo_program"] = athens.id
+    game.year, game.turn = 1990, 540
+    greeks, russians = game.players[2], game.players[3]
+    greeks.spaceship.parts = {"structural": 4, "component": 2, "module": 2}
+    russians.spaceship.parts = {"structural": 4, "component": 2, "module": 3}
+    athens.production = Item("building", "ss_module")
+    athens.shields = 300
+    spaceship.launch(game, russians)
+
+    observer = serialize.state_payload(game)
+    assert observer["space"] == {"earliest_landing": 546, "earliest_landing_year": 1996}
+    ship = observer["players"][2]["spaceship"]
+    assert ship["parts"] == greeks.spaceship.parts and ship["flight_years"] == 15
+    assert [(row["part"], row["city"], row["cost"]) for row in ship["making"]] == [
+        ("module", athens.name, rules.buildings["ss_module"].cost)]
+    turns = ship["making"][0]["turns"]
+    assert ship["projection"]["launch_turn"] == 540 + turns
+    flying = observer["players"][3]["spaceship"]
+    assert flying["launched_year"] == 1990 and flying["arrival_year"] == 2005
+    assert flying["projection"] is None
+
+    # The Romans, played by a person: they know the parts of the Greeks they have met, not
+    # what their cities make; of the Russians, never met, only the launch the world heard of.
+    played = serialize.state_payload(game, pov=1, controller=HumanController())
+    ship = played["players"][2]["spaceship"]
+    assert ship["parts"] == greeks.spaceship.parts and ship["making"] == []
+    assert ship["projection"] is None                    # a module missing, its making unknown
+    flying = played["players"][3]["spaceship"]
+    assert flying["parts"] == {} and flying["arrival_year"] == 2005
+    assert flying["flight_years"] == 15
 
 
 def test_wonders_payload(rules):

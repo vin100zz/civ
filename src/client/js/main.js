@@ -16,6 +16,7 @@ import { renderLog } from './panels/log.js';
 import { renderTurn } from './panels/turn.js';
 import { renderCities } from './panels/cities.js';
 import { renderWonders } from './panels/wonders.js';
+import { renderSpace, spaceBadge } from './panels/space.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
@@ -58,6 +59,7 @@ const panels = {
   civ: () => (leader() !== null ? renderEmpire($('panel-civ')) : renderCiv($('panel-civ'))),
   cities: () => renderCities($('panel-cities')),
   wonders: () => renderWonders($('panel-wonders')),
+  space: () => renderSpace($('panel-space')),
   tech: () => renderTech($('panel-tech')),
   chart: () => renderChart($('panel-chart')),
   log: () => renderLog($('panel-log')),
@@ -132,6 +134,18 @@ function refreshClock() {
     showGameOver();
   }
   refreshPlanet();
+  refreshSpaceBadge();
+}
+
+// On the Space button of the rail: the turns before the first spaceship in flight lands,
+// in red when it is a rival's.
+function refreshSpaceBadge() {
+  const badge = spaceBadge();
+  const element = $('space-badge');
+  element.hidden = !badge;
+  if (!badge) return;
+  element.textContent = badge.turns;
+  element.classList.toggle('rival', badge.rival);
 }
 
 // The state of the planet in the top bar, once pollution has appeared: polluted tiles, a gauge of

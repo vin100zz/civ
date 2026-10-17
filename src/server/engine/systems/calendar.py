@@ -13,6 +13,18 @@ def next_year(rules: Rules, year: int) -> int:
     return 1 if following == 0 else following
 
 
+def year_after(rules: Rules, year: int, turns: int) -> int:
+    """The year `turns` turns after `year`."""
+    for _ in range(turns):
+        year = next_year(rules, year)
+    return year
+
+
+def year_of_turn(rules: Rules, turn: int) -> int:
+    """The year of a turn of the game (turn 0 is the start year)."""
+    return year_after(rules, rules.game.calendar.start_year, turn)
+
+
 def turns_until(rules: Rules, year: int, target_year: int) -> int:
     """Number of turns before the calendar reaches `target_year`."""
     turns = 0
