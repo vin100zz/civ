@@ -11,9 +11,9 @@ Prérequis : Python 3.11 ou plus, avec `fastapi`, `uvicorn`, `websockets` et `py
 python run.py
 ```
 
-Puis ouvrir http://127.0.0.1:8005. Sous Windows, `start.bat` fait la même chose. `--port 9000` change le port.
+Puis ouvrir http://127.0.0.1:8005. `--port 9000` change le port. `--resume` reprend la dernière partie sauvegardée (la plus récente du dossier `saves/`, sauvegarde automatique comprise) ; sous Windows, `start.bat` lance le serveur de cette façon.
 
-Au démarrage, le serveur lance une partie observée. Le bouton **New game** (ou **Game** en cours de partie jouée) ouvre la fenêtre où l'on choisit le mode.
+Au démarrage, le serveur lance une partie observée, ou, avec `--resume`, recharge la dernière sauvegarde (une partie neuve s'il n'y en a pas). Le bouton **New game** (ou **Game** en cours de partie jouée) ouvre la fenêtre où l'on choisit le mode.
 
 ## Jouer une civilisation
 
