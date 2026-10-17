@@ -16,7 +16,7 @@ from ..engine.model.game import Game
 from ..engine.model.worldmap import Tile
 from ..engine.rules.schema import Rules
 from ..engine.systems import city as city_rules
-from ..engine.systems import pollution, production, research
+from ..engine.systems import calendar, pollution, production, research, spaceship
 from ..engine.view import PlayerView
 from ..human import orders, report
 from ..human.controller import HumanController
@@ -65,7 +65,8 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
             {"id": b.id, "name": b.name, "short": b.short, "cost": b.cost, "upkeep": b.upkeep,
              "wonder": b.wonder, "description": b.description, "requires": b.requires,
              "obsolete_by": b.obsolete_by, "effects": [_effect_payload(e) for e in b.effects],
-             "unlocks_units": any(u.requires_wonder == b.id for u in rules.units.values())}
+             "unlocks_units": any(u.requires_wonder == b.id for u in rules.units.values()),
+             "part": b.spaceship_part, "requires_wonder": b.requires_wonder}
             for b in rules.buildings.values()],
         "techs": [
             {"id": t.id, "name": t.name, "era": t.era, "prerequisites": list(t.prerequisites),
@@ -91,7 +92,11 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
             {"id": shape_id, "name": shape.name, "description": shape.description}
             for shape_id, shape in rules.game.map.shapes.items()],
         "spaceship": {"min_parts": dict(rules.game.spaceship.min_parts),
-                      "max_parts": dict(rules.game.spaceship.max_parts)},
+                      "max_parts": dict(rules.game.spaceship.max_parts),
+                      "flight_years": rules.game.spaceship.flight_years,
+                      "years_per_component": rules.game.spaceship.years_per_component,
+                      "years_per_mass": rules.game.spaceship.years_per_mass,
+                      "min_flight_years": rules.game.spaceship.min_flight_years},
         "max_turns": rules.game.calendar.max_turns,
         "points_per_move": rules.game.movement.points_per_move,
         "specialist_min_size": rules.game.city.specialist_min_size,
@@ -168,19 +173,54 @@ def player_payload(game: Game, player: Player) -> dict[str, Any]:
                        if cid in game.cities and game.cities[cid].owner == player.id),
         "ships": sum(1 for u in units if game.rules.units[u.type].domain == "sea"),
         "aircraft": sum(1 for u in units if game.rules.units[u.type].domain == "air"),
-        "spaceship": {"parts": dict(player.spaceship.parts),
-                      "launched_turn": player.spaceship.launched_turn,
-                      "arrival_turn": player.spaceship.arrival_turn},
+        "spaceship": spaceship_payload(game, player),
+    }
+
+
+def spaceship_payload(game: Game, player: Player, known: bool = True,
+                      making: bool = True) -> dict[str, Any]:
+    """A civilization's spaceship. The whole world hears of a launch and of the flight time;
+    the parts built are public to those who have met the civilization (`known`); the parts
+    in production stay with its owner and the observer (`making`). The projection tells when
+    the ship could leave and land (see spaceship.projection)."""
+    ship = player.spaceship
+    rules = game.rules
+    in_production = []
+    if making:
+        for city in game.player_cities(player.id):
+            item = city.production
+            part = rules.buildings[item.id].spaceship_part \
+                if item is not None and item.kind == "building" else None
+            if part is None or not production.can_build(game, city, item):
+                continue
+            cost = production.item_cost(game, item)
+            surplus = city_rules.compute_city(game, city).shield_surplus
+            in_production.append({
+                "part": part, "city": city.name, "city_id": city.id, "x": city.x, "y": city.y,
+                "shields": city.shields, "cost": cost,
+                "turns": max(1, -(-(cost - city.shields) // surplus)) if surplus > 0 else None})
+        in_production.sort(key=lambda row: (row["turns"] is None, row["turns"] or 0))
+    started = known and any(ship.parts.values())
+    return {
+        "parts": dict(ship.parts) if known else {},
+        "launched_turn": ship.launched_turn, "arrival_turn": ship.arrival_turn,
+        "launched_year": calendar.year_of_turn(rules, ship.launched_turn) if ship.launched else None,
+        "arrival_year": calendar.year_of_turn(rules, ship.arrival_turn) if ship.launched else None,
+        "flight_years": spaceship.flight_years(game, player) if ship.launched or started else None,
+        "making": in_production,
+        "projection": spaceship.projection(
+            game, player, [(row["part"], row["turns"]) for row in in_production])
+        if known and not player.is_barbarian else None,
     }
 
 
 def public_player_payload(game: Game, player: Player, viewer: Player) -> dict[str, Any]:
     """What a person knows of another civilization: nothing before they meet; afterwards its
     name, its government, the cities seen and what the whole world is told (wonders,
-    spaceship launches). Treasury, science and armies stay secret (None)."""
+    spaceship launches, and the parts of its spaceship). Treasury, science and armies stay
+    secret (None)."""
     met = player.is_barbarian or game.in_contact(viewer.id, player.id)
     known = [m for m in viewer.known_cities.values() if m.owner == player.id]
-    ship = player.spaceship
     payload: dict[str, Any] = {
         "id": player.id, "barbarian": player.is_barbarian, "alive": player.alive, "met": met,
         "civ": player.civ.id if met else None,
@@ -196,8 +236,8 @@ def public_player_payload(game: Game, player: Player, viewer: Player) -> dict[st
         "at_war": [], "at_peace": [],
         "wonders": sum(1 for cid in game.wonders.values()
                        if cid in game.cities and game.cities[cid].owner == player.id),
-        "spaceship": {"parts": {}, "launched_turn": ship.launched_turn,
-                      "arrival_turn": ship.arrival_turn},
+        "spaceship": spaceship_payload(game, player, known=met and not player.is_barbarian,
+                                       making=False),
     }
     if met and not player.is_barbarian and player.alive:
         # Wars and treaties between civilizations the viewer has met are public.
@@ -559,6 +599,7 @@ def state_payload(game: Game, pov: Optional[int] = None,
     """
     viewer = game.players[pov] if pov is not None and 0 <= pov < len(game.players) else None
     leading = viewer is not None and controller is not None
+    landing_turn, landing_year = spaceship.earliest_landing(game)
     payload: dict[str, Any] = {
         "seed": game.seed, "turn": game.turn, "year": game.year,
         "finished": game.finished, "winner": game.winner, "victory": game.victory,
@@ -567,6 +608,8 @@ def state_payload(game: Game, pov: Optional[int] = None,
                     "threshold": game.rules.game.pollution.warming_threshold},
         "pov": viewer.id if viewer is not None else None,
         "wonders": wonders_payload(game),
+        # A ship in flight that lands before this cannot be caught any more.
+        "space": {"earliest_landing": landing_turn, "earliest_landing_year": landing_year},
     }
     cities = list(game.cities.values())
     units = list(game.units.values())
