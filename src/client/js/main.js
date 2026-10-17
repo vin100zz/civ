@@ -126,7 +126,6 @@ function refreshClock() {
   $('year').textContent = yearLabel(state.year);
   $('turn').innerHTML = `Turn ${state.turn} <span class="muted">of ${max}</span>`;
   $('turn-progress').style.width = `${Math.min(100, 100 * state.turn / max)}%`;
-  $('seed-label').textContent = `seed ${state.seed}`;
   $('gameover-pill').hidden = !state.finished;
   if (state.finished && gameOverSeen !== `${state.seed}:${state.turn}`) {
     gameOverSeen = `${state.seed}:${state.turn}`;
@@ -563,9 +562,6 @@ document.querySelectorAll('#speed button').forEach((button) => {
 $('pov').addEventListener('change', (e) => {
   send({ cmd: 'pov', player: e.target.value === '' ? null : Number(e.target.value) });
 });
-$('btn-new').addEventListener('click', () => openGameDialog('seed'));
-$('btn-save').addEventListener('click', () => openGameDialog('save'));
-$('btn-saves').addEventListener('click', () => openGameDialog('save'));
 $('btn-game').addEventListener('click', () => openGameDialog('save'));
 $('gameover-pill').addEventListener('click', showGameOver);
 $('btn-end-turn').addEventListener('click', endTurn);
