@@ -10,9 +10,12 @@ from fastapi.testclient import TestClient
 
 from server.api import serialize
 from server.api.app import create_app
+from server.api.replay import HEADLINES, Replay
 from server.api.session import Session, base_name, year_tag
 from server.engine import persistence
-from server.engine.systems import pollution
+from server.engine.model.entities import NO_CONTACT, Item
+from server.engine.systems import pollution, spaceship
+from server.human.controller import HumanController
 
 from .conftest import add_city, make_game
 
@@ -448,6 +451,46 @@ def test_city_sheet_tells_what_each_unit_costs(rules):
     assert detail["support"]["unhappy"] == 1 and detail["stats"]["unhappy"] == 1
 
 
+def test_spaceship_payload(rules):
+    game = make_game(rules, civ_ids=("romans", "greeks", "russians"))
+    add_city(game, 1, 2, 2)
+    athens = add_city(game, 2, 10, 5, size=8)
+    add_city(game, 3, 6, 9)
+    game.relation(1, 3).state = NO_CONTACT
+    for player in game.players[1:]:
+        player.techs.update({"space_flight", "plastics", "robotics"})
+    game.wonders["apollo_program"] = athens.id
+    game.year, game.turn = 1990, 540
+    greeks, russians = game.players[2], game.players[3]
+    greeks.spaceship.parts = {"structural": 4, "component": 2, "module": 2}
+    russians.spaceship.parts = {"structural": 4, "component": 2, "module": 3}
+    athens.production = Item("building", "ss_module")
+    athens.shields = 300
+    spaceship.launch(game, russians)
+
+    observer = serialize.state_payload(game)
+    assert observer["space"] == {"earliest_landing": 546, "earliest_landing_year": 1996}
+    ship = observer["players"][2]["spaceship"]
+    assert ship["parts"] == greeks.spaceship.parts and ship["flight_years"] == 15
+    assert [(row["part"], row["city"], row["cost"]) for row in ship["making"]] == [
+        ("module", athens.name, rules.buildings["ss_module"].cost)]
+    turns = ship["making"][0]["turns"]
+    assert ship["projection"]["launch_turn"] == 540 + turns
+    flying = observer["players"][3]["spaceship"]
+    assert flying["launched_year"] == 1990 and flying["arrival_year"] == 2005
+    assert flying["projection"] is None
+
+    # The Romans, played by a person: they know the parts of the Greeks they have met, not
+    # what their cities make; of the Russians, never met, only the launch the world heard of.
+    played = serialize.state_payload(game, pov=1, controller=HumanController())
+    ship = played["players"][2]["spaceship"]
+    assert ship["parts"] == greeks.spaceship.parts and ship["making"] == []
+    assert ship["projection"] is None                    # a module missing, its making unknown
+    flying = played["players"][3]["spaceship"]
+    assert flying["parts"] == {} and flying["arrival_year"] == 2005
+    assert flying["flight_years"] == 15
+
+
 def test_wonders_payload(rules):
     game = make_game(rules)
     rome = add_city(game, 1, 5, 5)
@@ -572,3 +615,124 @@ def test_each_game_has_its_rules(rulesets, tmp_path):
     (tmp_path / "lost.json").write_text(json.dumps(data))
     with pytest.raises(persistence.SaveError, match="lost_rules"):
         session.load("lost")
+
+
+# ── The replay ────────────────────────────────────────────────────────────────
+
+def cities_in(replay: dict, turn: int) -> dict[int, dict]:
+    """The cities as the replay draws them when `turn` begins."""
+    cities: dict[int, dict] = {}
+    for change in replay["cities"]:
+        kind, when, city_id = change[:3]
+        if when > turn:
+            break
+        if kind == "found":
+            cities[city_id] = dict(zip(("owner", "x", "y", "name", "size"), change[3:]))
+        elif kind == "owner":
+            cities[city_id]["owner"] = change[3]
+        elif kind == "size":
+            cities[city_id]["size"] = change[3]
+        else:
+            del cities[city_id]
+    return cities
+
+
+def test_the_replay_notes_what_changes_in_the_cities(rules):
+    game = make_game(rules)
+    replay = Replay()
+    rome = add_city(game, 1, 2, 2)
+    replay.note_cities(game)
+    game.turn = 1
+    athens = add_city(game, 2, 8, 6, size=3)
+    rome.size = 2
+    replay.note_cities(game)
+    game.turn = 2
+    rome.owner = 2
+    del game.cities[athens.id]
+    replay.note_cities(game)
+    game.turn = 3
+    replay.note_cities(game)                               # nothing changed
+    assert replay.cities == [
+        ["found", 0, rome.id, 1, 2, 2, rome.name, 1],
+        ["size", 1, rome.id, 2],
+        ["found", 1, athens.id, 2, 8, 6, athens.name, 3],
+        ["owner", 2, rome.id, 2],
+        ["gone", 2, athens.id]]
+
+    # Battles and great events are kept, the routine of the cities is not.
+    replay.note_events([
+        {"type": "combat", "turn": 3, "year": -3940, "text": "Roman Legion attacks...",
+         "player": 1, "other": 2, "x": 4, "y": 5, "attacker": "legion", "defender": "phalanx",
+         "attacker_won": True, "attack": 4, "defense": 2, "winner": 1, "loser": 2},
+        {"type": "building", "turn": 3, "year": -3940, "text": "Rome builds Barracks.",
+         "player": 2, "x": 2, "y": 2},
+        {"type": "wonder", "turn": 3, "year": -3940, "text": "Rome (Greek) completes Colossus.",
+         "player": 2, "x": 2, "y": 2, "wonder": "colossus", "city": rome.id}])
+    assert replay.battles == [[3, 4, 5, 1, 2]]
+    assert replay.events == [{"type": "wonder", "turn": 3, "year": -3940, "player": 2, "x": 2,
+                              "y": 2, "text": "Rome (Greek) completes Colossus."}]
+
+    # Taken back from a save, it goes on where it stopped.
+    again = Replay.restore(json.loads(json.dumps(replay.payload())), game, [])
+    assert again.payload() == replay.payload()
+    game.turn = 4
+    rome.size = 5
+    again.note_cities(game)
+    assert again.cities[-1] == ["size", 4, rome.id, 5] and len(again.cities) == 6
+
+
+def test_the_replay_of_an_observed_game(client):
+    with client.websocket_connect("/ws") as socket:
+        socket.receive_json()
+        socket.send_json({"cmd": "new_game", "seed": 11, "players": 3})
+        socket.receive_json()
+        for _ in range(25):
+            socket.send_json({"cmd": "step"})
+            message = receive(socket, "turn")
+        state = message["state"]
+        socket.send_json({"cmd": "replay"})
+        replay = receive(socket, "replay")
+    assert replay["since"] == 0 and replay["cities"][0][:2] == ["found", 1]
+    assert cities_in(replay, state["turn"]) == {
+        c["id"]: {"owner": c["owner"], "x": c["x"], "y": c["y"], "name": c["name"], "size": c["size"]}
+        for c in state["cities"]}
+    turns = [change[1] for change in replay["cities"]]
+    assert turns == sorted(turns)
+
+
+def test_no_replay_while_a_person_plays(client):
+    with client.websocket_connect("/ws") as socket:
+        start_playing(socket)
+        socket.send_json({"cmd": "replay"})
+        assert receive(socket, "notice") == {
+            "type": "notice", "text": "The replay opens once the game is over.", "ok": False}
+
+
+def test_the_replay_is_saved_with_the_game(rules, tmp_path):
+    session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
+    session.new_game(7, players=3)
+    for _ in range(12):
+        asyncio.run(session.step())
+    noted = session.replay.payload()
+    assert noted["cities"] and noted["events"]
+    session.save("replayed")
+    session.load("replayed")
+    assert session.replay.payload() == noted
+    asyncio.run(session.step())
+    founded = [change[2] for change in session.replay.cities if change[0] == "found"]
+    assert len(founded) == len(set(founded)), "a city goes on being followed, not founded again"
+
+    # A game saved before replays were noted: its cities as they are now, from the turn
+    # each was founded, and the great events its chronicle still holds.
+    data = json.loads((tmp_path / "replayed.json").read_text())
+    del data["extra"]["replay"]
+    (tmp_path / "older.json").write_text(json.dumps(data))
+    session.load("older")
+    game = session.game
+    replay = session.replay.payload()
+    assert replay["since"] == game.turn == 12
+    assert cities_in(replay, game.turn) == {
+        c.id: {"owner": c.owner, "x": c.x, "y": c.y, "name": c.name, "size": c.size}
+        for c in game.cities.values()}
+    told = [e["text"] for e in data["extra"]["log"] if e["type"] in HEADLINES]
+    assert told and [e["text"] for e in replay["events"]] == told

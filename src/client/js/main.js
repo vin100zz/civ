@@ -12,10 +12,12 @@ import { renderCivs, renderCiv, techName, governmentName } from './panels/civs.j
 import { renderCity, setTileRenderer } from './panels/city.js';
 import { renderTech, resetTechLayout } from './panels/tech.js';
 import { renderChart } from './panels/chart.js';
+import { renderReplay, receiveReplay, resetReplay, replayKey, playFromStart } from './panels/replay.js';
 import { renderLog } from './panels/log.js';
 import { renderTurn } from './panels/turn.js';
 import { renderCities } from './panels/cities.js';
 import { renderWonders } from './panels/wonders.js';
+import { renderSpace, spaceBadge } from './panels/space.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
 import { initToasts, toast, clearToasts } from './toasts.js';
@@ -58,12 +60,14 @@ const panels = {
   civ: () => (leader() !== null ? renderEmpire($('panel-civ')) : renderCiv($('panel-civ'))),
   cities: () => renderCities($('panel-cities')),
   wonders: () => renderWonders($('panel-wonders')),
+  space: () => renderSpace($('panel-space')),
   tech: () => renderTech($('panel-tech')),
   chart: () => renderChart($('panel-chart')),
+  replay: () => renderReplay($('panel-replay')),
   log: () => renderLog($('panel-log')),
 };
-// Science and History take the whole width; a city opens in a window over the map.
-const WORKSPACES = ['tech', 'chart'];
+// Science, History and Replay take the whole width; a city opens in a window over the map.
+const WORKSPACES = ['tech', 'chart', 'replay'];
 let activeTab = 'civs';
 let mapTab = 'civs';         // the last tab that leaves the map in view
 let gameOverSeen = null;     // "seed:turn" of the finished game already announced
@@ -132,6 +136,18 @@ function refreshClock() {
     showGameOver();
   }
   refreshPlanet();
+  refreshSpaceBadge();
+}
+
+// On the Space button of the rail: the turns before the first spaceship in flight lands,
+// in red when it is a rival's.
+function refreshSpaceBadge() {
+  const badge = spaceBadge();
+  const element = $('space-badge');
+  element.hidden = !badge;
+  if (!badge) return;
+  element.textContent = badge.turns;
+  element.classList.toggle('rival', badge.rival);
 }
 
 // The state of the planet in the top bar, once pollution has appeared: polluted tiles, a gauge of
@@ -397,6 +413,7 @@ on('init', () => {
     if ($(id).open) $(id).close();
   }
   gameOverSeen = null;
+  resetReplay();
   mapView.setMarker(null);
   clearToasts();
   syncMode();
@@ -479,6 +496,7 @@ on('status', () => {
 
 on('saves', refreshSaves);
 on('notice', showNotice);
+on('replay', receiveReplay);
 
 on('city', () => {
   mapView.invalidate();
@@ -540,6 +558,10 @@ on('locate', ({ x, y }) => {
 });
 on('show-tab', showTab);
 on('back-to-map', () => showTab(mapTab));
+on('play-replay', () => {
+  playFromStart();
+  showTab('replay');
+});
 on('open-research', () => openResearchDialog());
 on('open-proposal', openProposal);
 on('confirm-war', openWarConfirm);
@@ -636,6 +658,10 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !play.mode) {
     if (WORKSPACES.includes(activeTab)) showTab(mapTab);
     else if (store.selectedCity !== null) emit('close-city');
+    return;
+  }
+  if (activeTab === 'replay' && replayKey(e)) {
+    e.preventDefault();
     return;
   }
   if (leader() !== null) {

@@ -5,6 +5,7 @@ import { send } from './net.js';
 import { store, emit, player, yearLabel, inkOn, swatch, civColor, plural, turnsFor } from './state.js';
 import { icon } from './icons.js';
 import { governmentName } from './panels/civs.js';
+import { paintThumbnail } from './panels/replay.js';
 
 const $ = (id) => document.getElementById(id);
 const VICTORY = {
@@ -550,6 +551,11 @@ export function showGameOver() {
         </div>
         <div class="over-actions">
           <button class="btn primary" data-over="new">New game</button>
+          <button class="replay-card" data-over="replay" aria-label="Replay the game from the start">
+            <span class="thumb" style="aspect-ratio:${store.map.width} / ${store.map.height}"><canvas></canvas><span class="play">${icon('play', 22, 2)}</span></span>
+            <span class="titles"><b>Replay the game</b>
+              <span class="sub">${plural(state.turn, 'turn')}, ${store.history.length ? yearLabel(store.history[0].year) : ''} to ${yearLabel(state.year)}</span></span>
+          </button>
           <div class="two" style="gap:8px">
             <button class="btn" data-over="history">Review history</button>
             <button class="btn" data-over="map">Browse the map</button>
@@ -562,8 +568,10 @@ export function showGameOver() {
       dialog.close();
       if (button.dataset.over === 'new') openGameDialog('new');
       if (button.dataset.over === 'history') emit('show-tab', 'chart');
+      if (button.dataset.over === 'replay') emit('play-replay');
     });
   });
   show(dialog);
+  paintThumbnail(dialog.querySelector('.replay-card canvas'));
 }
 

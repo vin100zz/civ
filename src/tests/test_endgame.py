@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 import pytest
 
@@ -268,6 +269,32 @@ def test_spaceship_is_lost_with_the_capital(rules):
     assert movement.move_unit(game, invader, game.map.tile(5, 5)) == movement.CAPTURED
     assert not player.spaceship.launched and player.spaceship.parts == {}
     assert "spaceship_lost" in [e["type"] for e in game.events]
+
+
+def test_when_a_spaceship_could_leave_and_land(rules):
+    game, city, other = space_game(rules)
+    player = game.players[1]
+    settings = rules.game.spaceship
+    game.year, game.turn = 1990, 540                                  # one year a turn by then
+    fastest = settings.min_flight_years
+    assert spaceship.earliest_landing(game) == (540 + fastest, 1990 + fastest)
+    assert spaceship.projection(game, player, []) is None             # nothing built
+
+    # A module short: the ship leaves when the city building one is done, with the engine
+    # done by then; the structural part comes too late to fly.
+    player.spaceship.parts = dict(settings.min_parts)
+    player.spaceship.parts["module"] -= 1
+    coming = [("structural", 9), ("module", None), ("module", 4), ("component", 3)]
+    years = max(fastest, math.ceil(settings.flight_years - settings.years_per_component))
+    assert spaceship.projection(game, player, coming) == {
+        "launch_turn": 544, "launch_year": 1994, "arrival_turn": 544 + years,
+        "arrival_year": 1994 + years, "flight_years": years}
+    assert spaceship.projection(game, player, [("module", None)]) is None   # never done
+
+    player.spaceship.parts["module"] += 1                             # ready: it leaves now
+    assert spaceship.projection(game, player, coming)["launch_turn"] == 540
+    player.capital_id = None
+    assert spaceship.projection(game, player, coming) is None
 
 
 # ── Victory and score ─────────────────────────────────────────────────────────

@@ -8,6 +8,9 @@ sees the game through that person's eyes, and only what it is supposed to know. 
 includes the steps the units take in its sight: its own, and those of the others while they
 play, which the browser shows one after the other.
 
+Each turn, the session notes the figures of the History and what the replay shows (replay.py).
+The replay is sent to a browser that asks, once nothing is hidden any more.
+
 Turns are played in a worker thread, so the web server stays responsive. The session also
 saves the game to the `saves` folder and loads it back. A played game saves itself every few
 turns under the name it was loaded or saved under; the save it replaces is kept as
@@ -43,6 +46,7 @@ from ..human import orders
 from ..human.controller import BLOCKED, HumanController
 from ..sim.runner import create_game, restore_game
 from . import commands, serialize
+from .replay import Replay
 
 MAX_LOG = 600
 HISTORY_FIELDS = ("cities", "population", "techs", "score", "gold", "units")
@@ -74,6 +78,7 @@ class Session:
         self.delay = 0.4                       # seconds between two turns while playing
         self.clients: dict[WebSocket, Optional[int]] = {}    # socket -> point of view
         self.history: list[dict] = []
+        self.replay = Replay()
         self.log: deque[dict] = deque(maxlen=MAX_LOG)           # everything that happened
         self.heard: deque[dict] = deque(maxlen=MAX_LOG)         # what the person heard of
         self._events_read = 0                  # events of game.events already in the logs
@@ -137,7 +142,9 @@ class Session:
                                 map_settings=map_settings, human_civ=civ, level=level)
         self.save_name = None
         self._reset(humans=[p.id for p in self.game.players if turn.is_interactive(self.game, p)])
-        self.history = [self._history_row()]
+        self.history = []
+        self.replay = Replay()
+        self._note_turn()
         if self.in_play():
             self._advance()                    # up to the person's first turn
             self._read_events()
@@ -198,6 +205,11 @@ class Session:
                 player.gold, len(game.player_units(player.id))]
         return row
 
+    def _note_turn(self) -> None:
+        """A turn begins: its figures go to the History, its cities to the replay."""
+        self.history.append(self._history_row())
+        self.replay.note_cities(self.game)
+
     def _shown(self, row: dict) -> dict:
         """A history row as the browsers may see it: a person only follows its own figures."""
         if not self.in_play():
@@ -228,7 +240,8 @@ class Session:
         """The game as the text of its save, and the turn it is at."""
         game = self.game
         text = persistence.dump_game(game, extra={"history": self.history, "log": list(self.log),
-                                                  "heard": list(self.heard)})
+                                                  "heard": list(self.heard),
+                                                  "replay": self.replay.payload()})
         return text, {"seed": game.seed, "turn": game.turn, "year": game.year}
 
     def _write(self, name: str, text: str, moment: dict[str, int]) -> None:
@@ -308,6 +321,7 @@ class Session:
             row["players"] = {int(pid): values for pid, values in row["players"].items()}
         self.log.extend(extra.get("log", []))
         self.heard.extend(extra.get("heard", []))
+        self.replay = Replay.restore(extra.get("replay"), game, self.log)
         # Saves made before the origins of the wonders were kept: the chronicle still tells
         # when and by whom its latest wonders were completed.
         told = {event["wonder"]: event for event in self.log if event.get("type") == "wonder"}
@@ -339,6 +353,7 @@ class Session:
         fresh = game.events[self._events_read:]
         self._events_read = len(game.events)
         self.log.extend(fresh)
+        self.replay.note_events(fresh)
         if self.human is None:
             return fresh, fresh
         view = self._view()
@@ -372,7 +387,7 @@ class Session:
         self.game.events.clear()
         self._events_read = 0
         turn.play_turn(self.game)
-        self.history.append(self._history_row())
+        self._note_turn()
 
     def _advance(self) -> None:
         """Lets the AI play until the person's next turn (or the end of the game). The
@@ -384,7 +399,7 @@ class Session:
         self._events_read = 0
         turn.advance(game)
         if game.turn != before:
-            self.history.append(self._history_row())
+            self._note_turn()
 
     async def step(self) -> None:
         """Plays one turn of an observed game and tells everybody."""
@@ -640,6 +655,9 @@ class Session:
         elif command == "player":
             async with self._busy:
                 await self._player(client, message.get("id"))
+        elif command == "replay":
+            async with self._busy:
+                await self._replay(client)
 
     async def _new_game(self, client: WebSocket, message: dict) -> None:
         seed = message.get("seed")
@@ -716,3 +734,11 @@ class Session:
         else:
             detail = serialize.public_player_payload(game, player, self._leader())
         await self._send(client, {"type": "player", "player": detail})
+
+    async def _replay(self, client: WebSocket) -> None:
+        """The replay of the game. It shows every civilization: a person leading one waits
+        for the end of the game."""
+        if self.in_play():
+            await self._notice(client, "The replay opens once the game is over.", False)
+            return
+        await self._send(client, {"type": "replay", **self.replay.payload()})
