@@ -32,6 +32,7 @@ def test_static_files_and_rules(client):
     assert client.get("/resources/terrain/grassland.png").status_code == 200
     rules = client.get("/api/rules").json()
     assert len(rules["units"]) == 28 and len(rules["terrains"]) == 12
+    assert rules["ruleset"]["id"] == "civ1"
     assert {"id", "name", "color"} <= set(rules["civs"][0])
     assert rules["defaults"]["map"] == {"shape": "continents", "relief": 1, "climate": 1}
     assert {"continents", "small_islands", "pangaea"} <= {s["id"] for s in rules["map_shapes"]}
@@ -446,7 +447,7 @@ def test_wonders_payload(rules):
 
 
 def test_a_save_keeps_the_one_it_replaces(rules, tmp_path):
-    session = Session(rules, saves_dir=tmp_path)
+    session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
     game = session.game
 
     def save_in(year: int) -> set[str]:
@@ -474,7 +475,7 @@ def test_a_save_keeps_the_one_it_replaces(rules, tmp_path):
 
 
 def test_the_server_can_start_on_the_save_written_last(rules, tmp_path):
-    session = Session(rules, saves_dir=tmp_path)
+    session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
     assert session.resume() is None                        # nothing saved yet
     session.game.turn = 12
     session.save("rome")
@@ -496,7 +497,7 @@ def test_the_server_can_start_on_the_save_written_last(rules, tmp_path):
 
 
 def test_wonder_origins_are_saved(rules, tmp_path):
-    session = Session(rules, saves_dir=tmp_path)
+    session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
     game = session.game
     land = next(tile for tile in game.map.tiles if game.terrain(tile).is_land)
     city = add_city(game, 1, land.x, land.y)
@@ -519,6 +520,36 @@ def test_wonder_origins_are_saved(rules, tmp_path):
     (tmp_path / "old.json").write_text(json.dumps(data))
     session.load("old")
     assert session.game.wonder_origins == {"colossus": (-1200, city.owner, city.name)}
+
+
+def test_each_game_has_its_rules(rulesets, tmp_path):
+    session = Session(rulesets, saves_dir=tmp_path)
+    assert session.rules is rulesets["civ1"]
+    init = session.init_message(None)
+    assert init["rules"]["ruleset"]["id"] == "civ1"
+    assert [entry["id"] for entry in init["rulesets"]] == list(rulesets)
+
+    # The rules are chosen with the new game, and recorded in its saves.
+    asyncio.run(session._new_game(None, {"cmd": "new_game", "seed": 7, "ruleset": "golden_ages"}))
+    assert session.rules is rulesets["golden_ages"] and session.game.seed == 7
+    session.save("other")
+    assert json.loads((tmp_path / "other.json").read_text())["ruleset"] == "golden_ages"
+    session.new_game(8, ruleset="civ1")
+    session.load("other")
+    assert session.rules is rulesets["golden_ages"] and session.game.seed == 7
+    session.new_game(9)                                # no choice: the rules of the last game
+    assert session.rules is rulesets["golden_ages"]
+
+    # Saves made before the choice existed are games of Civilization I.
+    data = json.loads((tmp_path / "other.json").read_text())
+    del data["ruleset"]
+    (tmp_path / "old.json").write_text(json.dumps(data))
+    session.load("old")
+    assert session.rules is rulesets["civ1"]
+    data["ruleset"] = "lost_rules"
+    (tmp_path / "lost.json").write_text(json.dumps(data))
+    with pytest.raises(persistence.SaveError, match="lost_rules"):
+        session.load("lost")
 
 
 # ── The replay ────────────────────────────────────────────────────────────────
@@ -613,7 +644,7 @@ def test_no_replay_while_a_person_plays(client):
 
 
 def test_the_replay_is_saved_with_the_game(rules, tmp_path):
-    session = Session(rules, saves_dir=tmp_path)
+    session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
     session.new_game(7, players=3)
     for _ in range(12):
         asyncio.run(session.step())
@@ -640,4 +671,3 @@ def test_the_replay_is_saved_with_the_game(rules, tmp_path):
         for c in game.cities.values()}
     told = [e["text"] for e in data["extra"]["log"] if e["type"] in HEADLINES]
     assert told and [e["text"] for e in replay["events"]] == told
-

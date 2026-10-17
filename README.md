@@ -92,6 +92,12 @@ python simulate.py --seed 7 --turns 300 --shape small_islands --relief 2 --clima
 
 `--shape` prend une des formes de `map.shapes` dans `config/game.yaml` (on peut en ajouter) ; `--relief` et `--climate` vont de 0 à 2.
 
+```bash
+python simulate.py --seed 7 --turns 300 --rules golden_ages
+```
+
+`--rules` choisit le jeu de règles (un dossier de `config/rulesets/`, `civ1` par défaut) ; une partie chargée avec `--load` garde le sien.
+
 Une sauvegarde faite ici se charge aussi dans l'interface (et inversement).
 
 ## Tester
@@ -113,9 +119,11 @@ Tout est dans `config/` :
 | Fichier | Contenu |
 |---|---|
 | `game.yaml` | Carte, calendrier, règles de ville, combat, déplacements, huttes, barbares, pollution, nucléaire, vaisseau spatial, score, victoire |
-| `terrains.yaml`, `units.yaml`, `buildings.yaml`, `wonders.yaml` | Données du jeu ; les effets des bâtiments et les capacités des unités sont déclarés ici |
-| `technologies.yaml`, `governments.yaml`, `civilizations.yaml` | Arbre des techs, gouvernements, civilisations et personnalités |
+| `terrains.yaml`, `governments.yaml`, `civilizations.yaml` | Terrains, gouvernements, civilisations et personnalités |
 | `ai.yaml` | Poids et seuils de l'IA |
+| `rulesets/<id>/` | Un jeu de règles : `technologies.yaml`, `units.yaml`, `buildings.yaml`, `wonders.yaml` (les effets des bâtiments et les capacités des unités sont déclarés ici), et son nom dans `ruleset.yaml` |
+
+Chaque partie se joue avec un jeu de règles, choisi dans la fenêtre de nouvelle partie et enregistré dans ses sauvegardes : `civ1` (Civilization I) ou `golden_ages` (Golden Ages : une unité nouvelle à chaque époque, des canons qui ignorent les remparts, une seule Power Plant, Sewer System et Harbour, des merveilles qui ne deviennent jamais obsolètes). Un fichier du dossier d'un jeu de règles remplace celui de `config/` qui porte le même nom ; `game.yaml` et `ai.yaml` y sont fusionnés clé par clé, pour ne changer que ce qui diffère (par exemple les unités que nomme `game.yaml` : unités de départ, mercenaires, barbares). Pour créer un jeu de règles, copier `config/rulesets/civ1/` sous un autre nom : le nom du dossier est l'identifiant que gardent les sauvegardes. Les parties sauvegardées avant ce choix sont des parties `civ1`.
 
 Quelques réglages utiles dans `game.yaml` : `enabled_unit_domains` (retirer `sea` ou `air` pour une partie terrestre), `victory` (conquête, vaisseau), `calendar.max_turns` (fin au score), `pollution.enabled`.
 

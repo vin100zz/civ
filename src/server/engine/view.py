@@ -112,8 +112,9 @@ class PlayerView:
     def city_stats(self, city: City) -> CityStats:
         return city_rules.compute_city(self._game, city)
 
-    def city_tile_yields(self, city: City, tile: Tile) -> Yields:
-        return city_rules.tile_yields(self._game, city, tile)
+    def city_tile_yields(self, city: City, tile: Tile, effects: Optional[list] = None) -> Yields:
+        """What the tile gives the city; pass the city's effects when asking for many tiles."""
+        return city_rules.tile_yields(self._game, city, tile, effects)
 
     def city_max_size(self, city: City) -> Optional[int]:
         return city_rules.max_size(self._game, city)

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-from ..engine.rules.loader import DEFAULT_RESOURCES_DIR, PROJECT_ROOT, load_rules
+from ..engine.rules.loader import DEFAULT_RESOURCES_DIR, PROJECT_ROOT, load_rulesets
 from . import serialize
 from .session import Session
 
@@ -28,11 +28,11 @@ class ClientFiles(StaticFiles):
 def create_app(config_dir: Path | None = None, saves_dir: Path | None = None,
                resume: bool = False) -> FastAPI:
     """The application. With `resume`, it starts on the latest saved game, not a new one."""
-    rules = load_rules(config_dir)          # fails here, with a clear message, on a bad config
+    rulesets = load_rulesets(config_dir)    # fails here, with a clear message, on a bad config
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.session = Session(rules, saves_dir)
+        app.state.session = Session(rulesets, saves_dir)
         if resume:
             name = app.state.session.resume()
             print(f"Resuming the saved game {name}." if name
@@ -46,7 +46,8 @@ def create_app(config_dir: Path | None = None, saves_dir: Path | None = None,
 
     @app.get("/api/rules")
     async def get_rules() -> dict:
-        return serialize.rules_payload(rules)
+        """The rules of the game being played."""
+        return serialize.rules_payload(app.state.session.rules)
 
     @app.websocket("/ws")
     async def websocket(socket: WebSocket) -> None:

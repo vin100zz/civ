@@ -1,5 +1,8 @@
 """Loads config/*.yaml into the dataclasses of schema.py and validates them.
 
+There is one Rules object per set of rules (config/rulesets/<id>/): the files of its folder
+are read first, the shared ones of config/ for the rest (see config/rulesets/civ1/ruleset.yaml).
+
 Any problem (unknown key, wrong type, reference to something that does not exist) raises
 ConfigError with the file and the path of the faulty value, so a bad config never starts a game.
 """
@@ -20,6 +23,9 @@ from .schema import Rules
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_CONFIG_DIR = PROJECT_ROOT / "config"
 DEFAULT_RESOURCES_DIR = PROJECT_ROOT / "resources"
+RULESETS_DIR = "rulesets"
+DEFAULT_RULESET = "civ1"       # also the rules of the games saved before there was a choice
+MERGED_FILES = ("game.yaml", "ai.yaml")   # a set of rules changes some of their keys only
 
 
 class ConfigError(Exception):
@@ -100,19 +106,49 @@ def _build(cls: type, data: Any, where: str) -> Any:
     return cls(**kwargs)
 
 
-def _read(config_dir: Path, name: str) -> Any:
-    path = config_dir / name
+# ── The files of a set of rules ───────────────────────────────────────────────
+
+def _read_file(path: Path) -> Any:
     if not path.exists():
         raise ConfigError(f"{path}: file not found")
     try:
         with open(path, "r", encoding="utf-8") as fh:
             return yaml.safe_load(fh)
     except yaml.YAMLError as exc:
-        raise ConfigError(f"{name}: invalid YAML: {exc}") from exc
+        raise ConfigError(f"{path.name}: invalid YAML: {exc}") from exc
 
 
-def _load_list(config_dir: Path, name: str, cls: type) -> dict[str, Any]:
-    raw = _read(config_dir, name)
+def _merge(base: Any, change: Any) -> Any:
+    """`change` laid over `base`: mappings are merged key by key, anything else replaced."""
+    if not isinstance(base, dict) or not isinstance(change, dict):
+        return change
+    return {**base, **{k: _merge(base[k], v) if k in base else v for k, v in change.items()}}
+
+
+class _Files:
+    """Where the files of one set of rules are read: its own folder, then config/."""
+
+    def __init__(self, config_dir: Path, ruleset: str) -> None:
+        self.shared = config_dir
+        self.own = config_dir / RULESETS_DIR / ruleset
+
+    def read(self, name: str) -> Any:
+        own = self.own / name
+        if name not in MERGED_FILES:
+            return _read_file(own if own.exists() else self.shared / name)
+        data = _read_file(self.shared / name)
+        return _merge(data, _read_file(own)) if own.exists() else data
+
+
+def ruleset_ids(config_dir: Optional[Path] = None) -> list[str]:
+    """The sets of rules found in config/rulesets/, Civilization I first."""
+    folder = Path(config_dir or DEFAULT_CONFIG_DIR) / RULESETS_DIR
+    found = [path.parent.name for path in folder.glob("*/ruleset.yaml")]
+    return sorted(found, key=lambda ruleset: (ruleset != DEFAULT_RULESET, ruleset))
+
+
+def _load_list(files: _Files, name: str, cls: type) -> dict[str, Any]:
+    raw = files.read(name)
     if not isinstance(raw, list):
         raise ConfigError(f"{name}: expected a list of entries")
     result: dict[str, Any] = {}
@@ -128,28 +164,52 @@ def _load_list(config_dir: Path, name: str, cls: type) -> dict[str, Any]:
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def load_rules(config_dir: Optional[Path] = None, resources_dir: Optional[Path] = None,
-               check_sprites: bool = True) -> Rules:
+               check_sprites: bool = True, ruleset: str = DEFAULT_RULESET) -> Rules:
+    """One set of rules, Civilization I unless told otherwise."""
     config_dir = Path(config_dir) if config_dir else DEFAULT_CONFIG_DIR
     resources_dir = Path(resources_dir) if resources_dir else DEFAULT_RESOURCES_DIR
+    if ruleset not in ruleset_ids(config_dir):
+        raise ConfigError(f"no set of rules '{ruleset}' in {config_dir / RULESETS_DIR} "
+                          f"(a folder holding a ruleset.yaml)")
+    try:
+        return _load(_Files(config_dir, ruleset), ruleset,
+                     resources_dir if check_sprites else None)
+    except ConfigError as error:
+        raise ConfigError(f"Rules '{ruleset}': {error}") from None
 
-    buildings = _load_list(config_dir, "buildings.yaml", schema.BuildingDef)
-    wonders = _load_list(config_dir, "wonders.yaml", schema.BuildingDef)
+
+def load_rulesets(config_dir: Optional[Path] = None,
+                  resources_dir: Optional[Path] = None) -> dict[str, Rules]:
+    """Every set of rules of config/rulesets/, by id, Civilization I first."""
+    ids = ruleset_ids(config_dir)
+    if not ids:
+        raise ConfigError(f"no set of rules in {Path(config_dir or DEFAULT_CONFIG_DIR) / RULESETS_DIR}")
+    return {ruleset: load_rules(config_dir, resources_dir, ruleset=ruleset) for ruleset in ids}
+
+
+def _load(files: _Files, ruleset: str, resources_dir: Optional[Path]) -> Rules:
+    buildings = _load_list(files, "buildings.yaml", schema.BuildingDef)
+    wonders = _load_list(files, "wonders.yaml", schema.BuildingDef)
     for wonder_id, wonder in wonders.items():
         if wonder_id in buildings:
             raise ConfigError(f"wonders.yaml: id '{wonder_id}' already used in buildings.yaml")
         buildings[wonder_id] = dataclasses.replace(wonder, wonder=True)
 
+    info = files.read("ruleset.yaml")
+    if not isinstance(info, dict):
+        raise ConfigError("ruleset.yaml: expected a mapping with a name and a description")
     rules = Rules(
-        game=_build(schema.GameSettings, _read(config_dir, "game.yaml"), "game.yaml"),
-        terrains=_load_list(config_dir, "terrains.yaml", schema.TerrainDef),
-        units=_load_list(config_dir, "units.yaml", schema.UnitDef),
+        ruleset=_build(schema.RulesetInfo, {**info, "id": ruleset}, "ruleset.yaml"),
+        game=_build(schema.GameSettings, files.read("game.yaml"), "game.yaml"),
+        terrains=_load_list(files, "terrains.yaml", schema.TerrainDef),
+        units=_load_list(files, "units.yaml", schema.UnitDef),
         buildings=buildings,
-        techs=_load_list(config_dir, "technologies.yaml", schema.TechDef),
-        governments=_load_list(config_dir, "governments.yaml", schema.GovernmentDef),
-        civs=_load_list(config_dir, "civilizations.yaml", schema.CivDef),
-        ai=_build(schema.AISettings, _read(config_dir, "ai.yaml"), "ai.yaml"),
+        techs=_load_list(files, "technologies.yaml", schema.TechDef),
+        governments=_load_list(files, "governments.yaml", schema.GovernmentDef),
+        civs=_load_list(files, "civilizations.yaml", schema.CivDef),
+        ai=_build(schema.AISettings, files.read("ai.yaml"), "ai.yaml"),
     )
-    _validate(rules, resources_dir if check_sprites else None)
+    _validate(rules, resources_dir)
     return rules
 
 
@@ -255,6 +315,8 @@ def _validate(rules: Rules, resources_dir: Optional[Path]) -> None:
                 c.one_of(e.yield_kind, schema.YIELD_KINDS, f"{ewhere}.yield")
             if e.type == "acts_as_building" and e.building is None:
                 c.error(f"{ewhere}: 'building' is required")
+            if e.type == "tile_food_bonus":
+                c.one_of(e.domain, ("land", "sea"), f"{ewhere}.domain")
             if e.domain is not None:
                 c.one_of(e.domain, schema.DOMAINS, f"{ewhere}.domain")
             if e.vs is not None:

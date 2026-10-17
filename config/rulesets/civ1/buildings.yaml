@@ -28,9 +28,11 @@
 #   spaceship_part       - not a building: adds a `part` (structural | component | module)
 #                          to the owner's spaceship; can be built many times
 # requires_wonder: some civilization must have built this wonder.
+# short: a few letters naming the building in narrow columns (the Cities panel).
 
 - id: palace
   name: Palace
+  short: PAL
   description: Seat of your government. Corruption grows with the distance to it.
   cost: 200
   upkeep: 0
@@ -40,6 +42,7 @@
 
 - id: barracks
   name: Barracks
+  short: BAR
   description: Units built here start as veterans.
   cost: 40
   upkeep: 1
@@ -49,6 +52,7 @@
 
 - id: granary
   name: Granary
+  short: GRA
   description: Keeps half of the food box when the city grows.
   cost: 60
   upkeep: 1
@@ -58,6 +62,7 @@
 
 - id: temple
   name: Temple
+  short: TMP
   description: Makes 1 unhappy citizen content, 2 with Mysticism.
   cost: 40
   upkeep: 1
@@ -68,6 +73,7 @@
 
 - id: marketplace
   name: Marketplace
+  short: MKT
   description: +50% taxes and luxuries.
   cost: 80
   upkeep: 1
@@ -78,6 +84,7 @@
 
 - id: library
   name: Library
+  short: LIB
   description: +50% science.
   cost: 80
   upkeep: 1
@@ -87,6 +94,7 @@
 
 - id: courthouse
   name: Courthouse
+  short: CRT
   description: Halves corruption.
   cost: 80
   upkeep: 1
@@ -96,6 +104,7 @@
 
 - id: city_walls
   name: City Walls
+  short: WAL
   description: Triples the defense against land units.
   cost: 120
   upkeep: 2
@@ -105,6 +114,7 @@
 
 - id: aqueduct
   name: Aqueduct
+  short: AQU
   description: Lets the city grow beyond size 10.
   cost: 120
   upkeep: 2
@@ -114,6 +124,7 @@
 
 - id: bank
   name: Bank
+  short: BNK
   description: +50% taxes and luxuries, on top of the Marketplace.
   cost: 120
   upkeep: 3
@@ -125,6 +136,7 @@
 
 - id: cathedral
   name: Cathedral
+  short: CAT
   description: Makes 4 unhappy citizens content.
   cost: 160
   upkeep: 3
@@ -134,6 +146,7 @@
 
 - id: university
   name: University
+  short: UNI
   description: +50% science, on top of the Library.
   cost: 160
   upkeep: 3
@@ -144,6 +157,7 @@
 
 - id: colosseum
   name: Colosseum
+  short: COL
   description: Makes 3 unhappy citizens content.
   cost: 100
   upkeep: 4
@@ -153,6 +167,7 @@
 
 - id: factory
   name: Factory
+  short: FAC
   description: +50% shields.
   cost: 200
   upkeep: 4
@@ -162,6 +177,7 @@
 
 - id: mfg_plant
   name: Mfg. Plant
+  short: MFG
   description: +50% shields, on top of the Factory.
   cost: 320
   upkeep: 6
@@ -172,6 +188,7 @@
 
 - id: power_plant
   name: Power Plant
+  short: PWR
   description: +50% shields, on top of the Factory.
   cost: 160
   upkeep: 4
@@ -182,6 +199,7 @@
 
 - id: hydro_plant
   name: Hydro Plant
+  short: HYD
   description: +50% shields, on top of the Factory, and half the pollution of industry.
   cost: 240
   upkeep: 4
@@ -193,6 +211,7 @@
 
 - id: nuclear_plant
   name: Nuclear Plant
+  short: NUC
   description: +50% shields, on top of the Factory, and half the pollution of industry. May melt down in civil disorder until Fusion Power.
   cost: 160
   upkeep: 2
@@ -205,6 +224,7 @@
 
 - id: mass_transit
   name: Mass Transit
+  short: MTR
   description: Citizens cause no pollution.
   cost: 160
   upkeep: 4
@@ -214,6 +234,7 @@
 
 - id: sdi_defense
   name: SDI Defense
+  short: SDI
   description: Protects the city from nuclear attacks.
   cost: 200
   upkeep: 4
@@ -223,6 +244,7 @@
 
 - id: recycling_cntr
   name: Recycling Cntr.
+  short: REC
   description: Industry pollutes two thirds less.
   cost: 200
   upkeep: 2

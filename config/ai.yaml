@@ -27,6 +27,7 @@ strategy:
   attackers_excess: 1.5           # idle attackers beyond wanted x this are disbanded
   target_distance_weight: 0.5     # how much distance reduces the appeal of a target city
   siege_group_size: 3             # attackers gathered before assaulting a city
+  siege_share: 0.4                # share of the attackers that ignore walls, against walled cities
   # Counter-attack
   attackers_per_invader: 1.0      # attack units wanted per enemy unit seen on our land, near a city
   retake_bonus: 4.0               # appeal of an enemy city that was ours (a target, an invasion)

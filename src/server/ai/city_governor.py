@@ -64,6 +64,7 @@ class Governor:
         self.aircraft_open = plan.aircraft_wanted
         self.nuclear_open = plan.nuclear_wanted
         self.defenders_open = dict(plan.defenders_missing)
+        self.siege_open = self._siege_wanted()
         min_sea = self.rules.ai.get("overseas", "min_sea_size")
         self.sea_ports = {c.id for sea in know.seas.values() if sea.size >= min_sea
                           for c in sea.ports}
@@ -108,7 +109,10 @@ class Governor:
         if unit.can("found_city"):
             need = "settlers" if self.settlers_open > 0 else "workers" if self.workers_open > 0 else None
         elif unit.role == "attack":
-            need = "attackers" if self.attackers_open > 0 else "explorers" if self.explorers_open > 0 else None
+            if unit.can("ignore_walls") and self.siege_open > 0 and self.attackers_open > 0:
+                need = "siege"
+            else:
+                need = "attackers" if self.attackers_open > 0 else "explorers" if self.explorers_open > 0 else None
         elif unit.role == "defense":
             if self.defenders_open.get(city.id, 0) > 0:
                 need = "defenders"
@@ -137,6 +141,9 @@ class Governor:
         elif need == "workers":
             self.workers_open += delta
         elif need == "attackers":
+            self.attackers_open += delta
+        elif need == "siege":                 # an attacker that ignores walls
+            self.siege_open += delta
             self.attackers_open += delta
         elif need == "explorers":
             self.explorers_open += delta
@@ -262,15 +269,20 @@ class Governor:
                     out.append((self.w("workers") * urgency, founder,
                                 f"terrain work: {self.workers_open} worker(s) missing"))
 
-        # Attack.
+        # Attack. Against walls, a share of the attackers are siege engines that ignore them.
         attacker = _best(units, lambda u: u.role == "attack",
                          key=lambda u: (u.attack * u.moves / u.cost, u.attack))
+        siege = _best(units, lambda u: u.role == "attack" and u.can("ignore_walls"),
+                      key=lambda u: (u.attack / u.cost, u.attack)) if self.siege_open > 0 else None
+        if siege is not None:
+            attacker = siege
         if attacker is not None and self.attackers_open > 0 and defenders_here > 0:
             urgency = min(1.5, self.attackers_open / 3.0)
             if self.plan.war_targets or self.plan.invaders:
                 urgency *= 1.5
             out.append((self.w("attack") * self.scale["attack"] * urgency, attacker,
-                        f"offense: {self.attackers_open} attacker(s) missing"))
+                        f"offense: {self.attackers_open} attacker(s) missing"
+                        + (", walls to break" if siege is not None else "")))
 
         if defenders_here > 0:
             out.extend(self._sea_and_air_candidates(city, units))
@@ -327,6 +339,16 @@ class Governor:
         if bomb is not None and self.nuclear_open > 0:
             out.append((self.w("nuclear") * self.scale["attack"], bomb, "nuclear deterrent"))
         return out
+
+    def _siege_wanted(self) -> int:
+        """Attackers that ignore walls still wanted: a share of the attack force, while a city
+        the empire means to take has walls."""
+        if not any(memory.has_walls for memory in self.plan.war_targets):
+            return 0
+        attackers = self.know.units_with_role("attack")
+        siege = sum(1 for u in attackers if self.rules.units[u.type].can("ignore_walls"))
+        share = self.rules.ai.get("strategy", "siege_share")
+        return max(0, math.ceil(share * (len(attackers) + self.attackers_open)) - siege)
 
     def _can_spare_citizen(self, city: City, stats: CityStats, unit: UnitDef) -> bool:
         minimum = max(self.w("settlers_min_size"), unit.pop_cost + 1)
@@ -401,6 +423,13 @@ class Governor:
                 if city.size >= 3 and stats.food_surplus > 0:
                     consider(self.w("growth") * scale * 0.5 * (40 / cost) * min(2, stats.food_surplus),
                              "growth: faster growth")
+            elif effect.type == "tile_food_bonus":
+                # A Harbour: the tiles worked now gain at once, the others once the city grows.
+                worked, others = self._tiles_of_domain(city, effect.domain)
+                gain = effect.amount * (worked + 0.5 * min(others, max(0, city.size - worked)))
+                if gain > 0 and (limit is None or city.size < limit or stats.food_surplus < 0):
+                    consider(self.w("growth") * scale * gain * 10 / cost,
+                             f"growth: {worked + others} {effect.domain} tile(s)")
             elif effect.type == "allow_size_above":
                 if limit is not None and effect.size == limit and stats.food_surplus > 0:
                     closeness = max(0.0, 1.0 - (limit - city.size) / 3.0)
@@ -437,6 +466,20 @@ class Governor:
                 if arsenal and self.plan.war_targets and self.attackers_open > 1:
                     consider(self.w("barracks") * self.scale["attack"], "barracks: war effort")
         return best, reason
+
+    def _tiles_of_domain(self, city: City, domain: Optional[str]) -> tuple[int, int]:
+        """Tiles of the city area on land or at sea: those it works, and the others."""
+        worked = {tuple(offset) for offset in city.worked}
+        mine = others = 0
+        for offset, tile in self.view.map.city_area(city.x, city.y):
+            offset = tuple(offset)
+            if offset == (0, 0) or self.view.is_land(tile) != (domain == "land"):
+                continue
+            if offset in worked:
+                mine += 1
+            else:
+                others += 1
+        return mine, others
 
     def _yield_gain(self, stats: CityStats, kind: Optional[str], percent: float) -> float:
         base = {"tax": stats.tax, "luxury": stats.luxury, "science": stats.science,

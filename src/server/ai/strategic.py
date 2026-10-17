@@ -262,6 +262,7 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
 
     for city in know.cities:
         worked = {(city.x + dx, city.y + dy) for dx, dy in city.worked}
+        effects = view.city_effects(city)
         for (dx, dy), tile in view.map.city_area(city.x, city.y):
             if not view.explored(tile) or not view.is_land(tile):
                 continue
@@ -270,7 +271,7 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
             if tile.worked_by is not None and tile.worked_by != city.id:
                 continue
             terrain = rules.terrains[tile.terrain]
-            base = view.city_tile_yields(city, tile)
+            base = view.city_tile_yields(city, tile, effects)
             link = get("connect") if tile.index in links else 0.0
             options: list[tuple[float, str]] = []
             irrigation = terrain.irrigation

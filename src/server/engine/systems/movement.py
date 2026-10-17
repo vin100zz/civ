@@ -35,9 +35,8 @@ ILLEGAL = "illegal"
 def full_moves(game: Game, unit: Unit) -> int:
     """Movement points of the unit at the start of a turn, in thirds of a move."""
     definition = game.rules.units[unit.type]
-    player = game.players[unit.owner]
     # Several wonders giving the same bonus do not add up (Lighthouse, Magellan's Expedition).
-    bonus = max((effect.amount for effect in fx.player_effects(game, player, "unit_moves")
+    bonus = max((effect.amount for effect in fx.unit_effects(game, unit, "unit_moves")
                  if effect.domain == definition.domain), default=0)
     return (definition.moves + bonus) * game.rules.game.movement.points_per_move
 

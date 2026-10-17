@@ -1,0 +1,250 @@
+# Wonders of the World of Golden Ages: one of each in the whole world. None of them becomes
+# obsolete, and none gives a one-off gift but Marco Polo's map: every effect lasts.
+# Many act as a building in each of your cities: they are worth that building's cost and upkeep.
+#
+# Effects use the same format as buildings.yaml, plus:
+#   happy                - makes `amount` content citizens happy
+#   no_unhappy           - no unhappy citizens at all
+#   tile_trade_bonus     - +amount trade on every worked tile that already yields trade
+#   acts_as_building     - the affected cities count as having `building`
+#   free_government      - no anarchy on revolution, and any government can be chosen
+#   free_techs           - one shot: `count` advances on completion
+#   shared_knowledge     - receive any advance known by `min_civs` other civilizations
+#   military_unhappiness - changes unhappiness caused by each military unit abroad
+#   peace_keeper         - other civilizations always accept peace with the owner
+#   unit_moves           - +amount moves for units of `domain` (several do not add up);
+#                          scope continent: only for units on the wonder's continent
+#   pollution_percent    - industrial pollution of the affected cities is multiplied by percent/100
+#   reveal_map           - one shot: the owner discovers the whole world on completion
+
+# ── ANCIENT ───────────────────────────────────────────────────────────────────
+- id: colossus
+  name: Colossus
+  cost: 200
+  requires: bronze_working
+  description: +1 trade on every tile of this city that already produces trade.
+  effects:
+    - {type: tile_trade_bonus, amount: 1}
+
+- id: stonehenge
+  name: Stonehenge
+  cost: 200
+  requires: ceremonial_burial
+  description: Acts as a Temple in each of your cities on the same continent.
+  effects:
+    - {type: acts_as_building, building: temple, scope: continent}
+
+- id: pyramids
+  name: Pyramids
+  cost: 250
+  requires: masonry
+  description: Acts as a Granary in each of your cities.
+  effects:
+    - {type: acts_as_building, building: granary, scope: player}
+
+- id: hanging_gardens
+  name: Hanging Gardens
+  cost: 250
+  requires: pottery
+  description: One extra happy citizen in each of your cities.
+  effects:
+    - {type: happy, amount: 1, scope: player}
+
+- id: lighthouse
+  name: Lighthouse
+  cost: 150
+  requires: map_making
+  description: +1 movement for your sea units.
+  effects:
+    - {type: unit_moves, domain: sea, amount: 1, scope: player}
+
+- id: oracle
+  name: Oracle
+  cost: 250
+  requires: mysticism
+  description: Doubles the effect of your Temples.
+  effects:
+    - {type: content, amount: 1, scope: player, requires_building: temple}
+    - {type: content, amount: 1, scope: player, requires_building: temple, requires_tech: mysticism}
+
+- id: great_library
+  name: Great Library
+  cost: 300
+  requires: literacy
+  description: You receive any advance already known by two other civilizations. Acts as a Library in its city.
+  effects:
+    - {type: shared_knowledge, min_civs: 2, scope: player}
+    - {type: acts_as_building, building: library}
+
+- id: great_wall
+  name: Great Wall
+  cost: 300
+  requires: engineering
+  description: Your cities on the same continent are defended as if they had City Walls.
+  effects:
+    - {type: acts_as_building, building: city_walls, scope: continent}
+
+- id: marco_polos_embassy
+  name: Marco Polo's Embassy
+  cost: 200
+  requires: trade
+  description: Reveals the whole world when completed.
+  effects:
+    - {type: reveal_map, scope: player}
+
+- id: royal_road
+  name: Royal Road
+  cost: 400
+  requires: bridge_building
+  description: +1 movement for your land units on the same continent.
+  effects:
+    - {type: unit_moves, domain: land, amount: 1, scope: continent}
+
+# ── CLASSICAL AND MEDIEVAL ────────────────────────────────────────────────────
+- id: copernicus_observatory
+  name: Copernicus' Observatory
+  cost: 300
+  requires: astronomy
+  description: Doubles the science of this city.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 100, mode: compound}
+
+- id: sun_tzus_war_academy
+  name: Sun Tzu's War Academy
+  cost: 300
+  requires: feudalism
+  description: Every unit you build starts as a veteran.
+  effects:
+    - {type: veteran_units, scope: player}
+
+- id: king_richards_crusade
+  name: King Richard's Crusade
+  cost: 300
+  requires: chivalry
+  description: +50% shields in this city.
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive}
+
+- id: michelangelos_chapel
+  name: Michelangelo's Chapel
+  cost: 400
+  requires: religion
+  description: Acts as a Cathedral in each of your cities.
+  effects:
+    - {type: acts_as_building, building: cathedral, scope: player}
+
+- id: js_bachs_cathedral
+  name: J.S. Bach's Cathedral
+  cost: 400
+  requires: religion
+  description: Two more content citizens in each of your cities.
+  effects:
+    - {type: content, amount: 2, scope: player}
+
+- id: magellans_expedition
+  name: Magellan's Expedition
+  cost: 300
+  requires: navigation
+  description: +2 movement for your sea units (does not add up with the Lighthouse).
+  effects:
+    - {type: unit_moves, domain: sea, amount: 2, scope: player}
+
+- id: shakespeares_theatre
+  name: Shakespeare's Theatre
+  cost: 300
+  requires: medicine
+  description: No unhappy citizens in this city.
+  effects:
+    - {type: no_unhappy}
+
+- id: isaac_newtons_college
+  name: Isaac Newton's College
+  cost: 400
+  requires: theory_of_gravity
+  description: Your Libraries and Universities each produce one third more science.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 33.334, mode: additive, scope: player, requires_building: library}
+    - {type: yield_bonus, yield: science, percent: 33.334, mode: additive, scope: player, requires_building: university}
+
+- id: statue_of_liberty
+  name: Statue of Liberty
+  cost: 400
+  requires: democracy
+  description: Acts as an Aqueduct in each of your cities. Change government without anarchy.
+  effects:
+    - {type: acts_as_building, building: aqueduct, scope: player}
+    - {type: free_government, scope: player}
+
+# ── INDUSTRIAL ────────────────────────────────────────────────────────────────
+- id: darwins_voyage
+  name: Darwin's Voyage
+  cost: 500
+  requires: railroad
+  description: Acts as a University in each of your cities.
+  effects:
+    - {type: acts_as_building, building: university, scope: player}
+
+- id: edisons_laboratory
+  name: Edison's Laboratory
+  cost: 500
+  requires: electricity
+  description: +50% science in all your cities.
+  effects:
+    - {type: yield_bonus, yield: science, percent: 50, mode: compound, scope: player}
+
+- id: womens_suffrage
+  name: Women's Suffrage
+  cost: 400
+  requires: industrialization
+  description: One less unhappy citizen for each military unit abroad.
+  effects:
+    - {type: military_unhappiness, amount: -1, scope: player}
+
+- id: hoover_dam
+  name: Hoover Dam
+  cost: 500
+  requires: electronics
+  description: Acts as a Power Plant in each of your cities with a Factory on the same continent, and halves their industrial pollution.
+  effects:
+    - {type: yield_bonus, yield: shields, percent: 50, mode: additive, exclusive_group: power, scope: continent, requires_building: factory}
+    - {type: pollution_percent, percent: 50, scope: continent}
+
+- id: hollywood
+  name: Hollywood
+  cost: 500
+  requires: the_corporation
+  description: Doubles the luxuries of all your cities.
+  effects:
+    - {type: yield_bonus, yield: luxury, percent: 100, mode: compound, scope: player}
+
+- id: united_nations
+  name: United Nations
+  cost: 500
+  requires: communism
+  description: Other civilizations always accept peace with you. Acts as a Courthouse in each of your cities.
+  effects:
+    - {type: peace_keeper, scope: player}
+    - {type: acts_as_building, building: courthouse, scope: player}
+
+# ── MODERN ────────────────────────────────────────────────────────────────────
+- id: manhattan_project
+  name: Manhattan Project
+  cost: 600
+  requires: nuclear_fission
+  description: Allows every civilization to build nuclear weapons.
+
+- id: apollo_program
+  name: Apollo Program
+  cost: 600
+  requires: space_flight
+  description: Reveals the whole map and allows every civilization to build spaceship parts.
+  effects:
+    - {type: reveal_map, scope: player}
+
+- id: cure_for_cancer
+  name: Cure for Cancer
+  cost: 500
+  requires: genetic_engineering
+  description: One extra happy citizen in each of your cities.
+  effects:
+    - {type: happy, amount: 1, scope: player}

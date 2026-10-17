@@ -15,8 +15,9 @@ export const U = {
 };
 
 export const store = {
-  rules: null,
-  map: null,            // {width, height, terrain[], flags[], continent[], ground[]}
+  rules: null,          // the rules of the game on screen
+  rulesets: [],         // the sets of rules a new game may be played with: {id, name, description}
+  map: null,           // {width, height, terrain[], flags[], continent[], ground[]}
   state: null,          // {turn, year, players[], cities[], units[], explored?, pov, play?, me?}
   history: [],
   historyFields: [],
@@ -289,6 +290,7 @@ export function handleMessage(message) {
   switch (message.type) {
     case 'init':
       setRules(message.rules);
+      store.rulesets = message.rulesets || [message.rules.ruleset];
       store.map = message.map;
       store.state = null;
       store.playerDetail = null;     // setState gives a person its own detail back

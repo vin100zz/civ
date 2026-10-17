@@ -30,9 +30,22 @@ MAP_LEVELS = ("relief", "climate")
 UNKNOWN_COLOR = "#8A95A5"
 
 
+def ruleset_payload(rules: Rules) -> dict[str, str]:
+    info = rules.ruleset
+    return {"id": info.id, "name": info.name, "description": info.description}
+
+
+def _effect_payload(effect) -> dict[str, Any]:
+    """What an effect does, for the panels that sort the buildings by what they serve."""
+    fields = {"type": effect.type, "yield": effect.yield_kind, "group": effect.exclusive_group,
+              "building": effect.building, "size": effect.size or None, "vs": effect.vs}
+    return {name: value for name, value in fields.items() if value is not None}
+
+
 def rules_payload(rules: Rules) -> dict[str, Any]:
     """Static data the client needs to draw and label things."""
     return {
+        "ruleset": ruleset_payload(rules),
         "terrains": [
             {"id": t.id, "name": t.name, "sprite": t.sprite, "base_sprite": t.base_sprite,
              "color": t.color, "land": t.is_land, "move_cost": t.move_cost,
@@ -49,8 +62,10 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
              "pop_cost": u.pop_cost, "needs_support": u.needs_support}
             for u in rules.units.values()],
         "buildings": [
-            {"id": b.id, "name": b.name, "cost": b.cost, "upkeep": b.upkeep, "wonder": b.wonder,
-             "description": b.description, "requires": b.requires, "obsolete_by": b.obsolete_by}
+            {"id": b.id, "name": b.name, "short": b.short, "cost": b.cost, "upkeep": b.upkeep,
+             "wonder": b.wonder, "description": b.description, "requires": b.requires,
+             "obsolete_by": b.obsolete_by, "effects": [_effect_payload(e) for e in b.effects],
+             "unlocks_units": any(u.requires_wonder == b.id for u in rules.units.values())}
             for b in rules.buildings.values()],
         "techs": [
             {"id": t.id, "name": t.name, "era": t.era, "prerequisites": list(t.prerequisites),
@@ -271,6 +286,13 @@ def wonders_payload(game: Game) -> list[dict[str, Any]]:
 
 # ── Cities ────────────────────────────────────────────────────────────────────
 
+def has_walls(game: Game, city: City) -> bool:
+    """The city has a building (or a wonder acting as one) that strengthens it against land
+    attacks: the map draws walls around it."""
+    return any(e.type == "defense_multiplier" and e.vs in (None, "land")
+               for b in fx.effective_buildings(game, city) for e in game.rules.buildings[b].effects)
+
+
 def city_payload(game: Game, city: City) -> dict[str, Any]:
     item = city.production
     return {
@@ -279,7 +301,7 @@ def city_payload(game: Game, city: City) -> dict[str, Any]:
         "production": production.item_name(game, item) if item else None,
         "disorder": city.disorder, "celebrating": city.celebrating,
         "capital": fx.is_capital(game, city),
-        "walls": "city_walls" in fx.effective_buildings(game, city),
+        "walls": has_walls(game, city),
         "wonders": sum(1 for b in city.buildings if game.rules.buildings[b].wonder),
     }
 
@@ -309,6 +331,8 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         "item": [item.kind, item.id] if building else None,
         # The cities panel: buildings in rules order (wonders last), then each of its tabs.
         "buildings": sorted(city.buildings, key=rank.get),
+        # Buildings a wonder provides without the city having built them: building -> wonder.
+        "given": fx.given_buildings(game, city),
         "food": city.food, "food_box": stats.food_box, "max_size": city_rules.max_size(game, city),
         "shields_made": stats.shields, "shield_upkeep": stats.shield_upkeep,
         "corruption": stats.corruption, "luxury": stats.luxury, "tax": stats.tax,
@@ -402,6 +426,7 @@ def city_detail(game: Game, city: City, decision=None,
         "buildings": sorted(city.buildings,
                             key=lambda b: (game.rules.buildings[b].wonder, rank[b])),
         "upkeeps": {b: city_rules.building_upkeep(game, city, b) for b in city.buildings},
+        "given": fx.given_buildings(game, city),
         "tiles": tiles,
         "units_here": [row(u) for u in here],
         "units_supported": [row(u) for u in supported],

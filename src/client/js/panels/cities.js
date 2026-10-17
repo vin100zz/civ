@@ -7,30 +7,73 @@ import { icon } from '../icons.js';
 import { setTips } from '../tips.js';
 import { unitImage } from '../renderer/sprites.js';
 
-// The tabs: their colour, the buildings that serve them [id, header] and their wonders.
-// 'power' stands for the Power, Hydro and Nuclear Plants, which all do the same for a factory.
+// The tabs and their colour. The buildings and wonders of each come from the rules.
 const TABS = [
-  { id: 'food', label: 'Food', icon: 'food', color: 'var(--food)',
-    buildings: [['granary', 'GRA'], ['aqueduct', 'AQU']], wonders: [] },
-  { id: 'production', label: 'Production', icon: 'shield', color: 'var(--shield)',
-    buildings: [['factory', 'FAC'], ['mfg_plant', 'MFG'], ['power', 'PWR'], ['mass_transit', 'MTR'], ['recycling_cntr', 'REC']],
-    wonders: ['hoover_dam'] },
-  { id: 'trade', label: 'Trade', icon: 'trade', color: 'var(--trade)',
-    buildings: [['courthouse', 'CRT']], wonders: ['colossus'] },
-  { id: 'gold', label: 'Gold', icon: 'coin', color: 'var(--gold)',
-    buildings: [['marketplace', 'MKT'], ['bank', 'BNK']], wonders: [] },
-  { id: 'science', label: 'Science', icon: 'flask', color: 'var(--sci)',
-    buildings: [['library', 'LIB'], ['university', 'UNI']],
-    wonders: ['copernicus_observatory', 'isaac_newtons_college', 'seti_program', 'great_library', 'darwins_voyage'] },
-  { id: 'happiness', label: 'Happiness', icon: 'happy', color: 'var(--good)',
-    buildings: [['temple', 'TMP'], ['colosseum', 'COL'], ['cathedral', 'CAT']],
-    wonders: ['hanging_gardens', 'oracle', 'michelangelos_chapel', 'shakespeares_theatre', 'js_bachs_cathedral',
-      'cure_for_cancer', 'womens_suffrage'] },
-  { id: 'military', label: 'Military', icon: 'sword', color: '#D3D9E2',
-    buildings: [['barracks', 'BAR'], ['city_walls', 'WAL'], ['sdi_defense', 'SDI']],
-    wonders: ['great_wall', 'lighthouse', 'magellans_expedition', 'manhattan_project'] },
+  { id: 'food', label: 'Food', icon: 'food', color: 'var(--food)' },
+  { id: 'production', label: 'Production', icon: 'shield', color: 'var(--shield)' },
+  { id: 'trade', label: 'Trade', icon: 'trade', color: 'var(--trade)' },
+  { id: 'gold', label: 'Gold', icon: 'coin', color: 'var(--gold)' },
+  { id: 'science', label: 'Science', icon: 'flask', color: 'var(--sci)' },
+  { id: 'happiness', label: 'Happiness', icon: 'happy', color: 'var(--good)' },
+  { id: 'military', label: 'Military', icon: 'sword', color: '#D3D9E2' },
 ];
-const POWER = ['power_plant', 'hydro_plant', 'nuclear_plant'];
+
+// The tab each kind of effect serves (a function when it depends on the effect). A building
+// or a wonder goes to the tab of its first effect that serves one; a wonder that serves none
+// but unlocks units (the Manhattan Project) is military.
+const SERVES = {
+  food_box_keep: 'food', allow_size_above: 'food', tile_food_bonus: 'food',
+  yield_bonus: (effect) => ({ shields: 'production', tax: 'gold', luxury: 'gold', science: 'science' })[effect.yield],
+  pollution_percent: 'production', no_population_pollution: 'production',
+  corruption_percent: 'trade', tile_trade_bonus: 'trade',
+  shared_knowledge: 'science', free_techs: 'science',
+  content: 'happiness', happy: 'happiness', no_unhappy: 'happiness', military_unhappiness: 'happiness',
+  veteran_units: 'military', defense_multiplier: 'military', nuclear_shield: 'military', unit_moves: 'military',
+  acts_as_building: (effect) => tabOf(store.buildingDefs[effect.building]),
+};
+
+function tabOf(building) {
+  for (const effect of building.effects) {
+    const serves = SERVES[effect.type];
+    const tab = typeof serves === 'function' ? serves(effect) : serves;
+    if (tab) return tab;
+  }
+  return building.wonder && building.unlocks_units ? 'military' : null;
+}
+
+// The columns and the wonders of each tab, for the rules on screen. A column is the buildings
+// whose effects share an exclusive group (the Power, Hydro and Nuclear Plants: a factory uses
+// one of them only), or a building on its own: {key, ids, header, name}.
+let shelves = null;
+
+function shelvesOf(rules) {
+  if (shelves && shelves.rules === rules) return shelves;
+  shelves = { rules, columns: {}, wonders: {} };
+  for (const t of TABS) {
+    shelves.columns[t.id] = [];
+    shelves.wonders[t.id] = [];
+  }
+  for (const building of rules.buildings) {
+    const tab = tabOf(building);
+    if (!tab) continue;
+    if (building.wonder) {
+      shelves.wonders[tab].push(building.id);
+      continue;
+    }
+    const group = (building.effects.find((effect) => effect.group) || {}).group;
+    const column = group && shelves.columns[tab].find((c) => c.group === group);
+    if (column) column.ids.push(building.id);
+    else {
+      const header = building.short || building.name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
+      shelves.columns[tab].push({ key: building.id, ids: [building.id], group, header });
+    }
+  }
+  for (const column of Object.values(shelves.columns).flat()) {
+    const names = column.ids.map((id) => store.buildingDefs[id].name);
+    column.name = names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names[0];
+  }
+  return shelves;
+}
 
 // What follows the buildings in each tab: the figure of the city, then [key, width, header, name]
 // for the narrow columns at the end of the row.
@@ -65,13 +108,18 @@ let sortBy = null;          // {key, dir: 1 ascending | -1 descending}, null: fo
 // ── The city ────────────────────────────────────────────────────────────────
 
 const minus = (value) => (value < 0 ? `−${-value}` : String(value));
-const ids = (id) => (id === 'power' ? POWER : [id]);
-const has = (city, id) => ids(id).some((b) => city.buildings.includes(b));
-const making = (city, id) => Boolean(city.item) && city.item[0] === 'building' && ids(id).includes(city.item[1]);
+const built = (city, column) => column.ids.some((b) => city.buildings.includes(b));
+// The building of the column a wonder provides to the city (the Great Wall's walls), if any.
+const given = (city, column) => column.ids.find((b) => city.given && city.given[b]);
+const has = (city, column) => built(city, column) || Boolean(given(city, column));
+const making = (city, column) => Boolean(city.item) && city.item[0] === 'building' && column.ids.includes(city.item[1]);
 const blocked = (city) => city.max_size !== null && city.size >= city.max_size;
+// The city cannot grow any more without a building of this column (the Aqueduct).
+const needs = (city, column) => blocked(city) && column.ids.some((b) => store.buildingDefs[b].effects
+  .some((effect) => effect.type === 'allow_size_above' && effect.size === city.max_size));
 const specialists = (city) => SPECIALISTS.reduce((total, [kind]) => total + (city.specialists[kind] || 0), 0);
 const citizens = (city) => city.happy + city.content + city.unhappy + specialists(city);
-const wondersOf = (city, spec) => spec.wonders.filter((w) => city.buildings.includes(w));
+const wondersOf = (city) => shelvesOf(store.rules).wonders[tab].filter((w) => city.buildings.includes(w));
 
 function unitsIn(city) {
   return (store.unitsAt.get(tileIndex(city.x, city.y)) || []).filter((unit) => unit[U.OWNER] === city.owner);
@@ -103,15 +151,20 @@ function fig(width, html) {
   return `<span class="fig" style="width:${width}px">${html}</span>`;
 }
 
-// A building of the tab: built in the tab's colour, being built in grey, amber when the city
-// needs it to grow.
-function buildingCell(city, id) {
-  if (has(city, id)) return `<span class="bcell"><i class="built">${icon('check', 10, 3.6)}</i></span>`;
-  if (making(city, id)) {
+// A building of the tab: built in the tab's colour, outlined when a wonder provides it, being
+// built in grey, amber when the city needs it to grow.
+function buildingCell(city, column) {
+  if (built(city, column)) return `<span class="bcell"><i class="built">${icon('check', 10, 3.6)}</i></span>`;
+  const gift = given(city, column);
+  if (gift) {
+    const wonder = store.buildingDefs[city.given[gift]];
+    return `<span class="bcell" title="Given by ${wonder ? wonder.name : 'a wonder'}"><i class="given">${icon('check', 10, 3.6)}</i></span>`;
+  }
+  if (making(city, column)) {
     const done = Math.min(100, Math.round((100 * city.shields) / city.cost));
     return `<span class="bcell"><i class="making" style="--done:${done}%"></i></span>`;
   }
-  if (id === 'aqueduct' && blocked(city)) return '<span class="bcell"><i class="needed"></i></span>';
+  if (needs(city, column)) return '<span class="bcell"><i class="needed"></i></span>';
   return '<span class="bcell"><i></i></span>';
 }
 
@@ -231,12 +284,13 @@ function militaryWidget(city, color) {
 
 // ── Sorting ─────────────────────────────────────────────────────────────────
 
-function sortValue(key, city, spec) {
+function sortValue(key, city) {
   if (key.startsWith('b:')) {
-    const id = key.slice(2);
-    if (has(city, id)) return 3;
-    if (making(city, id)) return 1 + city.shields / city.cost;
-    return id === 'aqueduct' && blocked(city) ? -1 : 0;
+    const column = shelvesOf(store.rules).columns[tab].find((c) => c.key === key.slice(2));
+    if (!column) return 0;
+    if (has(city, column)) return 3;
+    if (making(city, column)) return 1 + city.shields / city.cost;
+    return needs(city, column) ? -1 : 0;
   }
   switch (key) {
     case 'value':
@@ -254,7 +308,7 @@ function sortValue(key, city, spec) {
     case 'units': return unitsIn(city).length;
     case 'away': return city.units_away;
     case 'routes': return city.trade_routes;
-    case 'wonders': return wondersOf(city, spec).length;
+    case 'wonders': return wondersOf(city).length;
     default: return 0;
   }
 }
@@ -294,15 +348,14 @@ export function renderCities(container) {
   const cities = store.state.cities.filter((city) => city.owner === id).sort((a, b) => a.id - b.id);
 
   // A building gets its column once its advance is known, or once a city has it anyway.
-  const known = (building) => ids(building).some((b) => {
+  const known = (column) => column.ids.some((b) => {
     const definition = store.buildingDefs[b];
-    return definition && (!definition.requires || me.tech_list.includes(definition.requires));
-  }) || cities.some((city) => has(city, building));
-  const columns = spec.buildings.filter(([building]) => known(building));
-  const wonders = cities.some((city) => wondersOf(city, spec).length);
+    return !definition.requires || me.tech_list.includes(definition.requires);
+  }) || cities.some((city) => has(city, column));
+  const columns = shelvesOf(store.rules).columns[tab].filter(known);
+  const wonders = cities.some((city) => wondersOf(city).length);
 
-  const named = (building) => (building === 'power' ? 'Power, Hydro or Nuclear Plant' : store.buildingDefs[building].name);
-  const heads = columns.map(([building, header]) => title(`b:${building}`, header, named(building), 'b', tips));
+  const heads = columns.map((column) => title(`b:${column.key}`, column.header, column.name, 'b', tips));
   if (tab === 'trade') heads.push(title('routes', icon('route', 13, 2), 'Trade routes', 'b', tips));
   if (wonders) heads.push(title('wonders', '★', 'Wonders', 'b wonder', tips));
   const legend = (widget.legend || []).map(([text, swatch]) => `<span><i style="background:${swatch}"></i>${text}</span>`).join('');
@@ -324,14 +377,14 @@ export function renderCities(container) {
 
   let order = cities;
   if (sortBy) {
-    order = cities.map((city, i) => ({ city, i, v: sortValue(sortBy.key, city, spec) }))
+    order = cities.map((city, i) => ({ city, i, v: sortValue(sortBy.key, city) }))
       .sort((a, b) => (a.v - b.v) * sortBy.dir || a.i - b.i).map((entry) => entry.city);
   }
   const rows = order.map((city) => {
-    const cells = columns.map(([building]) => buildingCell(city, building));
+    const cells = columns.map((column) => buildingCell(city, column));
     if (tab === 'trade') cells.push(`<span class="bcell"><b class="${city.trade_routes ? 'soft' : 'faint'}">${city.trade_routes}</b></span>`);
     if (wonders) {
-      const own = wondersOf(city, spec);
+      const own = wondersOf(city);
       const names = own.map((w) => store.buildingDefs[w].name).join(', ');
       cells.push(`<span class="bcell"${names ? ` title="${names}"` : ''}><b class="gold">${own.length > 1 ? `★${own.length}` : own.length ? '★' : ''}</b></span>`);
     }
