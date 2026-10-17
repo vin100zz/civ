@@ -12,7 +12,8 @@ Turns are played in a worker thread, so the web server stays responsive. The ses
 saves the game to the `saves` folder and loads it back. A played game saves itself every few
 turns under the name it was loaded or saved under; the save it replaces is kept as
 `name-<its year>`, and the backup before that one goes. Only the copy of the game holds the
-others up: the files are written, renamed and deleted in the background.
+others up: the files are written, renamed and deleted in the background. When the server
+starts, the session can take up the save written last instead of a new game.
 
 Each game is played with one of the sets of rules of config/rulesets/, chosen when it starts;
 its saves record which, and a loaded game takes the rules it was played with.
@@ -23,6 +24,7 @@ import asyncio
 import dataclasses
 import random
 import re
+import sys
 from collections import deque
 from pathlib import Path
 from typing import Any, Optional
@@ -300,6 +302,18 @@ class Session:
         if self.in_play() and game.current_player != self.human:
             self._advance()                    # saved between two turns: on to the person's
             self._read_events()
+
+    def resume(self) -> Optional[str]:
+        """Loads the save written last that this version can read, and returns its name;
+        None when there is none, and the game on the table stays."""
+        for name in self.saved_games():
+            try:
+                self.load(name)
+            except persistence.SaveError as error:
+                print(f"Cannot load {name}: {error}", file=sys.stderr)
+                continue
+            return name
+        return None
 
     # ── Playing turns ─────────────────────────────────────────────────────────
 

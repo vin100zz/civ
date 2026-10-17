@@ -1,4 +1,4 @@
-"""Starts the game server:  python run.py [--port 8005]  then open http://127.0.0.1:8005"""
+"""Starts the game server:  python run.py [--port 8005] [--resume]  then open http://127.0.0.1:8005"""
 import sys
 from pathlib import Path
 

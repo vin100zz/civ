@@ -1,4 +1,4 @@
-"""Entry point: python -m server.main [--port 8005]  (run from the src/ directory)."""
+"""Entry point: python -m server.main [--port 8005] [--resume]  (run from the src/ directory)."""
 from __future__ import annotations
 
 import argparse
@@ -15,9 +15,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Civilization server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8005)
+    parser.add_argument("--resume", action="store_true",
+                        help="start on the latest saved game instead of a new one")
     args = parser.parse_args()
     try:
-        app = create_app()
+        app = create_app(resume=args.resume)
     except ConfigError as error:
         print(error, file=sys.stderr)
         sys.exit(1)

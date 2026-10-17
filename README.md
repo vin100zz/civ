@@ -11,9 +11,9 @@ Prérequis : Python 3.11 ou plus, avec `fastapi`, `uvicorn`, `websockets` et `py
 python run.py
 ```
 
-Puis ouvrir http://127.0.0.1:8005. Sous Windows, `start.bat` fait la même chose. `--port 9000` change le port.
+Puis ouvrir http://127.0.0.1:8005. `--port 9000` change le port. `--resume` reprend la dernière partie sauvegardée (la plus récente du dossier `saves/`, sauvegarde automatique comprise) ; sous Windows, `start.bat` lance le serveur de cette façon.
 
-Au démarrage, le serveur lance une partie observée. Le bouton **New game** (ou **Game** en cours de partie jouée) ouvre la fenêtre où l'on choisit le mode.
+Au démarrage, le serveur lance une partie observée, ou, avec `--resume`, recharge la dernière sauvegarde (une partie neuve s'il n'y en a pas). Le bouton **New game** (ou **Game** en cours de partie jouée) ouvre la fenêtre où l'on choisit le mode.
 
 ## Jouer une civilisation
 
@@ -58,8 +58,8 @@ La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. 
 
 Mode **Watch the AI play them all** de la fenêtre « Game ».
 
-- **Play / Step / Speed** : lecture continue, tour par tour, vitesse. Espace = lecture/pause, N = un tour.
-- **New game, Save, Saved games** : ouvrent la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
+- **Speed / Step / Play** (à droite de la barre du haut, à la place de End turn) : vitesse, tour par tour, lecture continue. Espace = lecture/pause, N = un tour.
+- **Dossier** (à côté de la roue dentée, comme en partie jouée) : ouvre la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
 - **Sur la carte** : « View as » pour voir le monde comme une civilisation (brouillard compris), le zoom et la mini-carte. Les calques Territory / Grid / AI missions sont derrière la roue dentée de la barre du haut.
 - **État de la planète** (barre du haut, après les taux, dès qu'il y a de la pollution) : cases polluées, jauge du réchauffement (orange à mi-chemin du seuil, rouge aux trois quarts), tours avant l'arrivée d'un vaisseau spatial ; l'infobulle donne les chiffres.
 - **Rail de droite** : World (classement des civilisations), Empire, City, Wonders, Science, History, Chronicle (en partie jouée, Turn et Cities en plus). Science et History occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.

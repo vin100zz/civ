@@ -283,10 +283,6 @@ button.chip:hover { border-color: var(--line-3); }
 #gameover-pill { cursor: pointer; font-size: 12px; padding: 2px 10px; }
 
 .transport, .game-actions { display: flex; align-items: center; gap: 8px; }
-.game-actions { gap: 4px; }
-.transport .vr { margin: 0 6px; }
-#seed-label { margin-right: 8px; }
-#btn-new { margin-left: 6px; font-size: 13px; padding: 0 12px; }
 
 .status { display: flex; align-items: center; gap: 7px; margin-left: 14px; font-size: 12px; color: var(--soft); }
 
@@ -370,13 +366,9 @@ button.chip:hover { border-color: var(--line-3); }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 3px rgba(242, 117, 106, 0.18); }
 
 #topbar { overflow: hidden; }
-@media (max-width: 1800px) {
-  .roomy { display: none; }
-}
 @media (max-width: 1500px) {
   #topbar { gap: 12px; }
   .chip-btn.split, .chip-btn .bar, .chip-btn .goal { display: none; }
-  .game-actions .btn.ghost span:not([data-icon]) { display: none; }
   .progress { width: 100px; }
 }
 @media (max-width: 1240px) {

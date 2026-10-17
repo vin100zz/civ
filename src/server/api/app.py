@@ -25,12 +25,18 @@ class ClientFiles(StaticFiles):
         return response
 
 
-def create_app(config_dir: Path | None = None, saves_dir: Path | None = None) -> FastAPI:
+def create_app(config_dir: Path | None = None, saves_dir: Path | None = None,
+               resume: bool = False) -> FastAPI:
+    """The application. With `resume`, it starts on the latest saved game, not a new one."""
     rulesets = load_rulesets(config_dir)    # fails here, with a clear message, on a bad config
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.session = Session(rulesets, saves_dir)
+        if resume:
+            name = app.state.session.resume()
+            print(f"Resuming the saved game {name}." if name
+                  else "No saved game to resume: a new game starts.")
         task = asyncio.create_task(app.state.session.run())
         yield
         task.cancel()
