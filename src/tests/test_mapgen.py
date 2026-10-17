@@ -113,9 +113,16 @@ def test_default_settings_give_the_same_world(rules):
     assert _signature(generate_world(rules, 7, _settings(rules))) == _signature(generate_world(rules, 7))
 
 
-@pytest.mark.parametrize("shape", ["small_islands", "medium_islands", "large_islands",
-                                   "two_continents", "continents_islands", "pangaea",
-                                   "pangaea_lakes", "world_belt", "inner_sea"])
+GENERATED_SHAPES = ["small_islands", "continents_islands", "pangaea", "world_belt", "pangaea_lakes",
+                    "inner_sea", "isthmus", "new_world", "island_arcs", "broken_continent"]
+
+
+def _usual(rules, shape, **changes):
+    """The settings of a shape with its usual land."""
+    return _settings(rules, shape=shape, land=rules.game.map.shapes[shape].usual_land, **changes)
+
+
+@pytest.mark.parametrize("shape", GENERATED_SHAPES)
 def test_every_shape_gives_a_playable_world(rules, shape):
     settings = _settings(rules, shape=shape)
     assert _signature(generate_world(rules, 4, settings)) == _signature(generate_world(rules, 4, settings))
@@ -132,16 +139,20 @@ def test_every_shape_gives_a_playable_world(rules, shape):
 def test_shapes_have_the_land_masses_they_promise(rules):
     for seed in (1, 2, 3):
         def masses(shape):
-            return _land_masses(generate_world(rules, seed, _settings(rules, shape=shape)))
+            return _land_masses(generate_world(rules, seed, _usual(rules, shape)))
 
         assert len(masses("small_islands")) >= 14 and masses("small_islands")[0] < 150
-        assert 7 <= len(masses("medium_islands")) <= 14
-        assert 4 <= len(masses("large_islands")) <= 8
-        two = masses("two_continents")
-        assert two[1] > 300 and sum(two[2:]) < 100
+        assert len([size for size in masses("continents_islands") if size > 150]) == 3
         for shape in ("pangaea", "pangaea_lakes", "inner_sea"):
             one = masses(shape)
-            assert one[0] > 800 and sum(one[1:]) < 120
+            assert one[0] > 800 and sum(one[1:]) < 150
+        isthmus = masses("isthmus")                  # two continents, one mass
+        assert isthmus[0] > 0.85 * sum(isthmus)
+        old, new = masses("new_world")[:2]
+        assert old > new > 300
+        arcs = masses("island_arcs")
+        assert len(arcs) >= 15 and arcs[0] < 150
+        assert len([size for size in masses("broken_continent") if size > 100]) >= 2
 
 
 def test_world_belt_goes_around_the_world(rules):
@@ -154,9 +165,10 @@ def test_world_belt_goes_around_the_world(rules):
 
 
 def test_large_masses_are_not_all_plains(rules):
-    for shape in ("pangaea", "two_continents", "world_belt"):
+    for shape, land in (("pangaea", 30), ("isthmus", 30), ("world_belt", 40), ("continents", 60)):
         for climate, least in ((1, 1.0), (2, 1.8)):
-            worlds = [generate_world(rules, seed, _settings(rules, shape=shape, climate=climate))
+            worlds = [generate_world(rules, seed, _settings(rules, shape=shape, land=land,
+                                                            climate=climate))
                       for seed in (1, 2, 3, 4)]
             grassland = sum(_share(world, "grassland") for world in worlds)
             assert grassland > least * sum(_share(world, "plains") for world in worlds)
@@ -174,7 +186,7 @@ def test_lakes_and_inner_sea(rules):
 
 
 def test_relief_and_climate_change_the_terrain(rules):
-    for shape in ("continents", "pangaea", "medium_islands"):
+    for shape in ("continents", "pangaea", "continents_islands"):
         def average(terrains, **changes):
             worlds = [generate_world(rules, seed, _settings(rules, shape=shape, **changes))
                       for seed in (1, 2, 3, 4)]
@@ -185,3 +197,77 @@ def test_relief_and_climate_change_the_terrain(rules):
         wet = ("grassland", "jungle", "swamp", "river")
         humidity = [average(wet, climate=level) for level in (0, 1, 2)]
         assert humidity[0] + 0.03 < humidity[1] < humidity[2] - 0.03
+
+
+# ── Land, huts, starts and the Earth ──────────────────────────────────────────
+
+def _land(world):
+    """Share of the map covered by land, without the polar caps."""
+    return sum(1 for t in world.tiles if t.terrain != "ocean" and 0 < t.y < world.height - 1) \
+        / len(world.tiles)
+
+
+@pytest.mark.parametrize("shape", ["continents", "small_islands", "world_belt", "new_world"])
+def test_the_land_setting_gives_the_share_of_land(rules, shape):
+    for land in (20, 50, 70):
+        shares = [_land(generate_world(rules, seed, _settings(rules, shape=shape, land=land)))
+                  for seed in (1, 2)]
+        assert all(abs(share - land / 100) < 0.05 for share in shares), (land, shares)
+
+
+def test_original_continents_stay_the_same_and_flat_beyond(rules):
+    # At 20 %, the land of the original game: what the default settings give.
+    assert _signature(generate_world(rules, 3, _settings(rules, land=20))) \
+        == _signature(generate_world(rules, 3))
+    # More land does not pile up into mountains: relief stays the business of its setting.
+    for seed in (1, 2):
+        rough = _share(generate_world(rules, seed, _settings(rules, land=70)), "hills", "mountains")
+        assert rough < 0.22
+
+
+def test_spread_masses_never_touch(rules):
+    for seed in (1, 2):
+        world = generate_world(rules, seed, _settings(rules, shape="small_islands", land=60))
+        assert len(_land_masses(world, min_size=40)) >= 18
+
+
+def test_nobody_starts_on_the_new_world(rules):
+    for seed in (1, 2, 3):
+        for land in (40, 70):
+            settings = _settings(rules, shape="new_world", land=land)
+            game = new_game(rules, seed, map_settings=settings)
+            world = game.map
+            assert world.no_start
+            starts = [world.tile(u.x, u.y) for p in game.civilizations
+                      for u in game.player_units(p.id)]
+            assert len(starts) == len(game.civilizations)
+            assert not any(tile.index in world.no_start for tile in starts)
+
+
+def test_huts_setting(rules):
+    def huts(level):
+        world = generate_world(rules, 5, _settings(rules, huts=level))
+        return sum(1 for t in world.tiles if t.hut)
+
+    assert huts(0) == 0
+    assert huts(1) > 10
+    assert 1.6 * huts(1) < huts(2) < 2.4 * huts(1)
+
+
+def test_the_earth(rules):
+    earth = rules.game.map.shapes["earth"].fixed
+    settings = _settings(rules, shape="earth", land=80, relief=2, climate=0)
+    world = generate_world(rules, 9, settings)
+    assert (world.width, world.height) == (len(earth.rows[0]), len(earth.rows))
+    assert all(world.tile(x, y).terrain == earth.legend[letter]
+               for y, row in enumerate(earth.rows) for x, letter in enumerate(row))
+    # Every civilization starts in its homeland, unless the starts are drawn.
+    game = new_game(rules, 9, player_count=14, map_settings=settings)
+    for player in game.civilizations:
+        (unit,) = game.player_units(player.id)
+        assert (unit.x, unit.y) == earth.starts[player.civ.id]
+    drawn = new_game(rules, 9, player_count=14,
+                     map_settings=dataclasses.replace(settings, historical_starts=False))
+    homes = sum(1 for p in drawn.civilizations for u in drawn.player_units(p.id)
+                if (u.x, u.y) == earth.starts[p.civ.id])
+    assert homes < 3

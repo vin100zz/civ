@@ -12,18 +12,20 @@ const VICTORY = {
   spaceship: ['Spaceship victory', 'reach Alpha Centauri', 'rocket'],
   score: ['Victory on score', 'have the greatest civilization', 'trophy'],
 };
-// The choices of the next new game. They survive from one game to the next.
-const choice = { mode: 'play', ruleset: null, civ: null, level: null, players: 7, map: null, tab: 'new' };
+// The choices of the next new game. They survive from one game to the next. `map.shape` is the
+// generated world picked last; `fixed` the fixed world (the Earth) when that is the choice.
+const choice = { mode: 'play', ruleset: null, civ: null, level: null, players: 7, map: null, fixed: null,
+  tab: 'new' };
 
-// Pictogram of each map shape: [cx, cy, rx, ry] blobs in a 36 x 22 box. A blob drawn inside
-// another one is a hole (a lake, an inner sea).
+// Pictogram of each map shape in a 36 x 22 box: [cx, cy, rx, ry] blobs, or a path. A blob drawn
+// inside another one is a hole (a lake, an inner sea). `marks` are drawn over the land as they are.
+const blob = ([cx, cy, rx, ry]) =>
+  `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${2 * rx},0a${rx},${ry} 0 1,0 ${-2 * rx},0Z`;
+const SURPRISE = 'surprise';
 const SHAPE_GLYPHS = {
   continents: [[9, 8, 7, 5], [26, 14, 8, 6], [21, 4, 2.5, 2], [6, 18, 2, 1.5]],
   small_islands: [[5, 5, 2, 2], [15, 4, 2, 2], [27, 5, 2, 2], [9, 12, 2, 2], [20, 11, 2, 2],
     [31, 12, 2, 2], [5, 18, 2, 2], [15, 18, 2, 2], [26, 18, 2, 2]],
-  medium_islands: [[7, 6, 4, 3], [20, 5, 4, 3], [31, 9, 3.5, 3], [11, 16, 4, 3], [24, 16, 4, 3]],
-  large_islands: [[8, 7, 6, 4.5], [25, 6, 7, 4.5], [17, 16, 7, 4.5], [32, 17, 3, 2.5]],
-  two_continents: [[9, 11, 7.5, 9], [27, 11, 7.5, 9]],
   continents_islands: [[10, 8, 7, 5.5], [25, 14, 7, 5.5], [24, 4, 1.8, 1.8], [33, 6, 1.8, 1.8],
     [5, 18, 1.8, 1.8], [13, 18, 1.8, 1.8]],
   pangaea: [[18, 11, 16, 9]],
@@ -31,14 +33,39 @@ const SHAPE_GLYPHS = {
     [15, 15, 2, 1.5]],
   inner_sea: [[18, 11, 16, 9.5], [18, 11, 9, 4.5]],
   world_belt: 'M0,6C6,3 11,8 18,6S30,3 36,6V16C30,19 24,14 18,16S6,19 0,16Z',
+  isthmus: { land: [[10, 5.5, 8.5, 4.5], [26, 16.5, 8.5, 4.5]],
+    marks: '<path d="M14.5,8.6C17,10.2 18.5,11.6 21.5,13.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>' },
+  new_world: { land: [[11, 11, 9.5, 8.5]],
+    marks: '<ellipse cx="28.5" cy="11" rx="5.6" ry="7.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.6"/>' },
+  island_arcs: [[3, 17, 1.6, 1.4], [6.5, 13, 1.8, 1.5], [10.5, 9.5, 1.6, 1.4], [15, 6.5, 1.8, 1.5],
+    [20, 4.5, 1.5, 1.3], [18, 19.5, 1.6, 1.4], [22.5, 17, 1.8, 1.5], [26.5, 13.8, 1.6, 1.4],
+    [30, 10.5, 1.8, 1.5], [33.5, 7, 1.5, 1.3]],
+  broken_continent: blob([18, 11, 16, 9]) + 'M11.4,3.6L13.2,3.5L10.8,11L14.2,18.4L12.4,18.5L9,11Z'
+    + 'M23.4,3.5L25.2,3.6L23.4,11L26.6,18.3L24.8,18.4L21.6,11Z',
+  [SURPRISE]: { land: '', marks: `<path d="${blob([18, 11, 15, 9])}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.4 1.8"/>`
+    + '<text x="18" y="15.4" font-size="12" font-weight="700" text-anchor="middle" fill="currentColor">?</text>' },
 };
 
 function shapeGlyph(id) {
-  const blobs = SHAPE_GLYPHS[id];
-  if (!blobs) return '';
-  const path = typeof blobs === 'string' ? blobs : blobs.map(([cx, cy, rx, ry]) =>
-    `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${2 * rx},0a${rx},${ry} 0 1,0 ${-2 * rx},0Z`).join('');
-  return `<svg viewBox="0 0 36 22" aria-hidden="true"><path d="${path}" fill="currentColor" fill-rule="evenodd"/></svg>`;
+  const glyph = SHAPE_GLYPHS[id];
+  if (!glyph) return '';
+  const { land, marks = '' } = Array.isArray(glyph) || typeof glyph === 'string' ? { land: glyph } : glyph;
+  const path = typeof land === 'string' ? land : land.map(blob).join('');
+  return `<svg viewBox="0 0 36 22" aria-hidden="true">${path ? `<path d="${path}" fill="currentColor" fill-rule="evenodd"/>` : ''}${marks}</svg>`;
+}
+
+// A fixed world, such as the Earth, drawn tile by tile in the colours of its terrains.
+function drawFixedMap(canvas, fixed) {
+  const colors = Object.fromEntries(store.rules.terrains.map((t) => [t.id, t.color]));
+  const [width, height] = [fixed.rows[0].length, fixed.rows.length];
+  const size = 4;
+  canvas.width = width * size;
+  canvas.height = height * size;
+  const ctx = canvas.getContext('2d');
+  fixed.rows.forEach((row, y) => [...row].forEach((letter, x) => {
+    ctx.fillStyle = colors[fixed.legend[letter]];
+    ctx.fillRect(x * size, y * size, size, size);
+  }));
 }
 
 function show(dialog) {
@@ -68,17 +95,7 @@ function refreshChoices() {
   for (const button of $('levels').children) {
     button.setAttribute('aria-pressed', String(button.dataset.level === choice.level));
   }
-  for (const button of $('map-shapes').children) {
-    button.setAttribute('aria-pressed', String(button.dataset.shape === choice.map.shape));
-  }
-  const shape = store.rules.map_shapes.find((s) => s.id === choice.map.shape);
-  $('shape-hint').textContent = shape ? shape.description : '';
-  for (const group of document.querySelectorAll('[data-map-level]')) {
-    for (const button of group.children) {
-      button.setAttribute('aria-pressed',
-        String(Number(button.dataset.level) === choice.map[group.dataset.mapLevel]));
-    }
-  }
+  refreshWorld();
   $('players').textContent = choice.players;
   const max = store.rules.defaults.max_players;
   $('players-hint').textContent = playing
@@ -94,6 +111,53 @@ function refreshChoices() {
   $('game-new').hidden = choice.tab !== 'new';
   $('game-saves').hidden = choice.tab !== 'saves';
   $('btn-start').hidden = choice.tab !== 'new';
+}
+
+// The World column: a generated world (its shape, land and nature) or a fixed one.
+function refreshWorld() {
+  const shapes = store.rules.map_shapes;
+  const fixed = shapes.find((s) => s.id === choice.fixed);
+  for (const button of $('world-mode').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.world === (choice.fixed || '')));
+  }
+  $('world-generated').hidden = Boolean(fixed);
+  $('world-fixed').hidden = !fixed;
+  $('starts-field').hidden = !fixed;
+  if (fixed) {
+    $('fixed-hint').textContent = fixed.description;
+    drawFixedMap($('fixed-map'), fixed.fixed);
+  }
+  const surprise = choice.map.surprise;
+  for (const button of $('map-shapes').children) {
+    const picked = 'surprise' in button.dataset ? surprise : !surprise && button.dataset.shape === choice.map.shape;
+    button.setAttribute('aria-pressed', String(picked));
+  }
+  const shape = shapes.find((s) => s.id === choice.map.shape);
+  $('shape-hint').textContent = surprise
+    ? 'Shape, land, relief, climate, temperature and age drawn at random and kept secret.'
+    : shape ? shape.description : '';
+  // What a surprise draws stays out of reach.
+  $('land-field').classList.toggle('secret', surprise);
+  $('nature').classList.toggle('secret', surprise);
+  $('land-value').textContent = surprise ? '?' : `${choice.map.land} %`;
+  for (const button of $('land-track').children) {
+    const step = Number(button.dataset.land);
+    button.classList.toggle('landed', !surprise && step <= choice.map.land);
+    button.setAttribute('aria-pressed', String(!surprise && step === choice.map.land));
+  }
+  for (const tick of $('land-ticks').children) {
+    tick.classList.toggle('usual', !surprise && Boolean(shape) && Number(tick.dataset.land) === shape.land);
+  }
+  for (const group of document.querySelectorAll('[data-map-level]')) {
+    for (const button of group.children) {
+      const level = group.dataset.mapLevel;
+      const secret = surprise && level !== 'huts';
+      button.setAttribute('aria-pressed', String(!secret && Number(button.dataset.level) === choice.map[level]));
+    }
+  }
+  for (const button of $('starts').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.historical === String(choice.map.historical_starts)));
+  }
 }
 
 function setPlayers(count) {
@@ -119,9 +183,10 @@ export function refreshSaves() {
 export function resetGameDialog() {
   const rules = store.rules;
   if (!choice.map || !rules.map_shapes.some((s) => s.id === choice.map.shape)) {
-    choice.map = { ...rules.defaults.map };
+    choice.map = { ...rules.defaults.map, surprise: false };
     choice.players = rules.defaults.players;
   }
+  if (!rules.map_shapes.some((s) => s.id === choice.fixed && s.fixed)) choice.fixed = null;
   if (!rules.levels.some((level) => level.id === choice.level)) choice.level = rules.defaults.level;
   if (!playableCivs().some((civ) => civ.id === choice.civ)) choice.civ = null;
   // The rules of the game on screen, until the person picks others.
@@ -134,8 +199,16 @@ export function resetGameDialog() {
       <span class="who"><b>${civ.nation}</b><small>${civ.leader}</small></span>${icon('check', 16, 2.4)}</button>`).join('');
   $('levels').innerHTML = rules.levels.map((level) =>
     `<button data-level="${level.id}">${level.name}</button>`).join('');
-  $('map-shapes').innerHTML = rules.map_shapes.map((s) =>
-    `<button data-shape="${s.id}" title="${s.description}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('');
+  const fixed = rules.map_shapes.filter((s) => s.fixed);
+  $('world-mode').hidden = !fixed.length;
+  $('world-mode').innerHTML = '<button data-world="">Generated world</button>' + fixed.map((s) =>
+    `<button data-world="${s.id}">${icon('globe', 16)}${s.name}</button>`).join('');
+  $('map-shapes').innerHTML = rules.map_shapes.filter((s) => !s.fixed).map((s) =>
+    `<button data-shape="${s.id}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('')
+    + `<button data-shape="" data-surprise>${shapeGlyph(SURPRISE)}<span>Surprise</span></button>`;
+  $('land-track').innerHTML = rules.land_steps.map((step) =>
+    `<button data-land="${step}" aria-label="${step} % land"></button>`).join('');
+  $('land-ticks').innerHTML = rules.land_steps.map((step) => `<span data-land="${step}">${step}</span>`).join('');
   refreshChoices();
   refreshSaves();
 }
@@ -149,15 +222,19 @@ export function openGameDialog(focus) {
   setDialogStatus(`${current} · a new or loaded game replaces the current one.`);
   refreshChoices();
   show(dialog);
-  const field = $(focus === 'save' ? 'save-name' : 'seed');
-  field.focus();
-  field.select();
+  if (focus === 'save') {
+    $('save-name').focus();
+    $('save-name').select();
+  } else {
+    $('btn-start').focus();
+  }
 }
 
 function startNewGame() {
-  const seed = parseInt($('seed').value, 10);
-  const message = { cmd: 'new_game', seed: Number.isFinite(seed) ? seed : null,
-    players: choice.players, map: choice.map, ruleset: choice.ruleset };
+  // The server draws the seed. A fixed world is never a surprise.
+  const map = { ...choice.map, shape: choice.fixed || choice.map.shape,
+    surprise: !choice.fixed && choice.map.surprise };
+  const message = { cmd: 'new_game', seed: null, players: choice.players, map, ruleset: choice.ruleset };
   if (choice.mode === 'play') {
     const civs = playableCivs();
     message.mode = 'play';
@@ -207,7 +284,15 @@ export function initDialogs() {
     choice.civ = choice.civ === button.dataset.civ ? null : button.dataset.civ;
   });
   pick($('levels'), 'data-level', (button) => { choice.level = button.dataset.level; });
-  pick($('map-shapes'), 'data-shape', (button) => { choice.map.shape = button.dataset.shape; });
+  pick($('world-mode'), 'data-world', (button) => { choice.fixed = button.dataset.world || null; });
+  pick($('map-shapes'), 'data-shape', (button) => {
+    choice.map.surprise = 'surprise' in button.dataset;
+    if (!choice.map.surprise) choice.map.shape = button.dataset.shape;
+  });
+  pick($('land-track'), 'data-land', (button) => { choice.map.land = Number(button.dataset.land); });
+  pick($('starts'), 'data-historical', (button) => {
+    choice.map.historical_starts = button.dataset.historical === 'true';
+  });
   for (const group of document.querySelectorAll('[data-map-level]')) {
     pick(group, 'data-level', (button) => {
       choice.map[group.dataset.mapLevel] = Number(button.dataset.level);
@@ -219,13 +304,7 @@ export function initDialogs() {
   });
   $('players-less').addEventListener('click', () => setPlayers(choice.players - 1));
   $('players-more').addEventListener('click', () => setPlayers(choice.players + 1));
-  $('btn-dice').addEventListener('click', () => {
-    $('seed').value = 1 + Math.floor(Math.random() * 99999);
-  });
   $('btn-start').addEventListener('click', startNewGame);
-  $('seed').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') startNewGame();
-  });
   $('btn-do-save').addEventListener('click', save);
   $('save-name').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') save();
@@ -382,7 +461,7 @@ export function openDefeat() {
     title: `The ${me.nation} are no more`,
     text: 'Your last city has fallen and no settlers remain to found another. The world goes on without you: '
       + 'you can watch how it ends, or start again.',
-    buttons: [['Watch the rest of the game', '', null], ['New game', 'primary', () => openGameDialog('seed')]],
+    buttons: [['Watch the rest of the game', '', null], ['New game', 'primary', () => openGameDialog('new')]],
   });
 }
 
@@ -481,7 +560,7 @@ export function showGameOver() {
   dialog.querySelectorAll('[data-over]').forEach((button) => {
     button.addEventListener('click', () => {
       dialog.close();
-      if (button.dataset.over === 'new') openGameDialog('seed');
+      if (button.dataset.over === 'new') openGameDialog('new');
       if (button.dataset.over === 'history') emit('show-tab', 'chart');
     });
   });

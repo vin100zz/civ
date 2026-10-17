@@ -24,6 +24,7 @@ def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
     `human_civ` is the civilization a person will lead, at the difficulty `level`: it takes
     the first seat (and the first start position), the other civilizations are drawn.
     """
+    map_settings = map_settings or rules.game.map
     world = generate_world(rules, seed, map_settings)
     game = Game(rules, seed, world)
     rng = game.rng
@@ -50,9 +51,14 @@ def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
         visibility.init_player(game, player)
         game.players.append(player)
 
-    starts = choose_start_positions(rules, world, len(civ_ids), rng)
+    homes = {}
+    if map_settings.historical_starts:
+        homes = {rank: world.tile(*world.starts[civ_id])
+                 for rank, civ_id in enumerate(civ_ids) if civ_id in world.starts}
+    starts = choose_start_positions(rules, world, len(civ_ids), rng, homes)
     civilizations = [p for p in game.players if not p.is_barbarian]
     for player, tile in zip(civilizations, starts):
+        tile.hut = False                          # a homeland of a fixed world may hold one
         for unit_type in settings.start_units:
             unit = game.add_unit(unit_type, player.id, tile.x, tile.y)
             visibility.reveal_unit(game, unit)
@@ -62,13 +68,16 @@ def new_game(rules: Rules, seed: int, civ_ids: Optional[Sequence[str]] = None,
     return game
 
 
-def choose_start_positions(rules: Rules, world: WorldMap, count: int,
-                           rng: random.Random) -> list[Tile]:
+def choose_start_positions(rules: Rules, world: WorldMap, count: int, rng: random.Random,
+                           given: Optional[dict[int, Tile]] = None) -> list[Tile]:
     """Good city sites, far from each other, on continents with room to grow.
 
     Same idea as the original (StartGameMenu.cs F5_0000_07c7): draw random tiles and relax
-    the requirements as the attempts pile up.
+    the requirements as the attempts pile up. `given` holds the start of some of the
+    civilizations, by their rank (their homeland on a fixed world); the others keep away
+    from them.
     """
+    given = given or {}
     settings = rules.game.players
     scores = site_scores(rules, world)
     sites_per_continent: dict[int, int] = {}
@@ -78,17 +87,23 @@ def choose_start_positions(rules: Rules, world: WorldMap, count: int,
 
     margin_x, margin_y = world.width // 10, world.height * 4 // 25
     starts: list[Tile] = []
-    for _ in range(count):
+    for rank in range(count):
+        if rank in given:
+            starts.append(given[rank])
+            continue
         chosen: Optional[Tile] = None
+        others = starts + [tile for later, tile in given.items() if later > rank]
         for attempt in range(1, 4001):
             x = rng.randrange(world.width - 2 * margin_x) + margin_x
             y = rng.randrange(world.height - 2 * margin_y) + margin_y
             tile = world.tile(x, y)
             if not rules.terrains[tile.terrain].is_land or tile.hut:
                 continue
+            if tile.index in world.no_start:
+                continue
             if scores[tile.index] < settings.start_min_site_score - attempt // 32:
                 continue
-            nearest = min((world.distance(x, y, s.x, s.y) for s in starts), default=99)
+            nearest = min((world.distance(x, y, s.x, s.y) for s in others), default=99)
             if nearest < settings.start_min_distance - attempt // 64:
                 continue
             if nearest < 3:

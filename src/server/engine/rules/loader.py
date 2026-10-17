@@ -198,9 +198,15 @@ def _load(files: _Files, ruleset: str, resources_dir: Optional[Path]) -> Rules:
     info = files.read("ruleset.yaml")
     if not isinstance(info, dict):
         raise ConfigError("ruleset.yaml: expected a mapping with a name and a description")
+    game = _build(schema.GameSettings, files.read("game.yaml"), "game.yaml")
+    for shape_id, shape in game.map.shapes.items():
+        if shape.map is not None:
+            name = f"maps/{shape.map}.yaml"
+            game.map.shapes[shape_id] = dataclasses.replace(
+                shape, fixed=_build(schema.FixedMap, files.read(name), name))
     rules = Rules(
         ruleset=_build(schema.RulesetInfo, {**info, "id": ruleset}, "ruleset.yaml"),
-        game=_build(schema.GameSettings, files.read("game.yaml"), "game.yaml"),
+        game=game,
         terrains=_load_list(files, "terrains.yaml", schema.TerrainDef),
         units=_load_list(files, "units.yaml", schema.UnitDef),
         buildings=buildings,
@@ -364,18 +370,30 @@ def _validate(rules: Rules, resources_dir: Optional[Path]) -> None:
     c.ref(g.difficulty.default_level, g.difficulty.levels, "game.yaml.difficulty.default_level",
           "difficulty level")
     c.ref(g.map.shape, g.map.shapes, "game.yaml.map.shape", "map shape")
-    for name in ("temperature", "climate", "relief"):
+    c.one_of(g.map.land, schema.LAND_STEPS, "game.yaml.map.land")
+    for name in ("temperature", "climate", "age", "relief", "huts"):
         c.one_of(getattr(g.map, name), (0, 1, 2), f"game.yaml.map.{name}")
     for shape_id, shape in g.map.shapes.items():
         where = f"game.yaml.map.shapes.{shape_id}"
         if not 0 <= shape.lakes < 1:
             c.error(f"{where}.lakes: expected a share between 0 and 1")
+        if shape.fixed is not None:
+            if shape.masses or shape.lakes:
+                c.error(f"{where}: a fixed map has neither masses nor lakes")
+            _check_fixed_map(c, rules, shape.fixed, f"maps/{shape.map}.yaml")
         for masses in shape.masses:
             if masses.belt and masses.hollow:
                 c.error(f"{where}.masses: a belt cannot be hollow")
             if masses.count < 1 or not 0 < masses.land < 1 or not 0 <= masses.hollow < 1:
                 c.error(f"{where}.masses: expected count >= 1, and land and hollow between "
                         f"0 and 1")
+            if masses.rifts < 0 or masses.chains < 0:
+                c.error(f"{where}.masses: rifts and chains cannot be negative")
+            if masses.chains and (masses.belt or masses.hollow or masses.bridge):
+                c.error(f"{where}.masses: islands strung in chains cannot be belts, hollow "
+                        f"or bridged")
+        if shape.masses and all(not masses.settled for masses in shape.masses):
+            c.error(f"{where}.masses: no mass where the civilizations can start")
     steps = g.calendar.steps
     if not steps or steps[-1].until is not None:
         c.error("game.yaml.calendar.steps: the last step must have 'until: null'")
@@ -435,6 +453,27 @@ def _validate(rules: Rules, resources_dir: Optional[Path]) -> None:
 
     if c.errors:
         raise ConfigError("Invalid configuration:\n  - " + "\n  - ".join(c.errors))
+
+
+def _check_fixed_map(c: _Checker, rules: Rules, fixed: schema.FixedMap, where: str) -> None:
+    for letter, terrain in fixed.legend.items():
+        if len(letter) != 1:
+            c.error(f"{where}.legend: '{letter}' is not a single letter")
+        c.ref(terrain, rules.terrains, f"{where}.legend.{letter}", "terrain")
+    if not fixed.rows or len({len(row) for row in fixed.rows}) != 1:
+        c.error(f"{where}.rows: expected rows of the same length")
+        return
+    unknown = {letter for row in fixed.rows for letter in row} - set(fixed.legend)
+    if unknown:
+        c.error(f"{where}.rows: letters missing from the legend: {sorted(unknown)}")
+        return
+    width, height = len(fixed.rows[0]), len(fixed.rows)
+    for civ_id, (x, y) in fixed.starts.items():
+        c.ref(civ_id, rules.civs, f"{where}.starts", "civilization")
+        if not (0 <= x < width and 0 <= y < height):
+            c.error(f"{where}.starts.{civ_id}: ({x}, {y}) is off the map")
+        elif not rules.terrains[fixed.legend[fixed.rows[y][x]]].is_land:
+            c.error(f"{where}.starts.{civ_id}: ({x}, {y}) is not on land")
 
 
 def _is_color(value: str) -> bool:

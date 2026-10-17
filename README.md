@@ -59,7 +59,7 @@ La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. 
 Mode **Watch the AI play them all** de la fenêtre « Game ».
 
 - **Speed / Step / Play** (à droite de la barre du haut, à la place de End turn) : vitesse, tour par tour, lecture continue. Espace = lecture/pause, N = un tour.
-- **Dossier** (à côté de la roue dentée, comme en partie jouée) : ouvre la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
+- **Dossier** (à côté de la roue dentée, comme en partie jouée) : ouvre la fenêtre « Game ». Nouvelle partie (la graine est tirée au hasard ; la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : un monde généré ou la Terre du jeu original (départs historiques ou tirés au hasard). Pour un monde généré : la forme des terres (continents, petites îles, continents et îles, continent unique, ceinture de terre qui fait le tour du monde, continent à lacs, mer intérieure, isthme, Nouveau Monde où personne ne démarre, archipels en arc, continent fendu, ou Surprise qui tire tout au hasard sans le dire), la part de terres (20 à 80 %), le relief (plat, normal, accidenté), le climat (sec, normal, humide), la température (froid, tempéré, chaud) et l'âge (jeune, normal, vieux), chacun expliqué par une bulle au survol de son nom ; et les huttes (aucune, normales, nombreuses). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
 - **Sur la carte** : « View as » pour voir le monde comme une civilisation (brouillard compris), le zoom et la mini-carte. Les calques Territory / Grid / AI missions sont derrière la roue dentée de la barre du haut.
 - **État de la planète** (barre du haut, après les taux, dès qu'il y a de la pollution) : cases polluées, jauge du réchauffement (orange à mi-chemin du seuil, rouge aux trois quarts), tours avant l'arrivée d'un vaisseau spatial ; l'infobulle donne les chiffres.
 - **Rail de droite** : World (classement des civilisations), Empire, City, Wonders, Science, History, Chronicle (en partie jouée, Turn et Cities en plus). Science et History occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.
@@ -86,10 +86,10 @@ python simulate.py --load saves/seed7.json --turns 100
 ```
 
 ```bash
-python simulate.py --seed 7 --turns 300 --shape small_islands --relief 2 --climate 0
+python simulate.py --seed 7 --turns 300 --shape small_islands --land 40 --relief 2 --climate 0
 ```
 
-`--shape` prend une des formes de `map.shapes` dans `config/game.yaml` (on peut en ajouter) ; `--relief` et `--climate` vont de 0 à 2.
+`--shape` prend une des formes de `map.shapes` dans `config/game.yaml` (on peut en ajouter, et un monde fixe se dessine dans `config/maps/`, comme `earth.yaml`) ; `--land` va de 20 à 80 par pas de 10 ; `--relief`, `--climate`, `--temperature`, `--age` et `--huts` vont de 0 à 2.
 
 ```bash
 python simulate.py --seed 7 --turns 300 --rules golden_ages

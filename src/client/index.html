@@ -188,32 +188,82 @@
       </section>
       <section class="dialog-col alt">
         <div class="field">
-          <label for="seed">Seed</label>
-          <div class="row">
-            <input id="seed" class="input mono" type="text" inputmode="numeric" placeholder="Random" autocomplete="off">
-            <button id="btn-dice" class="btn icon tall" aria-label="Draw a random seed" title="Draw a random seed"><span data-icon="dice"></span></button>
-          </div>
-          <span class="sub">Same seed, same world. Empty draws one at random.</span>
+          <span id="world-label" class="field-label">World</span>
+          <div id="world-mode" class="seg fill tall" role="group" aria-labelledby="world-label"></div>
         </div>
-        <div class="field">
-          <span id="shape-label" class="field-label">World</span>
-          <div id="map-shapes" class="shapes" role="group" aria-labelledby="shape-label"></div>
-          <span id="shape-hint" class="sub"></span>
+        <div id="world-generated" class="world-part">
+          <div class="field">
+            <div id="map-shapes" class="shapes three" role="group" aria-labelledby="world-label"></div>
+            <span id="shape-hint" class="sub"></span>
+          </div>
+          <div id="land-field" class="field share">
+            <div class="between">
+              <span id="land-label" class="field-label">Land</span>
+              <b id="land-value" class="share-value"></b>
+            </div>
+            <div id="land-track" class="share-track" role="group" aria-labelledby="land-label"></div>
+            <div id="land-ticks" class="share-ticks" aria-hidden="true"></div>
+          </div>
+          <div id="nature" class="world-part">
+            <span class="field-group">Nature</span>
+            <div class="nature-grid">
+              <div class="field">
+                <span id="relief-label" class="field-label" data-hint-wide
+                  data-hint="How much of the land rises into hills and mountains&#10;Flat: open plains and grassland, the best land for food.&#10;Rugged: long ranges of hills and mountains, rich in shields and easy to defend, but poor in food.">Relief</span>
+                <div class="seg fill" data-map-level="relief" role="group" aria-labelledby="relief-label">
+                  <button data-level="0">Flat</button>
+                  <button data-level="1">Normal</button>
+                  <button data-level="2">Rugged</button>
+                </div>
+              </div>
+              <div class="field">
+                <span id="climate-label" class="field-label" data-hint-wide
+                  data-hint="How much rain the winds carry inland&#10;Dry: more desert, plains and hills.&#10;Wet: more grassland, forest, jungle, swamp and rivers.">Climate</span>
+                <div class="seg fill" data-map-level="climate" role="group" aria-labelledby="climate-label">
+                  <button data-level="0">Dry</button>
+                  <button data-level="1">Normal</button>
+                  <button data-level="2">Wet</button>
+                </div>
+              </div>
+              <div class="field">
+                <span id="temperature-label" class="field-label" data-hint-wide
+                  data-hint="How far the ice reaches from the poles, and the desert from the equator&#10;Cold: more tundra and ice.&#10;Hot: less of them, and a little more desert. The difference stays small.">Temperature</span>
+                <div class="seg fill" data-map-level="temperature" role="group" aria-labelledby="temperature-label">
+                  <button data-level="0">Cold</button>
+                  <button data-level="1">Temperate</button>
+                  <button data-level="2">Hot</button>
+                </div>
+              </div>
+              <div class="field">
+                <span id="age-label" class="field-label" data-hint-wide
+                  data-hint="How long erosion has shaped the land: 3, 4 or 5 billion years&#10;Young: open, gentle land, with more grassland and plains.&#10;Old: rougher, more varied land, with forest, jungle, hills and mountains, and lakes where mountains collapsed.">Age</span>
+                <div class="seg fill" data-map-level="age" role="group" aria-labelledby="age-label">
+                  <button data-level="0">Young</button>
+                  <button data-level="1">Normal</button>
+                  <button data-level="2">Old</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="world-fixed" class="field" hidden>
+          <canvas id="fixed-map" class="fixed-map" aria-label="Map of this world"></canvas>
+          <span id="fixed-hint" class="sub"></span>
+        </div>
+        <span class="field-group">Game</span>
+        <div id="starts-field" class="field inline" hidden>
+          <span id="starts-label" class="field-label">Starts</span>
+          <div id="starts" class="seg fill" role="group" aria-labelledby="starts-label">
+            <button data-historical="true">Historical</button>
+            <button data-historical="false">Random</button>
+          </div>
         </div>
         <div class="field inline">
-          <span id="relief-label" class="field-label">Relief</span>
-          <div class="seg fill" data-map-level="relief" role="group" aria-labelledby="relief-label">
-            <button data-level="0">Flat</button>
+          <span id="huts-label" class="field-label">Huts</span>
+          <div class="seg fill" data-map-level="huts" role="group" aria-labelledby="huts-label">
+            <button data-level="0">None</button>
             <button data-level="1">Normal</button>
-            <button data-level="2">Mountainous</button>
-          </div>
-        </div>
-        <div class="field inline">
-          <span id="climate-label" class="field-label">Climate</span>
-          <div class="seg fill" data-map-level="climate" role="group" aria-labelledby="climate-label">
-            <button data-level="0">Dry</button>
-            <button data-level="1">Normal</button>
-            <button data-level="2">Wet</button>
+            <button data-level="2">Many</button>
           </div>
         </div>
       </section>

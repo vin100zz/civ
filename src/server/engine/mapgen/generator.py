@@ -5,8 +5,9 @@ special resource and hut patterns. The stages are kept in the original order; on
 continent numbering (stage 6) is our own, because it has no gameplay effect.
 
 Our own additions are the map shapes other than the original continents (islands, a single
-continent, an inner sea...: see shapes.py) and the relief setting. With the default shape and
-relief, a seed gives the world of the original algorithm.
+continent, an inner sea...: see shapes.py), the fixed worlds such as the Earth, and the land,
+relief and huts settings. With the default shape, land, relief and huts, a seed gives the
+world of the original algorithm.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import random
 from typing import Optional
 
 from ..model.worldmap import CARDINALS, DIRECTIONS, Tile, WorldMap
-from ..rules.schema import MapSettings, Rules
+from ..rules.schema import LAND_STEPS, FixedMap, MapSettings, Rules
 from .continents import label_continents
 from .shapes import raise_shaped_land
 
@@ -36,7 +37,8 @@ _WORN_DOWN = (0.6, 0.0, 0.0)
 # The original continents come with their hills; the other shapes start flat and get these.
 _RANGES_OF_SHAPES = 0.12
 # The rain of the original barely enters a large land mass, which stays covered with desert
-# and plains. On the other shapes, for each climate setting (0 dry, 1 normal, 2 wet): the
+# and plains. On the other shapes, and on the original continents with more land than the
+# original, for each climate setting (0 dry, 1 normal, 2 wet): the
 # desert keeps at most this share of the land, and grassland gets at least this share of the
 # open land (plains and grassland).
 _DESERT_OF_SHAPES = (0.12, 0.06, 0.02)
@@ -47,18 +49,24 @@ def generate_world(rules: Rules, seed: int, settings: Optional[MapSettings] = No
     """The world of a seed. `settings` replaces the map settings of the rules."""
     settings = settings or rules.game.map
     shape = settings.shapes[settings.shape]
+    if shape.fixed is not None:
+        world = _draw_fixed_world(shape.fixed, settings.wrap_x)
+        label_continents(world, rules)
+        _place_resources_and_huts(world, rules, seed, settings.huts)
+        return world
+
     rng = random.Random(seed)
     world = WorldMap(settings.width, settings.height, settings.wrap_x, OCEAN)
-
     if shape.masses:
-        raise_shaped_land(world, shape, rng)
+        raise_shaped_land(world, shape, settings.land / 100, rng)
         _raise_ranges(world, _RANGES_OF_SHAPES + _RANGES[settings.relief], rng)
     else:
-        _raise_land(world, settings, rng)
-        _raise_ranges(world, _RANGES[settings.relief], rng)
+        _raise_land(world, rng)
+        added = _add_flat_land(world, settings.land, rng)
+        _raise_ranges(world, _RANGES[settings.relief] + _RANGES_OF_SHAPES * added, rng)
     _apply_temperature(world, settings, rng)
     _apply_climate(world, settings, rng)
-    if shape.masses:
+    if shape.masses or settings.land > LAND_STEPS[0]:
         _water_inland(world, _DESERT_OF_SHAPES[settings.climate],
                       _GRASSLAND_OF_SHAPES[settings.climate], rng)
     _apply_age(world, settings, rng)
@@ -66,34 +74,33 @@ def generate_world(rules: Rules, seed: int, settings: Optional[MapSettings] = No
     _carve_rivers(world, settings, rng)
     _add_polar_caps(world, rng)
     label_continents(world, rules)
-    _place_resources_and_huts(world, rules, seed)
+    _place_resources_and_huts(world, rules, seed, settings.huts)
+    return world
+
+
+def _draw_fixed_world(fixed: FixedMap, wrap_x: bool) -> WorldMap:
+    """Own: a world drawn by hand, such as the Earth, with the start of each civilization."""
+    world = WorldMap(len(fixed.rows[0]), len(fixed.rows), wrap_x, OCEAN)
+    for y, row in enumerate(fixed.rows):
+        for x, letter in enumerate(row):
+            world.tile(x, y).terrain = fixed.legend[letter]
+    world.starts = dict(fixed.starts)
     return world
 
 
 # ── Stage 1: continents ───────────────────────────────────────────────────────
 
-def _raise_land(world: WorldMap, settings: MapSettings, rng: random.Random) -> None:
+# The land budget of the original "Land mass: Normal"; it gives the first step of land.
+_ORIGINAL_LAND_MASS = 1
+
+
+def _raise_land(world: WorldMap, rng: random.Random) -> None:
     """Drops random-walk "clouds" of land; overlaps become hills, then mountains."""
     w, h = world.width, world.height
-    target = (settings.land_mass + 2) * (w * h * 2 // 25)       # land_mass * 320 + 640 on 80x50
-    margin_x, margin_y = max(2, w // 20), max(4, h // 6)
+    target = (_ORIGINAL_LAND_MASS + 2) * (w * h * 2 // 25)      # land_mass * 320 + 640 on 80x50
     raised = 0
     while raised < target:
-        cloud: set[int] = set()
-        x = rng.randrange(w - 2 * margin_x) + margin_x
-        y = rng.randrange(h - 2 * margin_y) + margin_y
-        size = rng.randrange(64) + 1
-        while True:
-            for dx, dy in ((0, 0),) + CARDINALS:
-                tile = world.tile(x + dx, y + dy)
-                if tile is not None:
-                    cloud.add(tile.index)
-            dx, dy = CARDINALS[rng.randrange(4)]
-            x = (x + dx) % w
-            y += dy
-            size -= 1
-            if not (size > 0 and 4 < y < h - 5):
-                break
+        cloud = _cloud(world, rng)
         for index in cloud:
             tile = world.tiles[index]
             if tile.terrain == OCEAN:
@@ -103,6 +110,50 @@ def _raise_land(world: WorldMap, settings: MapSettings, rng: random.Random) -> N
             elif tile.terrain == HILLS:
                 tile.terrain = MOUNTAINS
         raised += len(cloud)
+
+
+def _cloud(world: WorldMap, rng: random.Random) -> set[int]:
+    """The tiles of one cloud of land: a random walk, thickened by its four neighbours."""
+    w, h = world.width, world.height
+    margin_x, margin_y = max(2, w // 20), max(4, h // 6)
+    cloud: set[int] = set()
+    x = rng.randrange(w - 2 * margin_x) + margin_x
+    y = rng.randrange(h - 2 * margin_y) + margin_y
+    size = rng.randrange(64) + 1
+    while True:
+        for dx, dy in ((0, 0),) + CARDINALS:
+            tile = world.tile(x + dx, y + dy)
+            if tile is not None:
+                cloud.add(tile.index)
+        dx, dy = CARDINALS[rng.randrange(4)]
+        x = (x + dx) % w
+        y += dy
+        size -= 1
+        if not (size > 0 and 4 < y < h - 5):
+            return cloud
+
+
+def _add_flat_land(world: WorldMap, land: int, rng: random.Random) -> float:
+    """Own: more clouds, of plains only, until land covers `land` % of the map.
+
+    The original budget gives the first step of land; above it, the overlaps of the clouds
+    no longer pile up into mountains, so that relief stays the business of its own setting.
+    Returns the share of the land that was added.
+    """
+    if land <= LAND_STEPS[0]:
+        return 0.0
+    wanted = land * len(world.tiles) // 100
+    count = sum(1 for t in world.tiles if t.terrain != OCEAN)
+    added = 0
+    for _ in range(len(world.tiles)):               # the last free tiles may be out of reach
+        if count + added >= wanted:
+            break
+        for index in _cloud(world, rng):
+            tile = world.tiles[index]
+            if tile.terrain == OCEAN:
+                tile.terrain = PLAINS
+                added += 1
+    return added / (count + added)
 
 
 def _raise_ranges(world: WorldMap, share: float, rng: random.Random) -> None:
@@ -270,7 +321,8 @@ def _wear_down(world: WorldMap, share: float, rng: random.Random) -> None:
 
 def _carve_rivers(world: WorldMap, settings: MapSettings, rng: random.Random) -> None:
     """Rivers start on hills and wander until they reach the sea or another river."""
-    wanted = (settings.land_mass + settings.climate) * 2 + 6
+    # The original count, for its land; own: as many more as there is more land.
+    wanted = ((_ORIGINAL_LAND_MASS + settings.climate) * 2 + 6) * settings.land // LAND_STEPS[0]
     made = 0
     for _ in range(256):
         if made > wanted:
@@ -333,12 +385,14 @@ def has_shield_pattern(x: int, y: int) -> bool:
     return ((7 * x + 11 * y) & 2) == 0
 
 
-def _place_resources_and_huts(world: WorldMap, rules: Rules, seed: int) -> None:
+def _place_resources_and_huts(world: WorldMap, rules: Rules, seed: int, huts: int = 1) -> None:
     """One special resource per 4x4 block and one hut every other block, from the seed.
 
     Source: OpenCivOne MapManagement.cs CellHasSpecialResource / CellHasMinorTribeHut.
+    Own: `huts` 0 leaves out the huts, 2 puts one in every block (the other slot of the pair).
     """
-    huts = rules.game.huts.enabled
+    if not rules.game.huts.enabled:
+        huts = 0
     for tile in world.tiles:
         x, y = tile.x, tile.y
         tile.pattern = has_shield_pattern(x, y)
@@ -351,7 +405,8 @@ def _place_resources_and_huts(world: WorldMap, rules: Rules, seed: int) -> None:
         terrain = rules.terrains[tile.terrain]
         if slot == (block & 0xF) and terrain.special is not None:
             tile.special = True
-        if huts and terrain.is_land and slot == ((block + 8) & 0x1F):
+        if huts and terrain.is_land and (slot == ((block + 8) & 0x1F)
+                                         or huts == 2 and slot == ((block + 24) & 0x1F)):
             tile.hut = True
 
 

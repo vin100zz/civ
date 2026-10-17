@@ -36,7 +36,7 @@ from ..engine.model.entities import Player, Unit
 from ..engine.model.game import Game
 from ..engine.model.worldmap import Tile
 from ..engine.rules.loader import PROJECT_ROOT
-from ..engine.rules.schema import MapSettings, Rules
+from ..engine.rules.schema import LAND_STEPS, MapSettings, Rules
 from ..engine.systems import turn
 from ..engine.view import PlayerView
 from ..human import orders
@@ -155,8 +155,12 @@ class Session:
         for client in self.clients:
             self.clients[client] = None
 
-    def _map_settings(self, rules: Rules, choices: Any) -> MapSettings:
-        """The map settings of the rules, with the valid choices of the observer."""
+    def _map_settings(self, rules: Rules, choices: Any, seed: int) -> MapSettings:
+        """The map settings of the rules, with the valid choices of the new-game dialog.
+
+        A surprise world draws its shape, land and nature from the seed (never a fixed
+        world), and keeps the huts chosen.
+        """
         settings = rules.game.map
         if not isinstance(choices, dict):
             return settings
@@ -164,10 +168,22 @@ class Session:
         shape = choices.get("shape")
         if isinstance(shape, str) and shape in settings.shapes:
             changes["shape"] = shape
+        land = choices.get("land")
+        if type(land) is int and land in LAND_STEPS:
+            changes["land"] = land
         for name in serialize.MAP_LEVELS:
             level = choices.get(name)
             if type(level) is int and 0 <= level <= 2:
                 changes[name] = level
+        if type(choices.get("historical_starts")) is bool:
+            changes["historical_starts"] = choices["historical_starts"]
+        if choices.get("surprise") is True:
+            draw = random.Random(seed)
+            changes["shape"] = draw.choice(
+                [shape_id for shape_id, s in settings.shapes.items() if s.fixed is None])
+            changes["land"] = draw.choice(LAND_STEPS)
+            for name in serialize.NATURE_LEVELS:
+                changes[name] = draw.randrange(3)
         return dataclasses.replace(settings, **changes)
 
     def _history_row(self) -> dict:
@@ -633,7 +649,7 @@ class Session:
         players = message.get("players")
         if not isinstance(players, int) or not 2 <= players <= len(rules.playable_civs):
             players = None
-        map_settings = self._map_settings(rules, message.get("map"))
+        map_settings = self._map_settings(rules, message.get("map"), seed)
         civ = level = None
         if message.get("mode") == "play":
             playable = [c.id for c in rules.playable_civs]

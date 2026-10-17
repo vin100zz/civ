@@ -253,7 +253,7 @@ Barre du haut : à gauche, le temple et le nom du jeu, le dossier « Game » et 
 | **M11** Diplomatie et information | Réponse aux propositions de paix, guerre et paix depuis l'empire, carte, événements, détails et courbes limités à ce que le joueur sait, messages du tour, défaite et victoire | Fait |
 | **M12** Confort | Colons et explorateurs automatiques, gouverneur de ville, sauvegarde automatique, glissement des unités, niveaux de difficulté | Fait, sauf le réglage de l'IA contre un humain |
 
-Ensuite : régler l'IA contre un joueur humain à partir de vraies parties, écran de négociation, diplomates, carte de la Terre, éditeur de carte.
+Ensuite : régler l'IA contre un joueur humain à partir de vraies parties, écran de négociation, diplomates, éditeur de carte (la Terre est jouable depuis le 17 octobre 2026).
 
 ### Ce que donnent les parties simulées (7 civs, partie complète)
 

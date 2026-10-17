@@ -64,6 +64,10 @@ class WorldMap:
         ]
         self._neighbors: list[tuple[Tile, ...]] = []
         self.continent_sizes: dict[int, int] = {}
+        # Only used to place the civilizations of a new game, never saved: tiles where none
+        # may start, and the start tile of each civilization on a fixed world.
+        self.no_start: set[int] = set()
+        self.starts: dict[str, tuple[int, int]] = {}
         self._build_adjacency()
 
     # ── Access ────────────────────────────────────────────────────────────────

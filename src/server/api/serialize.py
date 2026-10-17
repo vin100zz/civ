@@ -14,7 +14,7 @@ from ..engine import effects as fx
 from ..engine.model.entities import WORK_ORDERS, City, CityMemory, Player, Unit
 from ..engine.model.game import Game
 from ..engine.model.worldmap import Tile
-from ..engine.rules.schema import Rules
+from ..engine.rules.schema import LAND_STEPS, MapShape, Rules
 from ..engine.systems import city as city_rules
 from ..engine.systems import pollution, production, research
 from ..engine.view import PlayerView
@@ -25,9 +25,20 @@ from ..human.controller import HumanController
 F_SPECIAL, F_PATTERN, F_HUT, F_ROAD, F_RAILROAD, F_IRRIGATION, F_MINE, F_FORTRESS, F_POLLUTION = (
     1, 2, 4, 8, 16, 32, 64, 128, 256)
 
-# Map settings the observer picks for a new game, each from 0 to 2.
-MAP_LEVELS = ("relief", "climate")
+# Map settings picked in the new-game dialog, each from 0 to 2; a surprise world draws the
+# nature ones.
+NATURE_LEVELS = ("relief", "climate", "temperature", "age")
+MAP_LEVELS = NATURE_LEVELS + ("huts",)
 UNKNOWN_COLOR = "#8A95A5"
+
+
+def map_shape_payload(shape_id: str, shape: MapShape) -> dict[str, Any]:
+    """A world of the new-game dialog; a fixed one comes with its terrain, to be shown."""
+    payload: dict[str, Any] = {"id": shape_id, "name": shape.name,
+                               "description": shape.description, "land": shape.usual_land}
+    if shape.fixed is not None:
+        payload["fixed"] = {"rows": list(shape.fixed.rows), "legend": dict(shape.fixed.legend)}
+    return payload
 
 
 def ruleset_payload(rules: Rules) -> dict[str, str]:
@@ -85,11 +96,12 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
         "defaults": {"players": rules.game.players.count,
                      "max_players": len(rules.playable_civs),
                      "level": rules.game.difficulty.default_level,
-                     "map": {"shape": rules.game.map.shape,
+                     "map": {"shape": rules.game.map.shape, "land": rules.game.map.land,
+                             "historical_starts": rules.game.map.historical_starts,
                              **{name: getattr(rules.game.map, name) for name in MAP_LEVELS}}},
-        "map_shapes": [
-            {"id": shape_id, "name": shape.name, "description": shape.description}
-            for shape_id, shape in rules.game.map.shapes.items()],
+        "land_steps": list(LAND_STEPS),
+        "map_shapes": [map_shape_payload(shape_id, shape)
+                       for shape_id, shape in rules.game.map.shapes.items()],
         "spaceship": {"min_parts": dict(rules.game.spaceship.min_parts),
                       "max_parts": dict(rules.game.spaceship.max_parts)},
         "max_turns": rules.game.calendar.max_turns,

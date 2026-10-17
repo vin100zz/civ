@@ -81,7 +81,8 @@ export function setTips(panel, tips) {
 // ── Hints ───────────────────────────────────────────────────────────────────
 // The name of a control, in place of the browser's title tooltip: an element marked
 // data-hint="label" shows it under itself (data-hint-side="left": on its left), with its key when
-// it has data-key. The lines after the first, if any, come below in a softer tone.
+// it has data-key. The lines after the first, if any, come below in a softer tone; with
+// data-hint-wide, they are sentences that wrap.
 
 let hint = null;               // the hint box, made the first time one is needed
 let hinted = null;             // the element it names
@@ -92,8 +93,11 @@ function showHint(target) {
     hint = document.createElement('div');
     hint.id = 'hint';
     hint.setAttribute('role', 'tooltip');
-    document.body.appendChild(hint);
   }
+  // Inside an open dialog, which shows above the whole page, the hint must live in it.
+  const host = target.closest('dialog[open]') || document.body;
+  if (hint.parentElement !== host) host.appendChild(hint);
+  hint.classList.toggle('wide', 'hintWide' in target.dataset);
   const [first, ...more] = target.dataset.hint.split('\n');
   const label = document.createElement('span');
   label.className = 'hint-label';

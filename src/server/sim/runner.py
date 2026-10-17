@@ -22,7 +22,7 @@ from ..ai.controller import AIController
 from ..engine import persistence
 from ..engine.model.game import Game
 from ..engine.rules.loader import DEFAULT_RULESET, load_rules, ruleset_ids
-from ..engine.rules.schema import MapSettings, Rules
+from ..engine.rules.schema import LAND_STEPS, MapSettings, Rules
 from ..engine.setup import new_game
 from ..engine.systems import turn
 from ..human.controller import HumanController
@@ -125,7 +125,9 @@ def main() -> None:
                         help=f"set of rules, a folder of config/rulesets/ (default {DEFAULT_RULESET})")
     parser.add_argument("--shape", type=str, default=None,
                         help="map shape, one of map.shapes in config/game.yaml")
-    for name in ("relief", "climate", "temperature"):
+    parser.add_argument("--land", type=int, choices=LAND_STEPS, default=None,
+                        help="%% of the map covered by land")
+    for name in ("relief", "climate", "temperature", "age", "huts"):
         parser.add_argument(f"--{name}", type=int, choices=(0, 1, 2), default=None)
     args = parser.parse_args()
 
@@ -137,7 +139,8 @@ def main() -> None:
     rules = load_rules(ruleset=ruleset)
     if args.shape is not None and args.shape not in rules.game.map.shapes:
         parser.error(f"unknown shape '{args.shape}' (known: {', '.join(rules.game.map.shapes)})")
-    choices = {name: getattr(args, name) for name in ("shape", "relief", "climate", "temperature")}
+    choices = {name: getattr(args, name)
+               for name in ("shape", "land", "relief", "climate", "temperature", "age", "huts")}
     map_settings = dataclasses.replace(
         rules.game.map, **{name: value for name, value in choices.items() if value is not None})
     loaded = restore_game(rules, saved) if saved is not None else None

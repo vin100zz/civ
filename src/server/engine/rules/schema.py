@@ -240,6 +240,9 @@ class CivDef:
 
 # ── game.yaml ─────────────────────────────────────────────────────────────────
 
+LAND_STEPS = (20, 30, 40, 50, 60, 70, 80)    # the choices of land, in % of the map
+
+
 @dataclass(frozen=True)
 class LandMasses:
     """A group of land masses of about the same size."""
@@ -247,6 +250,18 @@ class LandMasses:
     land: float                       # share of the map covered by the whole group
     hollow: float = 0.0               # 0..1: size of the inner sea in the middle of each mass
     belt: bool = False                # the mass goes all around the world, from west to east
+    bridge: bool = False              # the masses are joined by a narrow neck of land
+    rifts: int = 0                    # winding straits that split each mass
+    chains: int = 0                   # the masses are small islands strung along that many arcs
+    settled: bool = True              # false: no civilization starts there
+
+
+@dataclass(frozen=True)
+class FixedMap:
+    """A world drawn by hand (config/maps/), one letter per tile."""
+    legend: dict[str, str]            # letter -> terrain
+    rows: tuple[str, ...]             # north first
+    starts: dict[str, tuple[int, int]] = field(default_factory=dict)   # civilization -> (x, y)
 
 
 @dataclass(frozen=True)
@@ -255,6 +270,18 @@ class MapShape:
     description: str
     masses: tuple[LandMasses, ...] = ()       # empty: random continents of the original game
     lakes: float = 0.0                        # share of the land turned into lakes
+    map: Optional[str] = None                 # a fixed world, config/maps/<map>.yaml
+    fixed: Optional[FixedMap] = None          # that world, read by the loader
+
+    @property
+    def usual_land(self) -> Optional[int]:
+        """The step of LAND_STEPS closest to the land of the shape; None for a fixed world."""
+        if self.fixed is not None:
+            return None
+        if not self.masses:
+            return LAND_STEPS[0]                  # the original continents
+        share = 100 * sum(group.land for group in self.masses)
+        return min(LAND_STEPS, key=lambda step: abs(step - share))
 
 
 @dataclass(frozen=True)
@@ -262,11 +289,13 @@ class MapSettings:
     width: int
     height: int
     wrap_x: bool
-    land_mass: int
+    land: int
     temperature: int
     climate: int
     age: int
     relief: int
+    huts: int
+    historical_starts: bool
     shape: str
     shapes: dict[str, MapShape]
 

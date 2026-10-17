@@ -33,8 +33,16 @@ def test_static_files_and_rules(client):
     assert len(rules["units"]) == 28 and len(rules["terrains"]) == 12
     assert rules["ruleset"]["id"] == "civ1"
     assert {"id", "name", "color"} <= set(rules["civs"][0])
-    assert rules["defaults"]["map"] == {"shape": "continents", "relief": 1, "climate": 1}
-    assert {"continents", "small_islands", "pangaea"} <= {s["id"] for s in rules["map_shapes"]}
+    assert rules["defaults"]["map"] == {"shape": "continents", "land": 20, "relief": 1,
+                                        "climate": 1, "temperature": 1, "age": 1, "huts": 1,
+                                        "historical_starts": True}
+    assert rules["land_steps"] == [20, 30, 40, 50, 60, 70, 80]
+    shapes = {s["id"]: s for s in rules["map_shapes"]}
+    assert {"continents", "small_islands", "pangaea", "isthmus", "earth"} <= set(shapes)
+    assert shapes["continents"]["land"] == 20 and shapes["world_belt"]["land"] == 40
+    earth = shapes["earth"]
+    assert earth["land"] is None and len(earth["fixed"]["rows"]) == 50
+    assert "fixed" not in shapes["pangaea"]
 
 
 def test_observer_session(client):
@@ -128,8 +136,23 @@ def test_new_game_with_a_chosen_map(client):
         assert islands["map"]["terrain"] != default["map"]["terrain"]
         # Invalid choices fall back on the defaults of the rules.
         socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
-                          "map": {"shape": ["atlantis"], "relief": 9, "climate": 1.0}})
+                          "map": {"shape": ["atlantis"], "relief": 9, "climate": 1.0,
+                                  "land": 25, "huts": True, "historical_starts": 1}})
         assert socket.receive_json()["map"]["terrain"] == default["map"]["terrain"]
+        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+                          "map": {"shape": "continents", "land": 60}})
+        more = socket.receive_json()["map"]["terrain"]
+        assert more != default["map"]["terrain"]
+
+
+def test_surprise_world(client, rules):
+    session = client.app.state.session
+    choices = {"shape": "continents", "land": 20, "relief": 1, "huts": 2, "surprise": True}
+    drawn = [session._map_settings(rules, choices, seed) for seed in range(1, 30)]
+    assert drawn[0] == session._map_settings(rules, choices, 1)        # the seed decides
+    assert len({s.shape for s in drawn}) > 4 and len({s.land for s in drawn}) > 3
+    assert all(s.huts == 2 and rules.game.map.shapes[s.shape].fixed is None for s in drawn)
+    assert len({(s.relief, s.climate, s.temperature, s.age) for s in drawn}) > 10
 
 
 # ── A person leads a civilization ─────────────────────────────────────────────
