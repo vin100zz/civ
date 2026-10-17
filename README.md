@@ -53,7 +53,7 @@ Vous ne voyez que ce que votre civilisation connaît : les terres explorées, le
 | Maj + D | Dissoudre l'unité (à confirmer) |
 | Entrée | Finir le tour |
 
-La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. Si votre civilisation est détruite, la partie continue et vous pouvez la regarder jusqu'au bout.
+La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. Si votre civilisation est détruite, la partie continue et vous pouvez la regarder jusqu'au bout. À la fin de la partie, **Replay the game** (fenêtre de fin de partie) rejoue toute la partie sur la carte du monde (voir Observer). Le replay montre toutes les civilisations : il n'est ouvert qu'une fois la partie finie, ou votre civilisation détruite.
 
 ## Observer
 
@@ -63,10 +63,11 @@ Mode **Watch the AI play them all** de la fenêtre « Game ».
 - **Dossier** (à côté de la roue dentée, comme en partie jouée) : ouvre la fenêtre « Game ». Nouvelle partie (la même graine avec les mêmes choix redonne exactement la même partie) avec le choix du monde : forme des terres (continents, petites, moyennes ou grandes îles, deux continents, continents et îles, continent unique avec ou sans lacs, ceinture de terre qui fait le tour du monde, mer intérieure), relief (plat, normal, montagneux) et climat (sec, normal, humide). Enregistrement sous un nom (dossier `saves/`) et rechargement ; une partie rechargée se poursuit comme l'originale.
 - **Sur la carte** : « View as » pour voir le monde comme une civilisation (brouillard compris), le zoom et la mini-carte. Les calques Territory / Grid / AI missions sont derrière la roue dentée de la barre du haut.
 - **État de la planète** (barre du haut, après les taux, dès qu'il y a de la pollution) : cases polluées, jauge du réchauffement (orange à mi-chemin du seuil, rouge aux trois quarts), tours avant l'arrivée d'un vaisseau spatial ; l'infobulle donne les chiffres.
-- **Rail de droite** : World (classement des civilisations), Empire, City, Wonders, Space (la course à l'espace, toutes les civilisations), Science, History, Chronicle (en partie jouée, Turn et Cities en plus). Science et History occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.
+- **Rail de droite** : World (classement des civilisations), Empire, City, Wonders, Space (la course à l'espace, toutes les civilisations), Science, History, Replay, Chronicle (en partie jouée, Turn et Cities en plus, Replay une fois la partie finie). Science, History et Replay occupent toute la largeur ; Échap ou « Back to map » ramène à la carte.
 - **Clic sur une ville** : production, citoyens, cases exploitées, pollution, et pourquoi l'IA a choisi cette production.
 - **Clic sur une unité ou un territoire** : panneau Empire de la civilisation, avec son vaisseau spatial, ce que son IA veut, ses expéditions outre-mer et ses missions. Le calque « AI missions » les dessine sur la carte.
 - **Science, History, Chronicle** : arbre des technologies, courbes par civilisation, journal des événements (cliquer une ligne la situe sur la carte).
+- **Replay** : toute la partie rejouée sur la carte du monde, comme à la fin d'une partie de Civ 1. Les villes apparaissent, changent de couleur quand elles sont prises et disparaissent quand elles sont rasées ; le territoire de chaque civilisation suit ses villes. Les combats s'allument en rouge et s'éteignent en six tours ; une étoile marque une merveille, un cercle une ville prise, une croix une ville rasée (calques Territory, Battles, Events). L'année et le dernier grand événement s'affichent sur la carte ; dessous, le classement et la chronique de ce moment (filtres Conquests, War & peace, Wonders, Governments, New cities ; un clic sur une ligne y amène la carte et cerne l'endroit). Lecture et pause (Espace), tour par tour (flèches), grand événement précédent ou suivant (Maj + flèches), début et fin (Début, Fin), barre de progression, vitesse Slow, Normal ou Fast. Aux vitesses lentes, la lecture marque une courte pause sur les grands événements. Une partie sauvegardée avant l'arrivée du replay n'a que ses villes du moment, chacune posée à sa date de fondation, et les événements que sa chronique gardait : le replay n'est complet qu'à partir du chargement, et le dit.
 
 Une partie se termine par la conquête du monde, par l'arrivée d'un vaisseau spatial sur Alpha du Centaure, ou au score en 2060.
 
@@ -92,6 +93,12 @@ python simulate.py --seed 7 --turns 300 --shape small_islands --relief 2 --clima
 
 `--shape` prend une des formes de `map.shapes` dans `config/game.yaml` (on peut en ajouter) ; `--relief` et `--climate` vont de 0 à 2.
 
+```bash
+python simulate.py --seed 7 --turns 300 --rules golden_ages
+```
+
+`--rules` choisit le jeu de règles (un dossier de `config/rulesets/`, `civ1` par défaut) ; une partie chargée avec `--load` garde le sien.
+
 Une sauvegarde faite ici se charge aussi dans l'interface (et inversement).
 
 ## Tester
@@ -113,9 +120,11 @@ Tout est dans `config/` :
 | Fichier | Contenu |
 |---|---|
 | `game.yaml` | Carte, calendrier, règles de ville, combat, déplacements, huttes, barbares, pollution, nucléaire, vaisseau spatial, score, victoire |
-| `terrains.yaml`, `units.yaml`, `buildings.yaml`, `wonders.yaml` | Données du jeu ; les effets des bâtiments et les capacités des unités sont déclarés ici |
-| `technologies.yaml`, `governments.yaml`, `civilizations.yaml` | Arbre des techs, gouvernements, civilisations et personnalités |
+| `terrains.yaml`, `governments.yaml`, `civilizations.yaml` | Terrains, gouvernements, civilisations et personnalités |
 | `ai.yaml` | Poids et seuils de l'IA |
+| `rulesets/<id>/` | Un jeu de règles : `technologies.yaml`, `units.yaml`, `buildings.yaml`, `wonders.yaml` (les effets des bâtiments et les capacités des unités sont déclarés ici), et son nom dans `ruleset.yaml` |
+
+Chaque partie se joue avec un jeu de règles, choisi dans la fenêtre de nouvelle partie et enregistré dans ses sauvegardes : `civ1` (Civilization I) ou `golden_ages` (Golden Ages : une unité nouvelle à chaque époque, des canons qui ignorent les remparts, une seule Power Plant, Sewer System et Harbour, des merveilles qui ne deviennent jamais obsolètes). Un fichier du dossier d'un jeu de règles remplace celui de `config/` qui porte le même nom ; `game.yaml` et `ai.yaml` y sont fusionnés clé par clé, pour ne changer que ce qui diffère (par exemple les unités que nomme `game.yaml` : unités de départ, mercenaires, barbares). Pour créer un jeu de règles, copier `config/rulesets/civ1/` sous un autre nom : le nom du dossier est l'identifiant que gardent les sauvegardes. Les parties sauvegardées avant ce choix sont des parties `civ1`.
 
 Quelques réglages utiles dans `game.yaml` : `enabled_unit_domains` (retirer `sea` ou `air` pour une partie terrestre), `victory` (conquête, vaisseau), `calendar.max_turns` (fin au score), `pollution.enabled`.
 

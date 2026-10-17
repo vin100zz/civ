@@ -20,6 +20,7 @@ from typing import Any
 from .model.entities import (City, CityMemory, Item, Player, Relation, Spaceship, Unit)
 from .model.game import Game
 from .model.worldmap import WorldMap
+from .rules.loader import DEFAULT_RULESET
 from .rules.schema import Rules
 from .systems import city as city_rules
 
@@ -43,6 +44,7 @@ def game_to_data(game: Game) -> dict[str, Any]:
     return {
         "version": VERSION,
         "seed": game.seed, "turn": game.turn, "year": game.year,
+        "ruleset": game.rules.ruleset.id,
         "finished": game.finished, "winner": game.winner, "victory": game.victory,
         "warming_level": game.warming_level, "warming_count": game.warming_count,
         "next_unit_id": game._next_unit_id, "next_city_id": game._next_city_id,
@@ -143,10 +145,22 @@ def save_header(path: Path) -> dict[str, int] | None:
 
 # ── Loading ───────────────────────────────────────────────────────────────────
 
+def saved_ruleset(data: dict[str, Any]) -> str:
+    """The id of the rules a saved game is played with (Civilization I for the older saves)."""
+    ruleset = data.get("ruleset", DEFAULT_RULESET) if isinstance(data, dict) else None
+    if not isinstance(ruleset, str):
+        raise SaveError(f"not a set of rules: {ruleset!r}")
+    return ruleset
+
+
 def game_from_data(rules: Rules, data: dict[str, Any]) -> Game:
-    """Rebuilds a game. Controllers are not attached: see `restore_controllers`."""
+    """Rebuilds a game with the rules it was played with. Controllers are not attached: see
+    `restore_controllers`."""
     if not isinstance(data, dict) or data.get("version") != VERSION:
         raise SaveError(f"unsupported save version: {data.get('version') if isinstance(data, dict) else data!r}")
+    if saved_ruleset(data) != rules.ruleset.id:
+        raise SaveError(f"the game is played with the rules '{saved_ruleset(data)}', "
+                        f"not '{rules.ruleset.id}'")
     try:
         return _build_game(rules, data)
     except (KeyError, IndexError, TypeError, ValueError) as exc:

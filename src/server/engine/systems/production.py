@@ -55,10 +55,11 @@ def can_build(game: Game, city: City, item: Item) -> bool:
             return False
         if building.requires is not None and building.requires not in player.techs:
             return False
-        if item.id in city.buildings:
+        # A building a wonder provides is not built again, and counts as a prerequisite.
+        owned = fx.effective_buildings(game, city)
+        if item.id in owned:
             return False
-        if building.requires_building is not None \
-                and building.requires_building not in city.buildings:
+        if building.requires_building is not None and building.requires_building not in owned:
             return False
         if building.requires_wonder is not None and building.requires_wonder not in game.wonders:
             return False

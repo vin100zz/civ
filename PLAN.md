@@ -52,9 +52,13 @@ Tout se trouve sous `C:\V\Abandonware-France\Civilization\OpenCivOne\src\Game`. 
 config/                 données de jeu (YAML)
   game.yaml             constantes : carte, calendrier, ville, combat, déplacements, barbares,
                         pollution, nucléaire, vaisseau spatial, score, victoire
-  terrains.yaml  units.yaml  buildings.yaml  wonders.yaml
-  technologies.yaml  governments.yaml  civilizations.yaml
+  terrains.yaml  governments.yaml  civilizations.yaml
   ai.yaml               poids, seuils et personnalités de l'IA
+  rulesets/             un dossier par jeu de règles, choisi à la création d'une partie
+    civ1/               Civilization I : ruleset.yaml (nom), technologies.yaml, units.yaml,
+                        buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
+    golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
+                        sans obsolescence (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
 resources/              sprites, servis tels quels
 saves/                  parties sauvegardées (JSON, hors dépôt)
 run.py  simulate.py     lanceurs (serveur, simulateur)
@@ -62,7 +66,8 @@ src/
   server/
     main.py             point d'entrée du serveur
     api/                app (FastAPI), session (partie en cours, navigateurs, sauvegardes),
-                        commands (ordres du joueur -> actions), serialize (JSON)
+                        commands (ordres du joueur -> actions), serialize (JSON),
+                        replay (ce que montre le replay de fin de partie, noté tour par tour)
     engine/
       rules/            schema.py (structures typées), loader.py (chargement + validation)
       model/            worldmap, entities (Unit, City, Player, Spaceship), game (état complet)
@@ -102,8 +107,9 @@ src/
          tips.js        infobulles des panneaux (éléments marqués data-tip)
          renderer/      map (carte), ground (sol), minimap, sprites
          panels/        turn (tour du joueur), civs (monde, empire d'une IA), empire (empire du
-                        joueur), city, tech, chart, log, unitbar (barre de l'unité active)
-  tests/                192 tests : config, carte, villes, unités, empire, mer et air,
+                        joueur), city, tech, chart, log, unitbar (barre de l'unité active),
+                        replay (la partie rejouée sur la carte du monde)
+  tests/                207 tests : config, carte, villes, unités, empire, mer et air,
                         fin de partie et sauvegardes, IA, joueur humain, API
 ```
 
@@ -146,14 +152,18 @@ Les unités suivent le même principe : `domain` (terre, mer, air), `abilities` 
 
 - HTTP : fichiers statiques, sprites (`/resources`), règles (`/api/rules`).
 - WebSocket `/ws` : message `init` à la connexion (règles, carte, état, historique, journal, liste des sauvegardes), puis un message `turn` par tour (état, cases modifiées, événements).
-- Commandes de l'observateur : `new_game` (graine, nombre de civs, monde), `play`, `pause`, `step`, `speed`, `pov` (tout voir ou voir comme une civ), `city` et `player` (détails, avec les raisons de l'IA), `save` et `load` (par nom, dans `saves/`).
+- Commandes de l'observateur : `new_game` (graine, nombre de civs, monde), `play`, `pause`, `step`, `speed`, `pov` (tout voir ou voir comme une civ), `city` et `player` (détails, avec les raisons de l'IA), `save` et `load` (par nom, dans `saves/`), `replay` (le replay de la partie, message `replay` ; refusé tant qu'une personne dirige une civilisation).
 - Commandes du joueur : `new_game` avec `mode: play`, `civ` et `level` ; `action` (un ordre, voir `api/commands.py`) ; `end_turn` ; `goto`, `automate`, `govern` (délégations) ; `unit` (détail et ordres possibles d'une unité) ; `preview` (ce que ferait un déplacement).
 - Messages propres au mode jeu : `update` après chaque ordre (résultat, état, cases modifiées ou découvertes, événements, détail de l'unité ou de la ville concernée), `unit`, `preview`. L'état porte alors `play` (qui est le joueur), `me` (ses affaires : recherche, budget, relations, propositions de paix), `alerts` et `notes`.
 - `update` et `turn` portent aussi `steps` : les pas d'unités que le joueur a vus (les siens après un ordre, ceux des autres pendant qu'ils jouaient), dans l'ordre. Le moteur signale chaque pas (`Game.watcher`), la session ne garde que ceux dont une case au moins était en vue à ce moment-là, avec les unités présentes sur ces cases après le pas.
 
 ### Sauvegardes
 
-`engine/persistence.py` écrit tout ce qui décide de la suite d'une partie : carte, joueurs, villes, unités, relations, merveilles, vaisseaux, réchauffement, et l'état du générateur aléatoire. Une partie jouée se sauvegarde au milieu du tour du joueur : le fichier dit qui est dirigé par une personne (`humans`) et à qui c'est de jouer. Elle s'enregistre aussi d'elle-même tous les cinq tours sous le nom `autosave`. Ce qui se déduit (quelle case porte quelle ville, chiffres des villes) est recalculé au chargement. Les contrôleurs enregistrent leur mémoire par `save_state()` / `load_state()` ; celle de l'IA ne contient que des données simples (expéditions en cours, missions des unités). L'historique des courbes et le journal de l'observateur voyagent dans le même fichier.
+`engine/persistence.py` écrit tout ce qui décide de la suite d'une partie : carte, joueurs, villes, unités, relations, merveilles, vaisseaux, réchauffement, et l'état du générateur aléatoire. Une partie jouée se sauvegarde au milieu du tour du joueur : le fichier dit qui est dirigé par une personne (`humans`) et à qui c'est de jouer. Elle s'enregistre aussi d'elle-même tous les cinq tours sous le nom `autosave`. Ce qui se déduit (quelle case porte quelle ville, chiffres des villes) est recalculé au chargement. Les contrôleurs enregistrent leur mémoire par `save_state()` / `load_state()` ; celle de l'IA ne contient que des données simples (expéditions en cours, missions des unités). L'historique des courbes, le journal de l'observateur et le replay voyagent dans le même fichier.
+
+### Replay (`api/replay.py`, `panels/replay.js`)
+
+À chaque ligne de l'historique des courbes (une par tour : le monde au début du tour), la session note pour le replay ce qui a changé dans les villes depuis la ligne d'avant : `["found", tour, ville, propriétaire, x, y, nom, taille]`, `["owner", tour, ville, propriétaire]`, `["size", tour, ville, taille]`, `["gone", tour, ville]`. La comparaison des villes attrape toutes les façons dont une ville naît, change de main ou disparaît (colons, huttes, prises, barbares). Elle garde aussi, parmi les événements lus, les grands événements (villes fondées, prises, rasées, civilisations détruites, merveilles, gouvernements, guerres, paix, contacts, vaisseau, arme nucléaire, réchauffement, fin de partie) et les combats (case, vainqueur, perdant). Le journal de l'observateur, limité aux 600 derniers événements, n'y suffirait pas. Une partie complète de 580 tours en donne environ 1 300 changements de ville, 280 événements et 540 combats, soit 66 Ko sur les 575 Ko de la sauvegarde. Le client rebâtit chaque tour à partir de ces changements et dessine la carte comme la mini-carte, avec la même règle de territoire. Une image du replay porte l'année du tour qui vient d'être joué, dont elle montre les événements. Une sauvegarde d'avant le replay n'a que ses villes du moment, posées au tour qui suit leur fondation (`City.founded_turn`), et les grands événements de son journal ; le replay dit à partir de quand il est complet.
 
 ## 3. Config : corrections apportées aux données extraites
 
@@ -221,7 +231,7 @@ Tout ordre donné à la main reprend l'unité. Ces délégations sont des donné
 - Les unités étrangères ne sont envoyées que si elles sont en vue ; les villes étrangères telles qu'elles ont été vues la dernière fois.
 - D'une civilisation non rencontrée, rien, pas même son nom. D'une civilisation rencontrée : nom, gouvernement, villes vues, merveilles, guerres et traités avec les civilisations que le joueur connaît. Trésor, science et armées restent secrets.
 - Les événements : ceux qui touchent le joueur, ceux qui se passent sous ses yeux, et les nouvelles du monde (merveille, civilisation détruite, vaisseau lancé, frappe nucléaire, réchauffement).
-- Les courbes ne suivent que sa propre civilisation. Tout est dévoilé à la fin de la partie.
+- Les courbes ne suivent que sa propre civilisation. Tout est dévoilé à la fin de la partie, replay compris.
 
 ### Diplomatie
 

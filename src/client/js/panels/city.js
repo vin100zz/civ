@@ -578,7 +578,17 @@ export function renderCity(container) {
     return sellAsked === `${c.id}:${id}`
       ? `<button class="chip big war" data-sell="${id}">Sell for ${building.cost}${icon('coin', 13, 2)} ?</button>`
       : `<button class="chip big" data-sell="${id}" data-tip="${tip}">${label}</button>`;
-  }).join('') || '<span class="muted">None</span>';
+  }).concat(Object.entries(c.given || {}).map(([id, wonderId]) => {
+    // A building a wonder provides: no upkeep, nothing to sell.
+    const building = store.buildingDefs[id];
+    const wonder = store.buildingDefs[wonderId];
+    const tip = `given:${id}`;
+    tips.set(tip, tipTitle(`<span>${building.name}</span>`, 'given') + tipRows([
+      ['Given by', `★ ${wonder.name}`],
+      ...(building.description ? [['Effect', building.description]] : []),
+    ]));
+    return `<span class="chip big given" data-tip="${tip}">${building.name}<span class="soft">★</span></span>`;
+  })).join('') || '<span class="muted">None</span>';
 
   const decided = c.decision
     ? `${c.decision.bought ? 'bought' : 'decided'} on turn ${c.decision.turn}` : '';

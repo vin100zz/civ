@@ -43,12 +43,14 @@ def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effec
     if is_center and shields < 1:
         shields = 1
 
-    if trade > 0:
-        if effects is None:
-            effects = fx.city_effects(game, city)
-        for effect in effects:
-            if effect.type == "tile_trade_bonus":
-                trade += effect.amount
+    if effects is None:
+        effects = fx.city_effects(game, city)
+    domain = "land" if terrain.is_land else "sea"
+    for effect in effects:
+        if effect.type == "tile_trade_bonus" and trade > 0:
+            trade += effect.amount
+        elif effect.type == "tile_food_bonus" and effect.domain == domain:
+            food += effect.amount       # a Harbour: +1 food on ocean tiles
 
     if tile.railroad:
         percent = movement.railroad_yield_percent

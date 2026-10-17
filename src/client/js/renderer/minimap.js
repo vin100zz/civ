@@ -3,9 +3,9 @@
 import { store, tileIndex, player } from '../state.js';
 
 const WIDTH = 320;          // pixels on screen (css/style.css)
-const OCEAN = [22, 44, 74];
+export const OCEAN = [22, 44, 74];
 
-function rgb(color) {
+export function rgb(color) {
   const value = parseInt(color.slice(1), 16);
   return [value >> 16, (value >> 8) & 255, value & 255];
 }

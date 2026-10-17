@@ -1,0 +1,15 @@
+# A set of rules: the advances, units, buildings and wonders of a game. Each game is played
+# with one of them, chosen in the "new game" dialog and recorded in its saves.
+#
+# A folder of config/rulesets/ is a set of rules when it holds this file. Its files are read
+# before those of config/ itself:
+#   - a list (technologies, units, buildings, wonders, and also governments, terrains or
+#     civilizations) replaces the shared file of that name;
+#   - game.yaml and ai.yaml are merged into the shared ones: they only need the keys that
+#     change, for example the units and advances game.yaml names (players.start_units,
+#     huts.mercenaries, barbarians.units_by_tech_count, movement.railroad_tech,
+#     pollution.population_techs...) or the AI weights.
+# The folder name is the id saved games refer to: renaming it makes their saves unreadable.
+
+name: Civilization I
+description: The advances, units, buildings and wonders of the original game.
