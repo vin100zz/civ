@@ -10,6 +10,8 @@ const PATHS = {
   play: '<path d="M7 5l12 7-12 7z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
   step: '<path d="M6 5l9 7-9 7zM18 5v14"/>',
+  'step-back': '<path d="M18 5l-9 7 9 7zM6 5v14"/>',
+  replay: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M10 9l5 3-5 3z"/>',
   save: '<path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM8 3v5h7M8 21v-7h8v7"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
