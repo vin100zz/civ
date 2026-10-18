@@ -40,6 +40,7 @@ class AIController:
     def play_turn(self, game: Game, player: Player) -> None:
         view = PlayerView(game, player)
         know = Knowledge(view)
+        foreign = {m.city_id: m.owner for m in know.foreign_cities}
 
         notes = diplomacy.review(view, know, self.memory)
         self._note_losses(view)
@@ -78,6 +79,7 @@ class AIController:
         for city in view.my_cities():
             if city.production is None:
                 self._decide(governor, city)
+        self._note_conquests(view, foreign)
         self._remember(view, know, plan)
 
     def _decide(self, governor: Governor, city) -> None:
@@ -92,7 +94,7 @@ class AIController:
 
     def accepts_peace(self, game: Game, player: Player, proposer: int) -> bool:
         view = PlayerView(game, player)
-        return diplomacy.accepts_peace(view, Knowledge(view), proposer)
+        return diplomacy.accepts_peace(view, Knowledge(view), proposer, self.memory)
 
     # ── Saved games (engine/persistence.py) ───────────────────────────────────
 
@@ -175,6 +177,21 @@ class AIController:
             if city_id in foreign and city_id not in known:
                 lost.append([city_id, view.turn])
         self.memory["lost_cities"] = lost
+
+    def _note_conquests(self, view: PlayerView, foreign: dict[int, int]) -> None:
+        """The cities we took this turn, kept or razed, are remembered for a while as
+        [city id, turn, former owner]: a war that goes our way is not given up
+        (diplomacy.momentum). `foreign`: the foreign cities we knew at the start of the turn
+        and their owners; only our own units acted since, and a city we no longer know as
+        foreign is one they took."""
+        keep = view.rules.ai.get("diplomacy", "momentum_memory")
+        conquests = [entry for entry in self.memory.get("conquests", [])
+                     if view.turn - entry[1] <= keep]
+        still_foreign = {m.city_id for m in view.known_foreign_cities()}
+        for city_id, owner in foreign.items():
+            if city_id not in still_foreign and not view.is_barbarian(owner):
+                conquests.append([city_id, view.turn, owner])
+        self.memory["conquests"] = conquests
 
     # ── Observer information ──────────────────────────────────────────────────
 

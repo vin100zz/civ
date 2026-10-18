@@ -9,10 +9,10 @@ from server.ai.knowledge import Knowledge
 from server.ai import strategic
 from server.api import serialize
 from server.engine import effects as fx
-from server.engine.model.entities import Item
+from server.engine.model.entities import PEACE, Item
 from server.engine.rules.loader import load_rules
 from server.engine.systems import city as city_rules
-from server.engine.systems import movement, production, visibility
+from server.engine.systems import diplomacy, movement, production, visibility
 from server.engine.view import PlayerView
 from server.human.controller import HumanController
 
@@ -51,6 +51,17 @@ def test_golden_ages_rules(golden):
             assert golden.units[older].obsolete_by == golden.units[newer].requires, (older, newer)
     assert golden.units["battleship"].attack == 12
     assert {"mfg_plant", "hydro_plant", "nuclear_plant", "seti_program"}.isdisjoint(golden.buildings)
+
+
+def test_no_senate_keeps_the_peace(golden, rules):
+    """The governments of Civ 1, but a Republic or a Democracy may go to war and stay there."""
+    assert list(golden.governments) == list(rules.governments)
+    assert not [g.id for g in golden.governments.values() if g.senate]
+    game = make_game(golden, relation=PEACE)
+    for player in game.civilizations:
+        player.government = "democracy"
+    assert diplomacy.declare_war(game, 1, 2)
+    assert not diplomacy.propose_peace(game, 2, 1, lambda: False)
 
 
 def test_harbour_feeds_ocean_tiles(golden):

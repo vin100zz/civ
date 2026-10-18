@@ -284,6 +284,66 @@ def test_the_others_close_ranks_against_a_dominant_civilization(rules):
     assert willing(2, 3) > willing(2, None), "peace with its other enemy"
 
 
+def test_a_war_is_prepared_then_declared(rules):
+    """The attack force is raised and gathered on the border before the war is declared."""
+    game = make_game(rules, width=24, relation=PEACE)
+    home = add_city(game, 1, 4, 5, size=8)
+    add_city(game, 1, 4, 9, size=8)
+    theirs = add_city(game, 2, 12, 5, size=2)
+    romans = game.players[1]
+    romans.explored = bytearray([1]) * len(game.map.tiles)
+    visibility.remember_city(game, romans, theirs)
+    game.turn, game.current_player = 50, 1
+    memory = {"war_plan": [2, game.turn]}
+
+    def review():
+        view = PlayerView(game, romans)
+        notes = ai_diplomacy.review(view, Knowledge(view), memory)
+        return view, notes, strategic.make_plan(view, Knowledge(view), {}, memory)
+
+    view, notes, plan = review()
+    assert game.relation(1, 2).state == PEACE and memory["war_plan"] == [2, 50]
+    assert any(note.startswith("preparing war on") for note in notes)
+    assert [m.city_id for m in plan.war_targets] == [theirs.id]
+    assert [m.stage for m in plan.missions if m.kind == M.ATTACK_CITY] == ["rally"]
+    assert plan.attackers_wanted == ai_diplomacy.attack_force_wanted(view, Knowledge(view), True)
+
+    ready = max(plan.attackers_wanted, int(rules.ai.get("strategy", "siege_group_size")))
+    for _ in range(ready):
+        game.add_unit("legion", 1, home.x, home.y)
+    _, notes, plan = review()
+    assert game.relation(1, 2).state == WAR and "war_plan" not in memory
+    assert "war on Greeks" in notes
+
+
+def test_a_war_that_goes_well_goes_on(rules):
+    game = make_game(rules, relation=PEACE)
+    add_city(game, 1, 2, 2, size=4)
+    theirs = add_city(game, 2, 8, 2, size=4)
+    romans, greeks = game.players[1], game.players[2]
+    visibility.remember_city(game, romans, theirs)
+    game.turn = 40
+    assert diplomacy.declare_war(game, 1, 2)
+    view = PlayerView(game, romans)
+    assert ai_diplomacy.peace_willingness(view, Knowledge(view), 2) == 0.0, "our war, just begun"
+
+    # The Romans take a Greek city: they remember it, and the Greeks remember their loss.
+    controller = AIController()
+    foreign = {m.city_id: m.owner for m in view.known_foreign_cities()}
+    cities.capture_city(game, game.add_unit("legion", 1, 7, 2), theirs)
+    controller._note_conquests(view, foreign)
+    assert controller.memory["conquests"] == [[theirs.id, 40, 2]]
+
+    game.turn += int(rules.ai.get("diplomacy", "war_min_turns"))
+    know = Knowledge(view)
+    assert ai_diplomacy.peace_willingness(view, know, 2, memory=controller.memory) \
+        < ai_diplomacy.peace_willingness(view, know, 2, memory={}), "winning"
+    victim = PlayerView(game, greeks)
+    lost = {"lost_cities": [[theirs.id, 40]]}
+    assert ai_diplomacy.peace_willingness(victim, Knowledge(victim), 1, memory=lost) \
+        > ai_diplomacy.peace_willingness(victim, Knowledge(victim), 1, memory={}), "losing"
+
+
 # ── Counter-attack ────────────────────────────────────────────────────────────
 
 def test_ai_goes_back_for_a_city_it_lost(rules):

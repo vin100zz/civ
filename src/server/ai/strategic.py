@@ -13,8 +13,8 @@ from typing import Optional
 from ..engine.model.entities import City, CityMemory
 from ..engine.model.worldmap import Tile
 from ..engine.view import PlayerView
+from . import diplomacy, overseas, pathfinding
 from . import missions as M
-from . import overseas, pathfinding
 from .knowledge import Knowledge
 from .missions import Mission
 
@@ -36,6 +36,7 @@ class Plan:
     attackers_surplus: int = 0        # attack units the empire could do without
     explorers_wanted: int = 0         # more explorers needed
     enemies: list[int] = field(default_factory=list)                   # civs we are fighting
+    war_plan: Optional[int] = None    # the civ we are preparing a war on (diplomacy.py)
     war_targets: list[CityMemory] = field(default_factory=list)
     invaders: int = 0                 # enemy units seen on our land, near our cities
     at_war: bool = False
@@ -56,6 +57,8 @@ def make_plan(view: PlayerView, know: Knowledge, previous: dict[int, tuple],
     plan = Plan()
     memory = memory if memory is not None else {}
     plan.enemies = [p.id for p in view.contacts() if view.at_war(p.id)]
+    if "war_plan" in memory:
+        plan.war_plan = memory["war_plan"][0]
     lost = {entry[0] for entry in memory.get("lost_cities", [])}
     _defense_missions(view, know, plan)
     _intercept_missions(view, know, plan)
@@ -142,7 +145,9 @@ def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan,
     """One enemy city per region is chosen as the target of all attackers there. A city
     that was ours (`lost`, see AIController._note_losses) is taken back first.
 
-    A region where we have no city counts too once our attackers have landed in it.
+    A region where we have no city counts too once our attackers have landed in it. The
+    cities of the civilization we are preparing a war on are targets too: the attackers
+    gather on the border, ready to strike once war is declared.
     """
     rules = view.rules
     get = lambda name: rules.ai.get("strategy", name)
@@ -156,7 +161,8 @@ def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan,
         bases = [(c.x, c.y) for c in region.my_cities] or [(u.x, u.y) for u in landed]
         if not bases:
             continue
-        targets = [m for m in region.foreign_cities if view.at_war(m.owner)]
+        targets = [m for m in region.foreign_cities
+                   if view.at_war(m.owner) or m.owner == plan.war_plan and region.my_cities]
         if not targets:
             continue
 
@@ -188,6 +194,8 @@ def _attack_missions(view: PlayerView, know: Knowledge, plan: Plan,
         undefended = view.city_defenders_seen(target) == 0
         ready = len(nearby) + len(gathered) >= group or len(nearby) >= 1 and undefended
         stage = "assault" if ready or undefended else "rally"
+        if not view.at_war(target.owner):
+            stage = "rally"                  # the war is not declared yet
         plan.missions.append(Mission(
             M.ATTACK_CITY, target.x, target.y, weight * 1.5, capacity=16,
             target=target.city_id, stage=stage, rally=(rally_city.x, rally_city.y),
@@ -453,8 +461,6 @@ def _count_needs(view: PlayerView, know: Knowledge, plan: Plan, sites: int, jobs
                  explore_capacity: int) -> None:
     rules = view.rules
     strategy = lambda name: rules.ai.get("strategy", name)
-    personality = view.player.civ.personality
-    bend = lambda name: rules.ai.get("personality", name)
 
     for mission in plan.missions:
         if mission.kind == M.DEFEND:
@@ -470,11 +476,7 @@ def _count_needs(view: PlayerView, know: Knowledge, plan: Plan, sites: int, jobs
     plan.workers_wanted = max(0, workers_wanted(view, know, jobs) - improving)
 
     attackers = len(know.units_with_role("attack"))
-    reachable_enemy = bool(plan.war_targets)
-    per_city = strategy("attackers_per_city") if reachable_enemy else strategy("attackers_peace")
-    per_city *= 1.0 + personality.mood * bend("aggressive_attack") \
-        - personality.ideology * bend("militarist_attack")
-    wanted = math.ceil(len(know.cities) * max(0.0, per_city))
+    wanted = diplomacy.attack_force_wanted(view, know, war=bool(plan.war_targets))
     # Enemies who landed near our cities call for a counter-attack, war target or not.
     wanted += math.ceil(plan.invaders * strategy("attackers_per_invader"))
     plan.attackers_wanted = max(0, wanted - attackers)

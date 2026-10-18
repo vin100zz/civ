@@ -58,7 +58,8 @@ config/                 données de jeu (YAML)
     civ1/               Civilization I : ruleset.yaml (nom), technologies.yaml, units.yaml,
                         buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
     golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
-                        sans obsolescence (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
+                        sans obsolescence, des gouvernements sans Sénat (governments.yaml)
+                        (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
 resources/              sprites, servis tels quels
 saves/                  parties sauvegardées (JSON, hors dépôt)
 run.py  simulate.py     lanceurs (serveur, simulateur)
@@ -183,7 +184,7 @@ Les unités suivent le même principe : `domain` (terre, mer, air), `abilities` 
 ### Déroulement d'un tour (`ai/controller.py`)
 
 1. **Connaissance.** Régions connues (terres explorées contiguës ; une ville étrangère ferme le passage), mers connues et leurs ports, frontières de l'inconnu, menaces près des villes, sites de ville classés.
-2. **Diplomatie.** Propositions de paix et déclarations de guerre, selon la personnalité et le rapport de forces estimé. Une déclaration de guerre rompt un traité : le moteur l'inscrit au dossier de la civilisation qui la déclare (`Player.broken_treaties`), et l'IA s'en méfie d'autant, sa victime surtout, les civilisations qui l'ont appris un peu moins ; la méfiance s'efface en 60 tours et compte double pour un traité rompu moins de 16 tours après sa signature. Une civilisation connue bien plus forte que toutes les autres voit les autres se liguer : elles font moins volontiers la paix avec elle, plus volontiers entre ennemis de cette civilisation, et lui déclarent la guerre en comptant les forces de ses autres ennemis.
+2. **Diplomatie.** Propositions de paix et déclarations de guerre, selon la personnalité et le rapport de forces estimé. Une déclaration de guerre rompt un traité : le moteur l'inscrit au dossier de la civilisation qui la déclare (`Player.broken_treaties`), et l'IA s'en méfie d'autant, sa victime surtout, les civilisations qui l'ont appris un peu moins ; la méfiance s'efface en 60 tours et compte double pour un traité rompu moins de 16 tours après sa signature. Une civilisation connue bien plus forte que toutes les autres voit les autres se liguer : elles font moins volontiers la paix avec elle, plus volontiers entre ennemis de cette civilisation, et lui déclarent la guerre en comptant les forces de ses autres ennemis. Une guerre se prépare avant d'être déclarée (`memory["war_plan"]`) : le tirage qui la décide choisit une cible, un voisin terrestre plus faible ; l'empire produit alors comme en temps de guerre et masse ses attaquants dans sa ville la plus proche de la cible (missions `attack_city` au stade `rally`), puis déclare la guerre quand il a les trois quarts de sa force de guerre, ou au bout de 25 tours s'il a de quoi former un groupe d'assaut ; sinon il y renonce. Une guerre qu'elle a déclarée, l'IA la poursuit au moins 20 tours, sauf si elle y perd des villes ; ensuite chaque ville prise à l'ennemi dans les 30 derniers tours, moins chaque ville perdue, l'éloigne de la paix (`diplomacy.momentum`, villes prises notées par `AIController._note_conquests`). Une civilisation qui n'a plus de site libre sur ses terres cherche plus volontiers la guerre. Seules les guerres contre un voisin qu'on peut atteindre à pied empêchent d'en préparer une autre. Une République ou une Démocratie, dont les unités au loin rendent les citoyens mécontents, prépare moins volontiers une guerre, et les chefs agressifs leur préfèrent la Monarchie ou le Communisme.
 3. **Plan.** Missions publiées avec une priorité : défendre une ville, intercepter un ennemi, prendre une ville (ralliement puis assaut ; une ville qu'on a perdue passe en premier pendant 80 tours), fonder une ville, aménager ou dépolluer une case, explorer la terre ou la mer, embarquer pour une expédition, aider une merveille. Puis affectation des unités et calcul de ce qui manque à l'empire (défenseurs, colons, ouvriers, attaquants, explorateurs, navires, avions). Un ennemi débarqué près d'une ville appelle une contre-attaque : un attaquant de plus par envahisseur, même sans ville ennemie à portée, et les défenseurs en surnombre qui ont de bonnes chances (60 %) vont le frapper.
 4. **Recherche, impôts, gouvernement.**
 5. **Gouverneurs de ville.** Chaque production possible reçoit un score = poids du besoin × urgence × efficacité. Les meilleurs candidats sont conservés pour l'observateur. Lancement du vaisseau spatial quand il est prêt.
@@ -271,6 +272,20 @@ Neuf graines jouées jusqu'au bout (1, 2, 4 à 10), sans plantage ni blocage sig
 - Des guerres dans chaque partie, des villes prises, parfois une civilisation détruite.
 - Chaque civ entretient un à cinq navires ; l'aviation apparaît dans les parties qui durent. La pollution reste contenue (les colons nettoient) : aucun réchauffement, aucune frappe nucléaire dans ces parties.
 - De 60 à 110 ms par tour en moyenne sur une partie complète.
+
+### Guerres préparées (octobre 2026)
+
+Une partie observée de 14 civilisations sur une carte à 70 % de terres finissait toujours par la course à l'espace : une cinquantaine de déclarations de guerre pour 130 traités de paix, la paix signée en général le tour même de la rencontre, une quarantaine de villes prises, une civilisation détruite au plus. Le moteur de combat n'y était pour rien (une unité de siège de son époque bat un défenseur fortifié 5 à 7 fois sur 10) ; l'IA déclarait la guerre sans armée (0,15 attaquant par ville en paix), et ses guerres duraient une vingtaine de tours : elle proposait ou acceptait la paix sans regarder si elle gagnait. Une IA prépare désormais ses guerres et les poursuit tant qu'elles tournent bien (section 4), et Golden Ages n'a plus de Sénat. Sur 8 graines (`golden_ages`, 14 civs, `--land 70`), avant puis après :
+
+| | Avant | Après |
+|---|---|---|
+| Déclarations de guerre | 50 | 65 |
+| Villes prises (dont rasées) | 39 (12) | 114 (29) |
+| Civilisations détruites | 1,1 | 3,75 |
+| Combats | 600 | 1 400 |
+| Fin de partie | vaisseau, tour 406 en moyenne | vaisseau 5 fois, score en 2060 3 fois ; tour 561 en moyenne |
+
+Avec les règles `civ1` (7 civs, carte par défaut) : 23 villes prises au lieu de 11, 2,1 civilisations détruites au lieu de 0,6, une partie sur huit finit à deux civilisations.
 
 ## 7. Assets
 
