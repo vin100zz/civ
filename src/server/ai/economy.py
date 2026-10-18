@@ -66,8 +66,12 @@ def review_government(view: PlayerView, know: Knowledge, plan: Plan, memory: dic
             value -= get("senate_aggressive_penalty") * max(0, personality.mood)
             if plan.at_war and plan.war_targets:
                 value -= get("senate_war_penalty")
-        if government.military_unhappiness and plan.at_war:
-            value -= get("war_weariness_penalty") * government.military_unhappiness
+        if government.military_unhappiness:
+            # War makes its citizens unhappy: warmongers do not like it either.
+            value -= get("weariness_aggressive_penalty") * government.military_unhappiness \
+                * max(0, personality.mood)
+            if plan.at_war or plan.war_plan is not None:
+                value -= get("war_weariness_penalty") * government.military_unhappiness
         if government.martial_law and plan.at_war:
             value += get("martial_law_bonus")
         return value

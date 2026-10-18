@@ -22,7 +22,7 @@ strategy:
   explorers_per_continent: 1
   explore_until_turn: 150
   # War
-  attackers_per_city: 0.5         # attack units wanted per own city when at war
+  attackers_per_city: 0.75        # attack units wanted per own city when at war
   attackers_peace: 0.15           # attack units wanted per own city when at peace
   attackers_excess: 1.5           # idle attackers beyond wanted x this are disbanded
   target_distance_weight: 0.5     # how much distance reduces the appeal of a target city
@@ -142,11 +142,20 @@ diplomacy:
   peace_when_stronger: -0.2
   peace_war_weariness: 0.01       # added per turn of war
   peace_min_turns: 8              # turns between two peace proposals to the same civ
-  war_base: 0.02                  # chance per turn to declare war on a weaker neighbour
-  war_aggressive: 0.03            # added per point of mood
-  war_strength_ratio: 1.5         # own strength / theirs needed to consider war
+  # War is prepared, then declared: the attack force is raised and gathered on the border.
+  war_base: 0.03                  # chance per turn to set out to war on a weaker neighbour
+  war_aggressive: 0.02            # added per point of mood
+  war_land_hunger: 0.02           # added when no land is left to settle on our continents
+  war_weariness: 0.01             # taken off per unhappy citizen a unit abroad makes (Republic...)
+  war_strength_ratio: 1.25        # own strength / theirs needed to consider war
   war_min_peace_turns: 16         # a treaty is kept at least this long
-  war_max_enemies: 1              # no new war while already fighting this many civs
+  war_max_enemies: 1              # no new war while already fighting this many neighbours
+  war_ready_share: 0.75           # share of the war-time attack force needed to declare war
+  war_prepare_turns: 25           # the war is declared then, if the force is big enough
+  war_min_turns: 20               # a war we declared is fought this long, unless it goes badly
+  # Cities taken and lost: a war that goes our way is not given up.
+  momentum_memory: 30             # turns a city taken or lost is remembered
+  peace_momentum: 0.25            # peace willingness lost per city taken (net of those lost)
   weaker_ratio: 1.2               # they are "stronger" above this power ratio
   stronger_ratio: 1.5             # we are "stronger" above this power ratio
   peace_unreachable: 0.2          # added when we know none of their cities
@@ -186,7 +195,8 @@ economy:
   revolution_min_gain: 20         # a new government must be this much more appealing
   senate_aggressive_penalty: 25   # aggressive leaders dislike senates
   senate_war_penalty: 20          # a senate is unwelcome in war time
-  war_weariness_penalty: 10       # per point of military unhappiness, in war time
+  war_weariness_penalty: 10       # per point of military unhappiness, in war time (or preparing one)
+  weariness_aggressive_penalty: 12.5   # per point of military unhappiness and of mood
   martial_law_bonus: 5            # in war time
 
 government_preference:
