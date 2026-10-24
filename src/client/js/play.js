@@ -140,8 +140,8 @@ export function decisions() {
   for (const city of store.state.cities) {
     if (city.owner !== me.id || !city.idle) continue;
     list.push({ kind: 'city', id: city.id, glyph: 'city',
-      text: `${city.name} needs something to build`,
-      detail: city.completed ? `${city.completed} is finished` : 'Nothing in production' });
+      text: city.completed ? `${city.name} finished ${city.completed}` : `${city.name} needs something to build`,
+      detail: city.completed ? '' : 'Nothing in production' });
   }
   return list;
 }

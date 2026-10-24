@@ -82,7 +82,7 @@ function nearestCity(unit, cities) {
 
 function todo(text, detail, attributes, glyph, advice = false) {
   return `<button class="todo${advice ? ' advice' : ''}" ${attributes}><span class="mark">${icon(glyph, 18)}</span>
-    <span class="body"><b>${text}</b><span>${detail}</span></span>${icon('right', 16, 2)}</button>`;
+    <span class="body"><b>${text}</b>${detail ? `<span>${detail}</span>` : ''}</span>${icon('right', 16, 2)}</button>`;
 }
 
 // What must be decided before the turn can end (play.js decisions).
