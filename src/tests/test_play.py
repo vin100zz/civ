@@ -154,7 +154,8 @@ def test_a_sentry_wakes_when_the_enemy_is_near(rules):
     turn.begin_player_turn(game, game.players[1])
     controller.begin_turn(game, game.players[1])
     assert sentry.order == "none" and asleep.order == "sentry"
-    assert any("wakes up" in note["text"] for note in controller.notes)
+    note = next(note for note in controller.notes if note.get("unit") == sentry.id)
+    assert "wakes up" in note["text"] and note["reason"] == "Woke up: enemy in sight"
 
 
 def test_orders_open_to_a_unit(rules):

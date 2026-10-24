@@ -7,6 +7,25 @@ import { icon, vetMark } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
 import { movesText } from './unitbar.js';
 import { unitImage } from '../renderer/sprites.js';
+import { turnNews, toneOf } from '../news.js';
+
+const NEWS_SHOWN = 6;           // the newest events; the others behind "N more"
+const NEWS_LOOK = { bad: 'alert', good: 'check', info: 'scroll' };
+let newsOpen = null;            // the turn whose whole list of news is shown
+
+function newsRows(me, key) {
+  const rows = [...turnNews()].reverse().map((event) => {
+    const tone = toneOf(event, me);
+    const located = event.x !== undefined;
+    const inner = `<span class="mark">${icon(NEWS_LOOK[tone], 15, 2)}</span><span class="text">${event.text}</span>`;
+    return located
+      ? `<button class="news-row ${tone}" data-x="${event.x}" data-y="${event.y}">${inner}<span class="link">Show</span></button>`
+      : `<div class="news-row ${tone}">${inner}</div>`;
+  });
+  if (rows.length <= NEWS_SHOWN) return rows;
+  if (newsOpen === key) return [...rows, '<button class="news-more" data-news-more>Show fewer</button>'];
+  return [...rows.slice(0, NEWS_SHOWN), `<button class="news-more" data-news-more>${rows.length - NEWS_SHOWN} more</button>`];
+}
 
 // The columns of the city table after its production: [field, icon, class, title].
 const COLUMNS = [
@@ -151,15 +170,18 @@ export function renderTurn(container) {
       <span class="mark">${icon('alert', 18)}</span><span class="body"><b>${alert.text}</b></span>
       <span class="link">Show</span></button>`);
 
+  // Why a unit left to itself is back in the person's hands (a sentry woken up, a blocked way).
+  const reasons = new Map((state.notes || []).filter((note) => note.reason).map((note) => [note.unit, note.reason]));
   const units = waiting.map((unit) => {
     const definition = store.unitDefs[unit[U.TYPE]];
     const near = nearestCity(unit, cities);
     const place = !near ? '' : near.distance === 0 ? `In ${near.city.name}` : `Near ${near.city.name}`;
+    const reason = reasons.get(unit[U.ID]);
     const on = unit[U.ID] === play.unit;
     return `<button class="unit-row${on ? ' on' : ''}" data-unit="${unit[U.ID]}">
       <span class="unit-portrait" style="background:${me.color}">${unitImage(definition)}</span>
       <span class="body"><b>${definition.name}${unit[U.VETERAN] ? vetMark() : ''}</b>
-        ${place ? `<span>${place}</span>` : ''}</span>
+        ${reason || place ? `<span>${reason ? `<span class="reason">${reason}</span>${place ? ' · ' : ''}` : ''}${place}</span>` : ''}</span>
       ${on ? '<span class="state">Active</span>' : `<span class="sub">${movesText(unit[U.MOVES])}</span>`}</button>`;
   });
 
@@ -168,6 +190,8 @@ export function renderTurn(container) {
   const columns = COLUMNS.map(([, glyph, kind, title]) =>
     `<span class="cell ${kind}" title="${title}">${icon(glyph, 15)}</span>`).join('');
 
+  const newsKey = `${state.seed}:${state.turn}`;
+  const news = newsRows(id, newsKey);
   const heading = (text, count) => `<div class="turn-head label"><span>${text}</span><span>${count}</span></div>`;
   container.innerHTML = `
     <div class="panel-head">
@@ -176,6 +200,7 @@ export function renderTurn(container) {
     ${toDecide.length ? `${heading('To decide before ending the turn', toDecide.length)}<div class="turn-list">${toDecide.join('')}</div>` : ''}
     ${advice.length ? `${heading('Worth a look', advice.length)}<div class="turn-list">${advice.join('')}</div>` : ''}
     ${alerts.length ? `${heading('Alerts', alerts.length)}<div class="turn-list">${alerts.join('')}</div>` : ''}
+    ${news.length ? `${heading('Since your last turn', turnNews().length)}<div class="turn-list tight">${news.join('')}</div>` : ''}
     ${heading('Units awaiting orders', waiting.length)}
     ${units.length ? `<div class="turn-list tight">${units.join('')}</div>` : ''}
     <div class="city-cols"><span class="label">Cities<span>${cities.length}</span></span>
@@ -197,6 +222,13 @@ export function renderTurn(container) {
     row.addEventListener('click', () =>
       emit('locate', { x: Number(row.dataset.x), y: Number(row.dataset.y) }));
   });
+  const moreNews = container.querySelector('[data-news-more]');
+  if (moreNews) {
+    moreNews.addEventListener('click', () => {
+      newsOpen = newsOpen === newsKey ? null : newsKey;
+      renderTurn(container);
+    });
+  }
   container.querySelectorAll('[data-proposal]').forEach((row) => {
     row.addEventListener('click', () => emit('open-proposal', Number(row.dataset.proposal)));
   });

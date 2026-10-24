@@ -20,7 +20,7 @@ import { renderWonders } from './panels/wonders.js';
 import { renderSpace, spaceBadge } from './panels/space.js';
 import { renderEmpire } from './panels/empire.js';
 import { renderUnitBar } from './panels/unitbar.js';
-import { initToasts, toast, clearToasts } from './toasts.js';
+import { initNews, resetNews, openTurnNews, addNews } from './news.js';
 import { hideTips, setTips, initHints } from './tips.js';
 import {
   play, activate, endTurn, handleKey, clickTile, aimAt, releaseAt, hoverTile, queue, activeUnit, setMode,
@@ -52,7 +52,7 @@ setOnLoad(() => {
 mapView.onViewChange = () => minimap.render();
 setTileRenderer((...args) => mapView.drawTile(...args));
 initDialogs();
-initToasts($('toasts'));
+initNews($('headline'));
 
 const panels = {
   turn: () => renderTurn($('panel-turn')),
@@ -323,52 +323,12 @@ function describeMove(tile) {
   return null;
 }
 
-// How loud an event is for the person: [tone, seconds on screen] or null to keep it quiet.
-function loudness(event, me) {
-  const mine = event.player === me;
-  const against = event.other === me;
-  switch (event.type) {
-    case 'combat': return event.winner === me ? ['good', 6] : ['bad', 0];
-    case 'city_captured': return mine ? ['good', 0] : ['bad', 0];
-    case 'disorder': case 'famine': case 'disband': case 'unit_lost': case 'pollution':
-      return mine ? ['bad', 0] : null;          // the misfortunes of others seen in passing
-    case 'city_destroyed': case 'meltdown': return mine ? ['bad', 0] : ['info', 0];
-    case 'barbarians': return ['bad', 0];
-    case 'war': return mine || against ? ['bad', 0] : ['info', 0];
-    case 'peace': case 'order': return ['good', 0];
-    case 'sold': return ['info', 8];
-    case 'wonder': return [mine ? 'good' : 'info', 0];
-    case 'tech': return mine && event.how !== 'discover' ? ['good', 0] : null;
-    case 'hut': case 'contact': case 'government': case 'trade_route': case 'civ_destroyed':
-    case 'nuclear': case 'global_warming': case 'spaceship_launched': case 'spaceship_lost':
-    case 'spaceship_part':
-      return ['info', 0];
-    default: return null;
-  }
-}
-
-function announce(events, lasting) {
-  const me = leader();
-  for (const event of events) {
-    const loud = loudness(event, me);
-    if (!loud) continue;
-    toast({ text: event.text, tone: loud[0], x: event.x, y: event.y, life: lasting ? loud[1] : loud[1] || 8 });
-  }
-}
-
 // Start of the person's turn: what happened, then the questions waiting for an answer.
 function openTurn(message) {
-  const state = store.state;
   // What the order that ended the last turn by itself brought is told again: it had no time to be read.
   const carried = play.carry || [];
   play.carry = null;
-  clearToasts();
-  for (const alert of state.alerts || []) {
-    toast({ text: alert.text, detail: alert.detail || '', tone: 'bad', x: alert.x, y: alert.y });
-  }
-  for (const note of state.notes || []) toast({ text: note.text, tone: 'info', x: note.x, y: note.y });
-  announce(carried, true);
-  announce(message.events, true);
+  openTurnNews(carried, message.events);
   const found = message.events.find((e) => e.type === 'tech' && e.player === leader() && e.how === 'discover');
   prompted.discovered = found ? found.tech : null;
   ask();
@@ -415,7 +375,7 @@ on('init', () => {
   gameOverSeen = null;
   resetReplay();
   mapView.setMarker(null);
-  clearToasts();
+  resetNews();
   syncMode();
   $('world-size').textContent = `${store.map.width} × ${store.map.height}`;
   refreshPovList();
@@ -457,8 +417,8 @@ on('turn', (message) => {
   requestDetails();
   refreshActivePanel();
   if (leader() !== null) {
+    openTurn(message);          // first: the Turn panel lists the news
     refreshPlay();
-    openTurn(message);
   }
 });
 
@@ -466,7 +426,7 @@ on('update', (message) => {
   refreshClock();
   mapView.slide(store.moves);
   minimap.render();
-  announce(message.events, false);
+  if (leader() !== null) addNews(message.events);
   if (store.selectedCity !== null && !store.state.cities.some((c) => c.id === store.selectedCity)) {
     store.selectedCity = null;
     store.cityDetail = null;

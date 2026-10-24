@@ -129,6 +129,8 @@ class HumanController:
     # ── Start of turn ─────────────────────────────────────────────────────────
 
     def _note(self, text: str, x: int, y: int, **data) -> None:
+        """What a delegated unit or city did. A unit handed back to the person also says
+        why in a few words (`reason`), shown under it in the Turn panel."""
         self.notes.append({"text": text, "x": x, "y": y, **data})
 
     def _forget_the_gone(self, view: PlayerView) -> None:
@@ -146,7 +148,8 @@ class HumanController:
             if any(view.enemy_units_at(tile) for tile in view.map.neighbors(view.tile_of(unit))):
                 view.do(actions.SetOrder(unit.id, ORDER_NONE))
                 self._note(f"{view.rules.units[unit.type].name} on sentry duty wakes up: "
-                           f"enemy in sight.", unit.x, unit.y, unit=unit.id)
+                           f"enemy in sight.", unit.x, unit.y, unit=unit.id,
+                           reason="Woke up: enemy in sight")
 
     def _continue_journeys(self, view: PlayerView) -> None:
         for key, (x, y) in sorted(self.memory["goto"].items(), key=lambda item: int(item[0])):
@@ -160,7 +163,7 @@ class HumanController:
             del self.memory["goto"][key]
             if status == BLOCKED:
                 self._note(f"{name} cannot go on: the way is blocked.", unit.x, unit.y,
-                           unit=unit.id)
+                           unit=unit.id, reason="Stopped: the way is blocked")
 
     def _govern_cities(self, view: PlayerView, know: Knowledge,
                        only: Optional[int] = None) -> None:
@@ -208,7 +211,7 @@ class HumanController:
             elif not explorer.has_frontier(ctx, unit):
                 del self.memory["auto"][key]
                 self._note(f"{view.rules.units[unit.type].name} has nothing left to explore.",
-                           unit.x, unit.y, unit=unit.id)
+                           unit.x, unit.y, unit=unit.id, reason="Nothing left to explore")
             elif unit.moves_left > 0:
                 explorer.act(ctx, unit, None)
         if workers:
@@ -235,7 +238,8 @@ class HumanController:
             if mission is None:
                 self.release(unit.id)
                 self._note(f"{view.rules.units[unit.type].name} cannot find any land to "
-                           f"improve within reach.", unit.x, unit.y, unit=unit.id)
+                           f"improve within reach.", unit.x, unit.y, unit=unit.id,
+                           reason="No land to improve within reach")
             elif view.unit(unit.id) is not None:
                 settler.act(ctx, unit, mission)
         self.work_missions = {**kept, **{unit_id: m.key for unit_id, m in assignment.items()}}

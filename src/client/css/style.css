@@ -533,7 +533,7 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 #unit-bar:empty, body.sheet-open #unit-bar { display: none; }
 
 /* A city, in a window over the map against the right panel. The unit bar steps aside for it
-   and the zoom buttons move to its left; the messages of the turn stay under it. */
+   and the zoom buttons move to its left; the news banner waits for it to close. */
 .city-window {
   position: absolute;
   top: 12px;
@@ -620,20 +620,32 @@ main { flex: 1; min-height: 0; display: flex; position: relative; }
 #map-banner b { font-weight: 600; }
 #map-banner .btn { margin-left: 8px; background: var(--hover); border: 0; }
 
-/* Messages of the turn. */
-#toasts { position: absolute; right: 72px; top: 16px; width: 420px; display: flex; flex-direction: column; gap: 8px; z-index: 2; pointer-events: none; }
-.toast { pointer-events: auto; border-radius: 12px; padding: 10px 8px 10px 12px; display: flex; align-items: center; gap: 12px; }
-.toast.bad { border-color: rgba(242, 117, 106, 0.45); }
-.toast.good { border-color: rgba(95, 203, 139, 0.4); }
-.toast .mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; background: rgba(255, 255, 255, 0.06); color: var(--soft); }
-.toast.bad .mark { background: rgba(242, 117, 106, 0.14); color: var(--bad); }
-.toast.good .mark { background: rgba(95, 203, 139, 0.14); color: var(--good); }
-.toast .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.toast .body b { font-size: 13px; font-weight: 600; }
-.toast .body span { font-size: 12px; color: var(--soft); }
-.toast .btn.small { background: var(--hover); border: 0; font-size: 12px; }
-.toast.more { padding: 7px 12px; justify-content: center; }
-.toast.more button { font-size: 12px; font-weight: 500; color: var(--gold); }
+/* The great news (news.js), at the top of the map until closed; the go-to banner steps under it. */
+#headline {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 160px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px 12px 12px;
+  border-radius: 14px;
+  border-color: rgba(226, 182, 89, 0.55);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+/* No room beside a city window: the banner waits for it to close. */
+#map-area:has(> .city-window:not([hidden])) #headline { display: none; }
+#map-area:has(> #headline:not([hidden])) #map-banner { top: 100px; }
+.headline-mark { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; flex: none; margin-right: 2px; }
+#headline .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+#headline .kicker { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+#headline b { font-size: 16px; font-weight: 600; line-height: 1.3; }
+#headline .body > span:not(.kicker) { font-size: 12px; color: var(--soft); }
+#headline .btn.small:not(.ghost) { background: var(--hover); border: 0; font-size: 12px; }
+#headline .count { font-size: 11px; color: var(--mute); }
 
 /* The tooltip of the map (#tooltip) and the one of the panels (#panel-tip, js/tips.js). */
 .tip {
@@ -769,6 +781,15 @@ body.play #notice { bottom: auto; top: 72px; }
 .todo .body, .alert .body, .unit-row .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .todo b, .alert b { font-size: 13px; font-weight: 600; }
 .todo .body span { font-size: 12px; color: var(--mute); }
+/* "Since your last turn": one line per event, its tone in the icon. */
+.news-row { width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 6px 10px; border-radius: 8px; font-size: 13px; line-height: 1.4; color: var(--soft); text-align: left; }
+button.news-row:hover { background: var(--raise); color: var(--text); }
+.news-row .mark { display: flex; padding-top: 1px; color: var(--mute); }
+.news-row.bad .mark { color: var(--bad); }
+.news-row.good .mark { color: var(--good); }
+.news-row .text { flex: 1; min-width: 0; }
+.news-row .link { flex: none; padding-top: 1px; }
+.news-more { align-self: flex-start; padding: 4px 10px; font-size: 12px; font-weight: 500; color: var(--gold); }
 .unit-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 10px; border: 1px solid transparent; }
 .unit-row:hover { background: var(--raise); }
 .unit-row.on { border-color: rgba(226, 182, 89, 0.45); background: rgba(226, 182, 89, 0.08); }
@@ -776,6 +797,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-row b small { font-size: 11px; font-weight: 400; color: var(--mute); }
 .unit-row .body > span { font-size: 12px; color: var(--mute); }
 .unit-row .state { font-size: 11px; font-weight: 600; color: var(--gold); }
+.unit-row .body .reason { color: var(--warn); }
 /* The city table: size, name and its problem icons, production with its turns left, then one
    column per figure. The name is red or amber after the worst problem; the figure at fault gets a chip. */
 .city-rows { display: flex; flex-direction: column; border-top: 1px solid var(--line-2); flex: none; }
