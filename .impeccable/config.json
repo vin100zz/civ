@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-10-24T06:14:43.520Z",
+        "reason": "Project design system: Geist has been the app-wide UI face since the 2026-10-03 UI redesign (memory ui-redesign-canvas); it predates the land-view change and was not touched by it"
+      }
+    ]
+  }
+}

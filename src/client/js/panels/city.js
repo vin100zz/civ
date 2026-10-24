@@ -113,6 +113,78 @@ function citizens(stats, specialists, manage, size) {
     + (others.length ? `<span class="sep"></span>${others.join('')}` : '');
 }
 
+// The food, shield and trade icons (icons.js) drawn on the land: filled, with a dark halo so
+// they read on any terrain, each in a box that fits its shape. Overlapping, a pictogram is cut
+// out of the one below by a ring of the pad's colour; the open trade arrows by a square.
+const PICTO = {
+  food: { box: '3.5 4 18 18', solid: '<path d="M12 12c0-4 3-6.5 8-6.5 0 4.5-3 7-8 6.5z"/><path d="M12 15c0-3-2.5-5-7-5 0 3.5 2.5 5.5 7 5z"/>', line: '<path d="M12 21v-9"/>' },
+  shield: { box: '2.5 2.5 19 19', solid: '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/>', line: '' },
+  trade: { box: '2 2 20 20', solid: '', line: '<path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/>', cut: '<rect x="3" y="3" width="18" height="18" rx="3"/>' },
+};
+// In pixels of a 90 px tile (css/style.css scales them with the land view): 18 px pictograms in
+// the 84 px a pad leaves. In a packet of one resource they overlap by about a third, less for
+// the open arrows; 3 px between packets, which tighten by up to 3 px a pictogram to keep one line.
+const PICTO_SIZE = 18;
+const PAD_ROOM = 84;
+const PACKED = { food: 12, shield: 11, trade: 14 };
+const APART = 3;
+const SQUEEZE = 3;
+
+function picto(kind, shift) {
+  const shape = PICTO[kind];
+  const cut = !shift ? '' : shape.cut ? `<g class="cut box">${shape.cut}</g>` : `<g class="cut">${shape.solid}${shape.line}</g>`;
+  const style = shift ? ` style="margin-left:calc(${shift.toFixed(1)} * var(--u))"` : '';
+  return `<svg class="land-glyph ${kind}" viewBox="${shape.box}"${style} aria-hidden="true">${cut}`
+    + `<g class="halo">${shape.solid}</g><g class="halo line">${shape.line}</g>`
+    + `<g class="tone">${shape.solid}</g><g class="tone line">${shape.line}</g></svg>`;
+}
+
+// n pictograms of one resource, `step` px apart; a packet wider than the pad is squeezed to fit.
+function packet(kind, n, step, gap) {
+  const s = n > 1 ? Math.min(step, (PAD_ROOM - PICTO_SIZE) / (n - 1)) : 0;
+  const icons = Array.from({ length: n }, (_, i) => picto(kind, i ? s - PICTO_SIZE : 0));
+  return `<span class="packet"${gap ? ` style="margin-left:calc(${gap} * var(--u))"` : ''}>${icons.join('')}</span>`;
+}
+
+// Packets on one line, tightened a little when they run short; null when they do not fit.
+function packedLine(groups) {
+  const joints = groups.reduce((sum, [, n]) => sum + n - 1, 0);
+  const width = groups.reduce((w, [kind, n], i) => w + PICTO_SIZE + PACKED[kind] * (n - 1) + (i ? APART : 0), 0);
+  const squeeze = width > PAD_ROOM && joints ? (width - PAD_ROOM) / joints : 0;
+  if (width > PAD_ROOM && groups.length > 1 && (!joints || squeeze > SQUEEZE)) return null;
+  return {
+    width: Math.min(width, PAD_ROOM),
+    html: groups.map(([kind, n], i) => packet(kind, n, PACKED[kind] - squeeze, i ? APART : 0)).join(''),
+  };
+}
+
+// Every way to cut a list into consecutive parts.
+function splits(list) {
+  if (list.length <= 1) return [[list]];
+  const out = [[list]];
+  for (let i = 1; i < list.length; i++) {
+    for (const rest of splits(list.slice(i))) out.push([list.slice(0, i), ...rest]);
+  }
+  return out;
+}
+
+// One pictogram per point, as in Civ 1: food, shields then trade, each resource a packet, on
+// as few lines as fit, the most even first. A line never cuts a packet.
+function yieldPad(yields) {
+  const groups = ['food', 'shield', 'trade'].map((kind, i) => [kind, yields[i]]).filter(([, n]) => n > 0);
+  if (!groups.length) return '';
+  let best = null;
+  for (const split of splits(groups)) {
+    const lines = split.map(packedLine);
+    if (lines.some((line) => !line)) continue;
+    const widest = Math.max(...lines.map((line) => line.width));
+    if (!best || lines.length < best.lines.length || (lines.length === best.lines.length && widest < best.widest)) {
+      best = { lines, widest };
+    }
+  }
+  return `<span class="land-pad">${best.lines.map((line) => `<span class="land-line">${line.html}</span>`).join('')}</span>`;
+}
+
 function landGrid(detail, owner, manage) {
   const byOffset = new Map(detail.tiles.map((t) => [`${t.dx},${t.dy}`, t]));
   const workable = manage ? new Set(manage.workable.map(([dx, dy]) => `${dx},${dy}`)) : null;
@@ -126,14 +198,15 @@ function landGrid(detail, owner, manage) {
       }
       const index = tile.y * store.map.width + tile.x;
       const terrain = store.terrains[store.map.terrain[index]];
-      const [food, shields, trade] = tile.yields;
       const center = dx === 0 && dy === 0;
       const classes = ['land-cell'];
       if (tile.worked) classes.push('worked');
       if (center) classes.push('center');
-      const mark = center
-        ? `<span class="city-mark" style="background:${owner.color};color:${inkOn(owner.color)}">${detail.size}</span>` : '';
-      const yields = `<span class="yields"><span class="food">${food}</span><span class="shield">${shields}</span><span class="trade">${trade}</span></span>`;
+      // The city square as on the map, its size above the yields of its tile.
+      const mark = center ? `<span class="city-square" style="background:${owner.color}"></span>`
+        + `<span class="city-size" style="color:${inkOn(owner.color)}">${detail.size}</span>` : '';
+      // Only the worked tiles show what they yield.
+      const yields = center || tile.worked ? yieldPad(tile.yields) : '';
       if (!manage) {
         cells.push(`<div class="${classes.join(' ')}" title="${terrain.name}${tile.worked ? ' — worked' : ''}">${mark}${yields}</div>`);
         continue;
@@ -160,8 +233,11 @@ function paintLand(container, detail) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   const size = LAND / 5;
+  const reach = new Set(detail.tiles.map((t) => `${t.dx},${t.dy}`));
   for (let dy = -2; dy <= 2; dy++) {
     for (let dx = -2; dx <= 2; dx++) {
+      // The corners are out of the city's reach: no terrain.
+      if (!reach.has(`${dx},${dy}`)) continue;
       drawTile(ctx, detail.x + dx, detail.y + dy, (dx + 2) * size, (dy + 2) * size, size);
     }
   }
