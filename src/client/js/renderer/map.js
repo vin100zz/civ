@@ -18,6 +18,11 @@ const RAIL = '#22262D';
 const STONE = '#D9D1BE';      // city walls
 const WALL_BAND = 0.055;      // width of the walls around the city square, in tiles
 const WALL_MERLON = 0.065;    // how far the merlons stand out of them
+// Huts: lit side to shaded side.
+const HUT_INK = '#3A2412';
+const THATCH = ['#F4D27A', '#DDA746', '#A9772C'];
+const MUD = ['#D09462', '#A96C3E', '#7B4724'];
+const DOORWAY = '#2B190C';
 const FONT = 'Geist, "Segoe UI", system-ui, sans-serif';
 export const MISSION_COLORS = {
   found_city: '#7bdc6a', improve: '#c9a25b', defend: '#6ab0ff', attack_city: '#ff5a4a',
@@ -62,6 +67,86 @@ function spaced(length, step, skip) {
 // The width of city walls, merlons included, at `size` pixels per tile.
 function wallsWidth(size) {
   return Math.max(1.5, size * WALL_BAND) + Math.max(1.5, size * WALL_MERLON);
+}
+
+// A horizontal gradient through `colors`, from x0 to x1.
+function across(ctx, x0, x1, colors) {
+  const gradient = ctx.createLinearGradient(x0, 0, x1, 0);
+  colors.forEach((color, i) => gradient.addColorStop(i / (colors.length - 1), color));
+  return gradient;
+}
+
+// The thatched cone of a hut `w` wide, from its rim at `eave` up to `apex`; the rim
+// curves down towards the viewer.
+function conePath(ctx, cx, eave, apex, w) {
+  const half = w * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - half, eave);
+  ctx.quadraticCurveTo(cx - w * 0.2, eave - w * 0.2, cx, apex);
+  ctx.quadraticCurveTo(cx + w * 0.2, eave - w * 0.2, cx + half, eave);
+  ctx.quadraticCurveTo(cx, eave + w * 0.2, cx - half, eave);
+  ctx.closePath();
+}
+
+// A round hut `w` wide standing on the ground at (cx, by): mud wall, doorway, thatched
+// cone. With `detail`, straw lines on the roof.
+function roundHut(ctx, cx, by, w, line, detail) {
+  const ww = w * 0.34;
+  const wallTop = by - w * 0.4;
+  ctx.lineWidth = line;
+  ctx.strokeStyle = HUT_INK;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - ww, wallTop);
+  ctx.lineTo(cx - ww, by - w * 0.05);
+  ctx.quadraticCurveTo(cx, by + w * 0.09, cx + ww, by - w * 0.05);
+  ctx.lineTo(cx + ww, wallTop);
+  ctx.closePath();
+  ctx.fillStyle = across(ctx, cx - ww, cx + ww, MUD);
+  ctx.fill();
+  ctx.stroke();
+  const dw = w * 0.095;
+  ctx.beginPath();
+  ctx.moveTo(cx - dw, by + w * 0.005);
+  ctx.lineTo(cx - dw, by - w * 0.17);
+  ctx.arc(cx, by - w * 0.17, dw, Math.PI, 0);
+  ctx.lineTo(cx + dw, by + w * 0.005);
+  ctx.closePath();
+  ctx.fillStyle = DOORWAY;
+  ctx.fill();
+  const half = w * 0.5;
+  const eave = wallTop + w * 0.08;
+  const apex = by - w * 0.96;
+  conePath(ctx, cx, eave, apex, w);
+  ctx.fillStyle = across(ctx, cx - half, cx + half, THATCH);
+  ctx.fill();
+  if (detail) {
+    ctx.save();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(122, 78, 22, 0.55)';
+    ctx.lineWidth = Math.max(0.75, line * 0.6);
+    ctx.beginPath();
+    for (const f of [-0.6, -0.25, 0.1, 0.42]) {
+      ctx.moveTo(cx + f * w * 0.08, apex + w * 0.12);
+      ctx.quadraticCurveTo(cx + f * w * 0.3, eave - w * 0.1, cx + f * half * 0.95, eave + w * 0.1 * (1 - f * f));
+    }
+    ctx.stroke();
+    // The lower layer of straw.
+    ctx.strokeStyle = 'rgba(122, 78, 22, 0.7)';
+    ctx.beginPath();
+    ctx.moveTo(cx - half, eave - w * 0.06);
+    ctx.quadraticCurveTo(cx, eave + w * 0.12, cx + half, eave - w * 0.06);
+    ctx.stroke();
+    ctx.restore();
+  }
+  conePath(ctx, cx, eave, apex, w);
+  ctx.stroke();
+  // The pole sticking out of the top.
+  ctx.beginPath();
+  ctx.moveTo(cx, apex + w * 0.04);
+  ctx.lineTo(cx + w * 0.03, apex - w * 0.1);
+  ctx.stroke();
 }
 
 export class MapView {
@@ -927,19 +1012,19 @@ export class MapView {
     }
   }
 
+  // A hamlet of two round huts, a small one behind, on a shadow. The straw lines go
+  // below 30 pixels per tile.
   _drawHut(ctx, px, py, size) {
-    const w = size * 0.36;
-    const x = px + (size - w) / 2;
-    const y = py + size * 0.5;
-    ctx.fillStyle = '#c9a25b';
-    ctx.fillRect(x, y, w, size * 0.22);
-    ctx.fillStyle = '#7a4b1e';
+    ctx.save();
+    ctx.fillStyle = 'rgba(24, 16, 6, 0.32)';
     ctx.beginPath();
-    ctx.moveTo(x - size * 0.05, y);
-    ctx.lineTo(px + size / 2, py + size * 0.26);
-    ctx.lineTo(x + w + size * 0.05, y);
-    ctx.closePath();
+    ctx.ellipse(px + size * 0.52, py + size * 0.8, size * 0.36, size * 0.09, 0, 0, Math.PI * 2);
     ctx.fill();
+    const line = Math.max(1, size * 0.032) * 0.9;
+    const detail = size >= 30;
+    roundHut(ctx, px + size * 0.33, py + size * 0.6, size * 0.38, line, detail);
+    roundHut(ctx, px + size * 0.6, py + size * 0.82, size * 0.5, line, detail);
+    ctx.restore();
   }
 
   _drawTerritory(ctx, range, explored) {
