@@ -244,6 +244,17 @@ def test_production_completes(rules):
     units = game.units_at(game.tile_of(city))
     assert [u.type for u in units] == ["militia"]
     assert units[0].home_city == city.id and city.last_completed == Item("unit", "militia")
+    assert city.production == Item("unit", "militia")    # a unit is built again
+
+
+def test_a_finished_building_leaves_the_city_building_nothing(rules):
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5)
+    city.production = Item("building", "barracks")
+    city.shields = rules.buildings["barracks"].cost
+    cities.process_city(game, city)
+    assert "barracks" in city.buildings and city.last_completed == Item("building", "barracks")
+    assert city.production is None
 
 
 def test_settlers_take_a_citizen(rules):

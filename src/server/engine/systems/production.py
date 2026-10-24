@@ -152,7 +152,8 @@ def sell(game: Game, city: City, building_id: str) -> bool:
 
 def complete_if_ready(game: Game, city: City) -> Optional[Item]:
     """Delivers the current production if the city has gathered enough shields. The next
-    item of its queue then takes over; without one a unit is built again, as in Civ 1."""
+    item of its queue then takes over; without one a unit is built again, as in Civ 1, and
+    a finished building leaves the city building nothing."""
     item = city.production
     if item is None:
         return None
@@ -173,6 +174,8 @@ def complete_if_ready(game: Game, city: City) -> Optional[Item]:
     else:
         city.shields -= cost
         _deliver_building(game, city, item.id)
+        if not can_build(game, city, item):
+            city.production = None      # built once: the city waits for its next order
     take_from_queue(game, city)
     return item
 
