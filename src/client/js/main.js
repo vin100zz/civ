@@ -510,6 +510,12 @@ on('player', () => {
 });
 
 on('play', refreshPlay);
+// The turn is over: what was opened during it closes, the next one starts on the Turn panel.
+on('turn-ended', () => {
+  showMapOptions(false);
+  if (store.selectedCity !== null) emit('close-city');
+  showTab('turn');
+});
 on('play-preview', () => {
   refreshBanner();
   mapView.invalidate();

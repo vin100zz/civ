@@ -268,6 +268,7 @@ function finishTurn() {
   syncHud();
   // The turn is named: a second window on the same game cannot end the next one by accident.
   send({ cmd: 'end_turn', turn: store.state.turn });
+  emit('turn-ended');
   emit('play');
 }
 
