@@ -378,7 +378,6 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         "trade": stats.trade - stats.corruption,
         "happy": stats.happy, "content": stats.content, "unhappy": stats.unhappy,
         "growth_disorder": city_rules.growth_brings_disorder(game, city),
-        "buy": production.buy_cost(game, city) if production.can_buy(game, city) else None,
         "idle": not building,
         "item": [item.kind, item.id] if building else None,
         # The cities panel: buildings in rules order (wonders last), then each of its tabs.

@@ -40,11 +40,14 @@ function cityRow(city, color) {
   const level = wrong.some(([, , l]) => l === 'bad') ? 'bad' : wrong.length ? 'warn' : '';
   const marks = wrong.map(([field, glyph, l]) =>
     `<span class="${l}" title="${PROBLEM[field][l]}">${icon(glyph, 14, 2)}</span>`).join('');
-  const turns = city.idle ? null : turnsFor(city.cost - city.shields, city.surplus);
-  const when = city.idle ? '<span class="bad">—</span>'
-    : turns === null ? '<span class="bad">∞</span>'
-      : turns <= 1 ? '<span class="good">1</span>' : turns;
   const flags = [];
+  // The turns before the production is done, next to it.
+  if (!city.idle) {
+    const turns = turnsFor(city.cost - city.shields, city.surplus);
+    const pace = turns === null ? ' bad' : turns <= 1 ? ' good' : '';
+    flags.push(`<span class="flag turns${pace}" title="${turns === null ? 'No shields to spare: never done' : 'Turns left'}">`
+      + `${icon('hourglass', 11, 2)}${turns === null ? '∞' : Math.max(1, turns)}</span>`);
+  }
   if (city.governed) flags.push(`<span class="flag icon" title="Governor">${icon('cog', 12, 2)}</span>`);
   if (city.queue && city.queue.length) {
     // What comes next, and the turns before each is done, in its tooltip.
@@ -52,7 +55,6 @@ function cityRow(city, color) {
       `${g.name}${g.count > 1 ? ` ×${g.count}` : ''}${g.turns === null ? '' : ` (${g.turns})`}`).join(', ');
     flags.push(`<span class="flag queued" title="Then: ${next}">+${city.queue.length}</span>`);
   }
-  if (city.buy !== null && !city.idle) flags.push(`<span class="flag gold" title="Buy">${city.buy}g</span>`);
   const cells = COLUMNS.map(([field, , kind]) => {
     const cause = wrong.find(([f]) => f === field);
     const value = city[field];
@@ -64,8 +66,7 @@ function cityRow(city, color) {
     <span class="size" style="background:${color}">${city.size}</span>
     <span class="name ${level}"><span>${city.capital ? '★ ' : ''}${city.name}</span>${marks}</span>
     <span class="making"><span><span class="what${city.idle ? ' bad' : ''}">${city.idle ? 'Nothing' : city.production}</span>${flags.join('')}</span>
-      <span class="bar thin"><span style="width:${city.idle ? 0 : Math.min(100, 100 * city.shields / city.cost)}%;background:var(--shield)"></span></span></span>
-    <span class="when">${when}</span>${cells}</button>`;
+      <span class="bar thin"><span style="width:${city.idle ? 0 : Math.min(100, 100 * city.shields / city.cost)}%;background:var(--shield)"></span></span></span>${cells}</button>`;
 }
 
 function nearestCity(unit, cities) {
@@ -178,7 +179,7 @@ export function renderTurn(container) {
     ${heading('Units awaiting orders', waiting.length)}
     ${units.length ? `<div class="turn-list tight">${units.join('')}</div>` : ''}
     <div class="city-cols"><span class="label">Cities<span>${cities.length}</span></span>
-      ${cities.length ? `<span class="when" title="Turns left">${icon('hourglass', 14)}</span>${columns}` : ''}</div>
+      ${cities.length ? columns : ''}</div>
     <div class="city-rows">${cityRows.join('') || '<span class="sub quiet">No city yet: found one with your Settlers (B).</span>'}</div>`;
   container.scrollTop = scroll;
 

@@ -776,8 +776,8 @@ body.play #notice { bottom: auto; top: 72px; }
 .unit-row b small { font-size: 11px; font-weight: 400; color: var(--mute); }
 .unit-row .body > span { font-size: 12px; color: var(--mute); }
 .unit-row .state { font-size: 11px; font-weight: 600; color: var(--gold); }
-/* The city table: size, name and its problem icons, production, turns left, then one column
-   per figure. The name is red or amber after the worst problem; the figure at fault gets a chip. */
+/* The city table: size, name and its problem icons, production with its turns left, then one
+   column per figure. The name is red or amber after the worst problem; the figure at fault gets a chip. */
 .city-rows { display: flex; flex-direction: column; border-top: 1px solid var(--line-2); flex: none; }
 .city-row, .city-cols { width: 100%; display: flex; align-items: center; padding: 8px 20px; }
 .city-row { border-bottom: 1px solid var(--line-2); }
@@ -791,13 +791,12 @@ body.play #notice { bottom: auto; top: 72px; }
 .city-row .name > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .city-row .name > span + span { display: flex; flex: none; }
 .city-row .name.warn, .city-row .name .warn { color: var(--warn); }
-.city-row .making { flex: 1; min-width: 0; margin-right: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--soft); }
+.city-row .making { flex: 1; min-width: 0; margin-right: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--soft); }
 .city-row .making > span:first-child { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
 .city-row .making .what { overflow: hidden; text-overflow: ellipsis; }
 .city-row .bar { background: var(--line); }
-.city-row .when, .city-cols .when { width: 22px; margin-right: 8px; display: flex; justify-content: flex-end; font-size: 12px; color: var(--mute); flex: none; }
 .city-row .cell, .city-cols .cell { width: 28px; flex: none; display: flex; justify-content: flex-end; font-size: 13px; }
-.city-row .when + .cell { border-left: 1px solid var(--line-2); }
+.city-row .making + .cell { border-left: 1px solid var(--line-2); }
 .city-cols .cell { padding-right: 2px; }
 /* Symmetric padding keeps a figure centred in its chip and right-aligned with the others. */
 .city-row .cell > span { height: 20px; padding: 0 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
@@ -809,8 +808,9 @@ body.play #notice { bottom: auto; top: 72px; }
 .city-row .cell .food.cause.bad, .city-row .cell .shield.cause.bad { color: var(--bad); }
 .city-row .cell .food.cause.warn, .city-row .cell .shield.cause.warn { color: var(--warn); }
 .flag { font-size: 11px; font-weight: 600; border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; color: var(--soft); flex: none; }
-.flag.gold { color: var(--gold); border-color: rgba(226, 182, 89, 0.45); }
 .flag.bad { color: var(--bad); border-color: rgba(242, 117, 106, 0.4); }
+.flag.good { color: var(--good); border-color: rgba(95, 203, 139, 0.4); }
+.flag.turns { display: inline-flex; align-items: center; gap: 2px; height: 18px; padding: 0 5px 0 3px; }
 .flag.icon { padding: 0 3px; display: inline-flex; align-items: center; height: 18px; }
 .flag.queued { color: var(--gold); border-color: transparent; background: rgba(226, 182, 89, 0.14); }
 .panel-head .pill { max-width: 200px; }
