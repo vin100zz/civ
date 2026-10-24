@@ -234,6 +234,8 @@ class Knowledge:
                     continue
                 if any(world.steps(tile.x, tile.y, x, y) < min_distance for x, y in known_cities):
                     continue
+                if not view.can_found_city(tile):
+                    continue
                 # Leave the land around foreign cities to their owners.
                 if any(world.steps(tile.x, tile.y, x, y) <= 3 for x, y in foreign):
                     continue

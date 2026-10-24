@@ -379,6 +379,7 @@ class SaleWeights:
 @dataclass(frozen=True)
 class CitySettings:
     min_distance: int
+    forbid_foreign_territory: bool
     food_per_citizen: int
     food_box_per_size: int
     disorder_shields: bool

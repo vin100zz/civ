@@ -265,7 +265,7 @@ def _found_city(game: Game, player, action: FoundCity) -> Result:
     if unit.moves_left <= 0:
         return _refuse("no movement left")
     tile = game.tile_of(unit)
-    if not cities.can_found_city(game, tile):
+    if not cities.can_found_city(game, tile, player.id):
         return _refuse("a city cannot be founded here")
     game.remove_unit(unit)
     cities.found_city(game, player, tile)

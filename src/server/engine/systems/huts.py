@@ -25,7 +25,7 @@ def enter_hut(game: Game, unit: Unit, tile: Tile) -> None:
     if outcome == 0:
         if distance > 3:
             if site_score(game.rules, game.map, tile) >= settings.advanced_tribe_min_site_score \
-                    and cities.can_found_city(game, tile):
+                    and cities.can_found_city(game, tile, player.id):
                 _advanced_tribe(game, unit, tile)
             else:
                 _gold(game, unit, tile)

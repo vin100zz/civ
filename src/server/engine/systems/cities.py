@@ -4,12 +4,12 @@ Source: OpenCivOne CityWorker.cs (F0_1d12_0045_ProcessCityState) for the yearly 
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Mapping, Optional
 
 from .. import effects as fx
-from ..model.entities import City, Player, Unit
+from ..model.entities import City, CityMemory, Player, Unit
 from ..model.game import Game
-from ..model.worldmap import Tile
+from ..model.worldmap import CITY_OFFSETS, Tile, WorldMap
 from . import city as city_rules
 from . import (budget, government, nuclear, pollution, production, research, spaceship,
                visibility)
@@ -17,9 +17,22 @@ from . import (budget, government, nuclear, pollution, production, research, spa
 
 # ── Founding ──────────────────────────────────────────────────────────────────
 
-def can_found_city(game: Game, tile: Tile) -> bool:
+def territory_owner(world: WorldMap, tile: Tile,
+                    known_cities: Mapping[int, City | CityMemory]) -> Optional[int]:
+    """Match the map's territory overlay: city radius, oldest city id wins overlaps."""
+    claim = min((city_id for city_id, city in known_cities.items()
+                 if (world.dx(city.x, tile.x), tile.y - city.y) in ((0, 0), *CITY_OFFSETS)),
+                default=None)
+    return known_cities[claim].owner if claim is not None else None
+
+
+def can_found_city(game: Game, tile: Tile, player_id: int) -> bool:
     if not game.terrain(tile).is_land or tile.city_id is not None:
         return False
+    if game.rules.game.city.forbid_foreign_territory:
+        owner = territory_owner(game.map, tile, game.cities)
+        if owner is not None and owner != player_id:
+            return False
     min_distance = game.rules.game.city.min_distance
     for other in game.cities.values():
         if game.map.steps(tile.x, tile.y, other.x, other.y) < min_distance:

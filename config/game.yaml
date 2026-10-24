@@ -121,6 +121,7 @@ difficulty:
 
 city:
   min_distance: 2          # cities may not be adjacent
+  forbid_foreign_territory: false
   food_per_citizen: 2
   food_box_per_size: 10    # food box = (size + 1) * this
   disorder_shields: false  # no shield surplus during civil disorder

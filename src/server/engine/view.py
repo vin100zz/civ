@@ -16,7 +16,7 @@ from .model.game import Game
 from .model.worldmap import Tile, WorldMap
 from .rules.schema import Effect, Rules, Yields
 from .systems import budget, city as city_rules, combat, diplomacy, government, movement
-from .systems import production, research, spaceship, trade
+from .systems import cities, production, research, spaceship, trade
 
 # Events every civilization hears of, wherever they happen.
 WORLD_NEWS = ("wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
@@ -77,6 +77,11 @@ class PlayerView:
         """Founding rules, checked against the cities the player knows about."""
         if not self.is_land(tile):
             return False
+        if self.rules.game.city.forbid_foreign_territory:
+            known = {**self.player.known_cities, **{c.id: c for c in self.my_cities()}}
+            owner = cities.territory_owner(self.map, tile, known)
+            if owner is not None and owner != self.player.id:
+                return False
         minimum = self.rules.game.city.min_distance
         for x, y in self.known_city_positions():
             if self._game.map.steps(tile.x, tile.y, x, y) < minimum:
