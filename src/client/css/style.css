@@ -1024,7 +1024,7 @@ body.play #notice { bottom: auto; top: 72px; }
 .civ-line .n { color: var(--soft); font-size: 13px; }
 .civ-line .score { font-size: 15px; font-weight: 600; }
 .civ-meta { display: flex; align-items: center; gap: 10px; width: 100%; padding-left: 26px; }
-.civ-meta .who { font-size: 12px; color: var(--mute); white-space: nowrap; }
+.civ-meta .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--mute); white-space: nowrap; }
 .civ-meta .war {
   font-size: 11px;
   font-weight: 500;
@@ -1038,7 +1038,8 @@ body.play #notice { bottom: auto; top: 72px; }
   min-width: 0;
 }
 .civ-meta .ship { color: var(--sci); border-color: rgba(109, 183, 242, 0.4); }
-.civ-meta .bar { flex: 1; min-width: 24px; justify-content: flex-end; }
+/* Keep the same scale in every row, independent of names and spaceship status. */
+.civ-meta .bar { flex: 0 0 40%; min-width: 0; margin-left: auto; justify-content: flex-end; }
 /* A civilization the person has met, with what it can do about it on the right. */
 .civ-known { position: relative; flex: none; }
 .civ-known.acts .civ-row { padding-right: 136px; }

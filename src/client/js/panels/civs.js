@@ -158,7 +158,6 @@ export function renderCivs(container) {
 
   const sorted = (key) => (key === sortBy ? ' sorted' : '');
   const rows = alive.map((p, i) => {
-    const enemies = p.at_war.map((id) => player(id).nation);
     const flying = p.spaceship && p.spaceship.arrival_turn !== null
       && p.spaceship.arrival_turn > state.turn;
     return `<button class="civ-row${p.id === store.selectedPlayer ? ' selected' : ''}" data-player="${p.id}">
@@ -171,7 +170,6 @@ export function renderCivs(container) {
       </span>
       <span class="civ-meta">
         <span class="who">${p.leader} · ${governmentName(p.government)}</span>
-        ${enemies.length ? `<span class="war" title="At war with ${enemies.join(', ')}">At war with ${enemies.join(', ')}</span>` : ''}
         ${flying ? '<span class="war ship">Spaceship in flight</span>' : ''}
         <span class="bar thin"><span style="width:${100 * p[sortBy] / best}%;background:${p.color}"></span></span>
       </span></button>`;
