@@ -148,7 +148,7 @@ export function preload(rules) {
     if (terrain.special) sprite('terrain', terrain.special.sprite);
     sprite('terrain', terrain.pattern_sprite);
   }
-  for (const name of ['irrigation', 'mine', 'pollution']) sprite('terrain', name);
+  for (const name of ['mine', 'pollution']) sprite('terrain', name);
   for (const unit of rules.units) sprite('unit', unit.sprite);
   sprite('city', 'city');
 }

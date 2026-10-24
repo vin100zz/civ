@@ -297,6 +297,7 @@ Dessinés au canvas, sans sprite :
 - marqueurs d'ordre (F fortifiée, S sentinelle, R route, I irrigation, M mine, P dépollution), point jaune des vétérans ;
 - sentinelle grisée et hachurée, unité fortifiée à bordure épaisse ;
 - rivières, routes et voies ferrées, reliées de case en case (les sprites `river_overlay` et `route` ne se raccordent pas) ; une voie ferrée est un trait fin barré de traverses, comme sur les cartes, tracé par-dessus les routes ;
+- irrigation : deux canaux bleus dans chaque sens, comme dans Civ 1, un peu ondulés et raccordés à ceux des cases irriguées voisines, sous les ressources et les routes ;
 - huttes, forteresses, territoires, brouillard.
 
 En mer, la case montre le navire et non ses passagers. Les transitions de côte ne sont pas traitées.

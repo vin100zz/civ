@@ -13,6 +13,13 @@ const DIRS4 = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const INK = '#0B0E13';
 const GOLD = '#E2B659';
 const RIVER = '#3D8FD6';
+// Irrigation canals, in the blue of the rivers with a light bank along them.
+const CANAL_BANK = 'rgba(255, 251, 228, 0.5)';
+const CANAL_ALPHA = 0.85;
+const CANAL_CUTS = [0.3, 0.7];  // two canals each way across the tile, as in Civ 1
+const CANAL_WAVE = 0.07;        // how far a canal wanders to the side, in tiles
+const CANAL_DRY = 0.1;          // where canals stop short of a dry neighbour's edge...
+const CANAL_SEA = 0.24;         // ...and of the sea's: the coast is rounded
 const ROAD = '#8A6A3A';
 const RAIL = '#22262D';
 const STONE = '#D9D1BE';      // city walls
@@ -62,6 +69,35 @@ function spaced(length, step, skip) {
     if (t >= skip) out.push(t);
   }
   return out;
+}
+
+// A number in [0, 1) that only depends on its arguments: a tile always gets the same.
+function hash(x, y, k) {
+  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(k, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+// Adds to the path a canal crossing the tile at `u` (in tiles), vertical or not, from `a`
+// to `b` along it. It is shifted sideways at its ends and in the middle by `e0`, `e1` and
+// `m` (numbers in [0, 1) mapped to ± CANAL_WAVE) and leaves each of these points straight
+// along, so the canals of neighbouring tiles join without a bend.
+function canalPath(ctx, vertical, u, a, b, e0, e1, m, px, py, size) {
+  const side = (r) => CANAL_WAVE * (2 * r - 1);
+  const start = side(e0);
+  const stop = side(e1);
+  const knots = [[0, start], [0.5, (start + stop) / 2 + side(m) * 0.6], [1, stop]];
+  const at = (t, shift) => {
+    const along = a + (b - a) * t;
+    return vertical ? [px + (u + shift) * size, py + along * size] : [px + along * size, py + (u + shift) * size];
+  };
+  ctx.moveTo(...at(...knots[0]));
+  for (let k = 1; k < knots.length; k++) {
+    const [t0, shift0] = knots[k - 1];
+    const [t1, shift1] = knots[k];
+    const third = (t1 - t0) / 3;
+    ctx.bezierCurveTo(...at(t0 + third, shift0), ...at(t1 - third, shift1), ...at(t1, shift1));
+  }
 }
 
 // The width of city walls, merlons included, at `size` pixels per tile.
@@ -845,7 +881,7 @@ export class MapView {
     }
   }
 
-  // What lies under the roads: river, resource, irrigation, mine.
+  // What lies under the roads: river, irrigation, resource, mine.
   _drawUnderRoads(ctx, index, tx, ty, px, py, size) {
     const { map } = store;
     const terrain = store.terrains[map.terrain[index]];
@@ -854,13 +890,13 @@ export class MapView {
     if (terrain.id === 'river') this._drawRiver(ctx, tx, ty, px, py, size);
 
     if (size < 14) return;        // too small for details
+    if (flags & F.IRRIGATION) this._drawIrrigation(ctx, tx, ty, px, py, size);
     // Icons sit lightly on the ground: smaller and a little translucent so the terrain still reads.
     if ((flags & F.SPECIAL) && terrain.special) {
       this._overlay(ctx, sprite('terrain', terrain.special.sprite), px, py, size, 0.64, 0.82);
     } else if ((flags & F.PATTERN) && terrain.pattern_sprite) {
       this._overlay(ctx, sprite('terrain', terrain.pattern_sprite), px, py, size, 0.4, 0.8);
     }
-    if (flags & F.IRRIGATION) this._overlay(ctx, sprite('terrain', 'irrigation'), px, py, size, 0.86, 0.3);
     if (flags & F.MINE) this._overlay(ctx, sprite('terrain', 'mine'), px, py, size, 0.64, 0.8);
   }
 
@@ -941,6 +977,47 @@ export class MapView {
       ctx.lineTo(to[0], to[1]);
       ctx.stroke();
     }
+  }
+
+  // Irrigation as in Civ 1: two canals each way, joined to those of the irrigated
+  // neighbours, so the fields of a valley make one grid. Towards a dry neighbour they stop
+  // short of the edge. Each canal wanders a little to the side, as if drawn by hand; where
+  // it crosses an edge, both tiles agree on how far.
+  _drawIrrigation(ctx, tx, ty, px, py, size) {
+    const { map } = store;
+    const x = ((tx % map.width) + map.width) % map.width;   // the same canals across the seam
+    const right = (x + 1) % map.width;
+    const [north, east, south, west] = DIRS4.map(([dx, dy]) => {
+      if (ty + dy < 0 || ty + dy >= map.height) return CANAL_DRY;
+      if (map.flags[tileIndex(tx + dx, ty + dy)] & F.IRRIGATION) return 0;
+      return this._terrainId(tx + dx, ty + dy) === 'ocean' ? CANAL_SEA : CANAL_DRY;
+    });
+    const trace = () => {
+      CANAL_CUTS.forEach((u, k) => {
+        const column = x * 2 + k;
+        const row = ty * 2 + k;
+        canalPath(ctx, true, u, north, 1 - south,
+          hash(column, ty, 60), hash(column, ty + 1, 60), hash(column, ty, 62), px, py, size);
+        canalPath(ctx, false, u, west, 1 - east,
+          hash(x, row, 61), hash(right, row, 61), hash(x, row, 63), px, py, size);
+      });
+    };
+    const width = Math.max(1, size * 0.05);
+    ctx.save();
+    ctx.globalAlpha = CANAL_ALPHA;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = CANAL_BANK;
+    ctx.lineWidth = width + Math.max(1.2, width * 0.9);
+    ctx.beginPath();
+    trace();
+    ctx.stroke();
+    ctx.strokeStyle = RIVER;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    trace();
+    ctx.stroke();
+    ctx.restore();
   }
 
   // Roads and railroads of the given tiles ([tx, ty, px, py, size]). Each tile draws half
