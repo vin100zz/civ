@@ -214,6 +214,7 @@ export class MapView {
     this.busyUntil = 0;                 // something moves on screen until then
     this.wanted = null;                 // the tile to bring into view once that is over
     this.inset = 0;                     // pixels on the right hidden by a window over the map
+    this.held = null;                   // the view to give back when that window closes
     this.blink = { key: null, since: 0, timer: null };
     this.still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this._bind();
@@ -259,10 +260,29 @@ export class MapView {
     if (!store.map) return;
     const fit = Math.max(this.width / store.map.width, this.height / store.map.height);
     this.tile = Math.min(MAX_TILE, Math.max(MIN_TILE, Math.floor(fit)));
+    this.held = null;
     this.cx = store.map.width / 2;
     this.cy = store.map.height / 2;
     this._clamp();
     this.invalidate();
+  }
+
+  // Keeps the view as it is, for `restoreView` to give it back when the city window closes:
+  // meanwhile the map shifts to show the city beside the window.
+  holdView() {
+    this.held = { cx: this.cx, cy: this.cy };
+  }
+
+  // Goes back to the view kept by `holdView`, unless the map was moved by hand since.
+  restoreView() {
+    const held = this.held;
+    this.held = null;
+    if (!held) return;
+    this.cx = held.cx;
+    this.cy = held.cy;
+    this._clamp();
+    this.invalidate();
+    this.onViewChange();
   }
 
   // Centres a tile in the part of the map that shows (left of a window over it, if any).
@@ -330,6 +350,7 @@ export class MapView {
   }
 
   zoomBy(factor) {
+    this.held = null;
     this.tile = this.tile * factor;
     this._clamp();
     this.invalidate();
@@ -415,6 +436,7 @@ export class MapView {
         const dy = e.clientY - drag.y;
         if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
         if (drag.moved) {
+          this.held = null;
           this.cx -= dx / this.tile;
           this.cy -= dy / this.tile;
           drag.x = e.clientX;
@@ -456,6 +478,7 @@ export class MapView {
       const worldX = (px - this.width / 2) / this.tile + this.cx;
       const worldY = (py - this.height / 2) / this.tile + this.cy;
       const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+      this.held = null;
       this.tile = Math.min(MAX_TILE, Math.max(MIN_TILE, this.tile * factor));
       this.cx = worldX - (px - this.width / 2) / this.tile;
       this.cy = worldY - (py - this.height / 2) / this.tile;

@@ -533,6 +533,7 @@ on('select-player', (id) => {
 });
 
 on('select-city', (id) => {
+  if (store.selectedCity === null) mapView.holdView();   // given back when the window closes
   store.selectedCity = id;
   const city = store.state.cities.find((c) => c.id === id);
   if (city && leader() === null) {
@@ -552,6 +553,7 @@ on('close-city', () => {
   store.cityDetail = null;
   hideTips();
   refreshActivePanel();
+  mapView.restoreView();
   mapView.invalidate();
 });
 

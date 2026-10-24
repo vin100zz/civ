@@ -26,6 +26,7 @@ export class Minimap {
     const rect = this.canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / rect.width * store.map.width);
     const y = Math.floor((e.clientY - rect.top) / rect.height * store.map.height);
+    this.mapView.held = null;    // moved by hand: closing the city window leaves it there
     this.mapView.centerOn(x, y);
     e.stopPropagation();
   }
