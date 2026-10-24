@@ -591,7 +591,6 @@ export class MapView {
         rows.push(['Building', city.production || '<span class="bad">nothing</span>']);
         if (city.disorder) rows.push(['Status', '<span class="bad">Civil disorder</span>']);
         else if (city.celebrating) rows.push(['Status', '<span class="good">Celebrating</span>']);
-        hint = 'Click to open the city';
       }
     } else {
       if (works.length) rows.push(['Works', works.join(' · ')]);
@@ -599,15 +598,28 @@ export class MapView {
     }
     if (units && units.length) {
       const counts = new Map();
+      const homes = new Map();
       for (const unit of units) {
-        const key = (city ? '' : `${player(unit[U.OWNER]).name} `) + store.unitDefs[unit[U.TYPE]].name
+        let key = (city ? '' : `${player(unit[U.OWNER]).name} `) + store.unitDefs[unit[U.TYPE]].name
           + (unit[U.ABOARD] ? ' (aboard)' : '');
+        if (me === null || unit[U.OWNER] === me) {
+          const home = state.cities.find((c) => c.id === unit[U.HOME]);
+          const name = home ? home.name : (unit[U.HOME] == null ? 'None' : 'Unknown');
+          if (city) key += ` (${name})`;
+          else {
+            if (!homes.has(name)) homes.set(name, new Set());
+            homes.get(name).add(key);
+          }
+        }
         counts.set(key, (counts.get(key) || 0) + 1);
       }
       const list = [...counts].map(([key, count]) => (count > 1 ? `${key} ×${count}` : key));
       rows.push([city ? 'Garrison' : 'Units', list.join(', ')]);
+      if (homes.size) {
+        rows.push(['Home city', [...homes].map(([name, labels]) =>
+          homes.size === 1 ? name : `${name} (${[...labels].join(', ')})`).join('; ')]);
+      }
       if (!city && me === null) hint = 'Click to select its civilization';
-      else if (!city && units.some((unit) => unit[U.OWNER] === me)) hint = 'Click to give orders';
     }
     const body = rows.length
       ? `<dl class="tip-rows">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';

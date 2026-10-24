@@ -201,7 +201,7 @@ def test_play_session(client):
         hidden = [i for i, mark in enumerate(state["explored"]) if mark == "0"]
         assert hidden and all(init["map"]["terrain"][i] == sea and init["map"]["flags"][i] == 0
                               for i in hidden)
-        assert state["units"] and all(u[2] == 1 and len(u) == 11 for u in state["units"])
+        assert state["units"] and all(u[2] == 1 and len(u) == 12 for u in state["units"])
 
         settlers = next(u for u in state["units"] if u[1] == "settlers")
         socket.send_json({"cmd": "unit", "id": settlers[0]})
@@ -365,6 +365,27 @@ def test_a_destroyed_person_becomes_an_observer(client):
         assert over["state"]["players"][2]["gold"] is not None, "nothing is hidden any more"
         socket.send_json({"cmd": "step"})
         assert socket.receive_json()["type"] == "turn"
+
+
+def test_map_units_include_home_city_without_revealing_enemy_support(rules):
+    game = make_game(rules)
+    capital = add_city(game, 1, 5, 5)
+    enemy_city = add_city(game, 2, 10, 5)
+    supported = game.add_unit("militia", 1, 5, 5, home_city=capital.id)
+    independent = game.add_unit("settlers", 1, 6, 5)
+    enemy = game.add_unit("legion", 2, 5, 6, home_city=enemy_city.id)
+    game.players[1].visible[game.tile_of(enemy).index] = True
+
+    observed = {u[0]: u for u in serialize.state_payload(game)["units"]}
+    assert observed[supported.id][8] == capital.id
+    assert observed[independent.id][8] is None
+    assert observed[enemy.id][8] == enemy_city.id
+
+    played = serialize.state_payload(game, pov=1, controller=HumanController())
+    units = {u[0]: u for u in played["units"]}
+    assert units[supported.id][8:] == [capital.id, supported.moves_left, "", 0]
+    assert units[independent.id][8] is None
+    assert units[enemy.id][8] is None
 
 
 def test_city_sheet_tells_where_things_go(rules):

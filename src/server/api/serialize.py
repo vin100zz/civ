@@ -534,17 +534,17 @@ def _city_choices(game: Game, city: City, controller: HumanController) -> dict[s
 
 # ── Units ─────────────────────────────────────────────────────────────────────
 
-def unit_payload(unit: Unit) -> list:
-    """Compact: [id, type, owner, x, y, order, veteran, aboard a ship]."""
+def unit_payload(unit: Unit, *, include_home: bool = False) -> list:
+    """Compact: [id, type, owner, x, y, order, veteran, aboard a ship, home city]."""
     return [unit.id, unit.type, unit.owner, unit.x, unit.y, unit.order, int(unit.veteran),
-            int(unit.aboard is not None)]
+            int(unit.aboard is not None), unit.home_city if include_home else None]
 
 
 def own_unit_payload(view: PlayerView, unit: Unit, controller: HumanController) -> list:
     """A unit of the person: the same, then the movement points it has left, what it was
     left to do by itself ("goto", "explore", "work" or "") and the turns before its work
     is done (0 without work)."""
-    return [*unit_payload(unit), unit.moves_left, controller.task(unit.id),
+    return [*unit_payload(unit, include_home=True), unit.moves_left, controller.task(unit.id),
             view.work_left(unit)]
 
 
@@ -636,7 +636,7 @@ def state_payload(game: Game, pov: Optional[int] = None,
     if not leading:
         payload["players"] = [player_payload(game, p) for p in game.players]
         payload["cities"] = [city_payload(game, c) for c in cities]
-        payload["units"] = [unit_payload(u) for u in units]
+        payload["units"] = [unit_payload(u, include_home=True) for u in units]
         return payload
 
     view = PlayerView(game, viewer)

@@ -5,13 +5,13 @@ export const F = {
   FORTRESS: 128, POLLUTION: 256,
 };
 
-// Fields of a unit as sent by the server: [id, type, owner, x, y, order, veteran, aboard].
+// Fields sent by the server: [id, type, owner, x, y, order, veteran, aboard, home city].
 // The units of the civilization a person leads carry three more: the movement points left
 // (see rules.points_per_move), what the unit was left to do by itself, and the turns before
 // its work (road, irrigation...) is done, 0 without work.
 export const U = {
-  ID: 0, TYPE: 1, OWNER: 2, X: 3, Y: 4, ORDER: 5, VETERAN: 6, ABOARD: 7, MOVES: 8, TASK: 9,
-  WORK_LEFT: 10,
+  ID: 0, TYPE: 1, OWNER: 2, X: 3, Y: 4, ORDER: 5, VETERAN: 6, ABOARD: 7, HOME: 8,
+  MOVES: 9, TASK: 10, WORK_LEFT: 11,
 };
 
 export const store = {
