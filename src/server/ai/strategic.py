@@ -234,7 +234,10 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
     Returns the number of jobs.
 
     A job is worth what it brings per turn of work: the longest ones (clearing a jungle)
-    wait until the quicker ones are done. The roads that link our cities come first.
+    wait until the quicker ones are done. The roads that link our cities come first. What a
+    city is short of counts more: irrigation where food is short, mines where shields are
+    (see `_city_values`). Once the Railroad is known, a road counts for the rails it will
+    carry too: on forests, hills or rivers that is what it is for.
 
     `for_person`: the jobs of a person's automated settlers. All of them are posted, each
     settler taking the best one within its reach, and the yield the government's tile penalty
@@ -254,14 +257,26 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
             return value - 1
         return value
 
-    def gain(before: int, bonus: int, city: City) -> float:
-        now = effective(before + bonus, city) - before
+    def held_back(now: int, bonus: int) -> float:
+        """A work worth `bonus` that brings `now` under the government's tile penalty."""
         if for_person and now < bonus:
             return now + (bonus - now) * get("withheld_gain")
         return now
 
-    def worth(food: float, shields: float, trade: float) -> float:
-        return get("irrigate") * food + get("mine") * shields + get("road") * trade
+    def gain(before: int, bonus: int, city: City) -> float:
+        return held_back(effective(before + bonus, city) - before, bonus)
+
+    def rails_gain(city: City, tile: Tile, effects: list,
+                   works: tuple[str, ...]) -> tuple[float, float, float]:
+        """What the rails bring on the tile once the `works` are done (its road)."""
+        old = view.city_tile_yields(city, tile, effects, works)
+        new = view.city_tile_yields(city, tile, effects, works + ("railroad",))
+        percent = movement.railroad_yield_percent
+        return tuple(held_back(after - before, before * percent // 100) for before, after in
+                     ((old.food, new.food), (old.shields, new.shields), (old.trade, new.trade)))
+
+    def worth(values: tuple[float, float, float], more: tuple[float, float, float]) -> float:
+        return sum(value * amount for value, amount in zip(values, more))
 
     def post(tile: Tile, value: float, order: str) -> None:
         best = jobs.get(tile.index)
@@ -271,6 +286,8 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
     for city in know.cities:
         worked = {(city.x + dx, city.y + dy) for dx, dy in city.worked}
         effects = view.city_effects(city)
+        values = _city_values(view, city)
+        food_value, shield_value, trade_value = values
         for (dx, dy), tile in view.map.city_area(city.x, city.y):
             if not view.explored(tile) or not view.is_land(tile):
                 continue
@@ -289,20 +306,20 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
                 turns = view.work_turns_at(tile, "irrigate")
                 if turns is not None:
                     food = gain(base.food, irrigation.bonus, city)
-                    options.append((get("irrigate") * food / turns, "irrigate"))
+                    options.append((food_value * food / turns, "irrigate"))
             mine = terrain.mine
             if mine is not None and mine.bonus and not tile.mine and not tile.irrigation:
                 turns = view.work_turns_at(tile, "mine")
                 if turns is not None:
                     shields = gain(base.shields, mine.bonus, city)
-                    options.append((get("mine") * shields / turns, "mine"))
+                    options.append((shield_value * shields / turns, "mine"))
             for order, work in (("irrigate", irrigation), ("mine", mine)):
                 if work is None or work.becomes is None or tile.special:
                     continue                # a resource is never cleared away
                 more = _farmland_gain(view, tile, work.becomes)
                 turns = view.work_turns_at(tile, order)
                 if more is not None and turns is not None:
-                    options.append((worth(*more) / turns, order))
+                    options.append((worth(values, more) / turns, order))
             if not tile.road:
                 turns = view.work_turns_at(tile, "road")
                 if turns is not None:
@@ -312,14 +329,18 @@ def improve_missions(view: PlayerView, know: Knowledge, plan: Plan,
                         if government.trade_bonus and base.trade == 0:
                             bonus += 1
                         trade = gain(base.trade, bonus, city)
-                    options.append(((link + get("road") * trade) / turns, "road"))
+                    value = link + trade_value * trade
+                    options.append((value / turns, "road"))
+                    # The rails come next on the road: what both bring, over both works.
+                    rails = view.work_turns_at(tile, "railroad", works=("road",))
+                    if rails is not None:
+                        more = rails_gain(city, tile, effects, ("road",))
+                        options.append(((value + worth(values, more)) / (turns + rails), "road"))
             elif not tile.railroad:
                 turns = view.work_turns_at(tile, "railroad")
                 if turns is not None:
-                    percent = movement.railroad_yield_percent
-                    more = worth(base.food * percent // 100, base.shields * percent // 100,
-                                 base.trade * percent // 100)
-                    options.append(((link + more) / turns, "railroad"))
+                    more = rails_gain(city, tile, effects, ())
+                    options.append(((link + worth(values, more)) / turns, "railroad"))
             if tile.pollution:
                 # Pollution halves the tile and warms the planet: it is cleaned first.
                 options.append((get("clean"), "clean"))
@@ -368,6 +389,33 @@ def _farmland_gain(view: PlayerView, tile: Tile, becomes: str) -> Optional[tuple
     if after[0] <= before[0]:
         return None
     return after[0] - before[0], after[1] - before[1], after[2] - before[2]
+
+
+def _city_values(view: PlayerView, city: City) -> tuple[float, float, float]:
+    """What one more food, shield and trade on its land is worth to the city.
+
+    What the city is short of counts more, what it has plenty of less: food against its
+    surplus, shields against its production once its units are paid, both for its size.
+    Below the mark the city is short, from twice the mark it has plenty; a city that cannot
+    grow any more (no Aqueduct) has all the food it needs.
+    """
+    get = lambda name: view.rules.ai.get("settlers", name)
+    stats = view.city_stats(city)
+
+    def need(surplus: int, mark: float) -> float:
+        if surplus < mark:
+            return get("short_need")
+        return get("plenty_need") if surplus >= 2 * mark else 1.0
+
+    food_mark = get("food_mark") + get("food_mark_per_citizen") * city.size
+    shield_mark = get("shield_mark") + get("shield_mark_per_citizen") * city.size
+    limit = view.city_max_size(city)
+    if limit is not None and city.size >= limit and stats.food_surplus >= 0:
+        food = get("plenty_need")
+    else:
+        food = need(stats.food_surplus, food_mark)
+    shields = need(stats.shield_surplus, shield_mark)
+    return get("irrigate") * food, get("mine") * shields, get("road")
 
 
 def _city_links(view: PlayerView, know: Knowledge) -> dict[int, Tile]:

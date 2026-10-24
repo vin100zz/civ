@@ -180,6 +180,15 @@ settlers:
   irrigate: 3.0                   # value of one food gained on a worked tile
   mine: 2.0                       # value of one shield gained
   road: 1.5                       # value of one trade gained
+  # What a city is short of counts more. Mark = base + per citizen x size, against the food
+  # surplus and the shield surplus: below it, the food or shields gained count short_need
+  # times; from twice the mark, plenty_need times.
+  food_mark: 2.0
+  food_mark_per_citizen: 0.1
+  shield_mark: 1.0
+  shield_mark_per_citizen: 0.5
+  short_need: 2.0
+  plenty_need: 0.5
   connect: 8.0                    # value of a road or railroad on the way between two cities
   connect_max_steps: 12           # cities farther apart than this are not linked by road
   clean: 2.5                      # value of cleaning a polluted tile

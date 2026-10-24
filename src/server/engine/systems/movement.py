@@ -10,7 +10,7 @@ carrier. A ship entering a city puts its passengers ashore.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Collection, Optional
 
 from .. import effects as fx
 from ..mapgen.generator import set_terrain
@@ -248,8 +248,10 @@ def work_left(game: Game, unit: Unit) -> int:
     return max(0, turns - unit.work) if turns is not None else 0
 
 
-def work_turns_at(game: Game, player: Player, tile: Tile, order: str) -> Optional[int]:
-    """Turns a terraforming unit of the player would need for this work on this tile."""
+def work_turns_at(game: Game, player: Player, tile: Tile, order: str,
+                  works: Collection[str] = ()) -> Optional[int]:
+    """Turns a terraforming unit of the player would need for this work on this tile.
+    `works`: as if these works were done first (the road a railroad needs)."""
     terrain = game.terrain(tile)
     settings = game.rules.game.movement
     if not terrain.is_land:
@@ -262,7 +264,7 @@ def work_turns_at(game: Game, player: Player, tile: Tile, order: str) -> Optiona
             return None
         return settings.road_turns_factor * terrain.move_cost + 1
     if order == "railroad":
-        if not tile.road or tile.railroad or tile.city_id is not None:
+        if not (tile.road or "road" in works) or tile.railroad or tile.city_id is not None:
             return None
         if settings.railroad_tech not in player.techs:
             return None

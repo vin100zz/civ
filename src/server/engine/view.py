@@ -6,7 +6,7 @@ remembers. That is what keeps the AI honest.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Collection, Optional
 
 from . import actions
 from . import effects as fx
@@ -117,9 +117,11 @@ class PlayerView:
     def city_stats(self, city: City) -> CityStats:
         return city_rules.compute_city(self._game, city)
 
-    def city_tile_yields(self, city: City, tile: Tile, effects: Optional[list] = None) -> Yields:
-        """What the tile gives the city; pass the city's effects when asking for many tiles."""
-        return city_rules.tile_yields(self._game, city, tile, effects)
+    def city_tile_yields(self, city: City, tile: Tile, effects: Optional[list] = None,
+                         works: Collection[str] = ()) -> Yields:
+        """What the tile gives the city; pass the city's effects when asking for many tiles.
+        `works`: what it would give once these works are done too ("road", "railroad", …)."""
+        return city_rules.tile_yields(self._game, city, tile, effects, works)
 
     def city_max_size(self, city: City) -> Optional[int]:
         return city_rules.max_size(self._game, city)
@@ -228,8 +230,8 @@ class PlayerView:
     def work_left(self, unit: Unit) -> int:
         return movement.work_left(self._game, unit)
 
-    def work_turns_at(self, tile: Tile, order: str) -> Optional[int]:
-        return movement.work_turns_at(self._game, self.player, tile, order)
+    def work_turns_at(self, tile: Tile, order: str, works: Collection[str] = ()) -> Optional[int]:
+        return movement.work_turns_at(self._game, self.player, tile, order, works)
 
     def has_water_source(self, tile: Tile) -> bool:
         return movement.has_water_source(self._game, tile)

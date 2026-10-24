@@ -6,7 +6,7 @@ F0_1d12_6abc_GetCityResourceCount), rewritten as separate, testable steps.
 from __future__ import annotations
 
 import dataclasses
-from typing import Optional
+from typing import Collection, Optional
 
 from .. import effects as fx
 from ..model.entities import SPECIALISTS, City, CityStats, Unit
@@ -17,8 +17,10 @@ from ..rules.schema import Effect, Yields
 
 # ── Tile yields ───────────────────────────────────────────────────────────────
 
-def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effect]] = None) -> Yields:
-    """Food, shields and trade a tile gives to the city working it."""
+def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effect]] = None,
+                works: Collection[str] = ()) -> Yields:
+    """Food, shields and trade a tile gives to the city working it. `works`: as if these
+    works were done on the tile too ("road", "railroad", "irrigation", "mine")."""
     rules = game.rules
     terrain = rules.terrains[tile.terrain]
     government = game.government(game.players[city.owner])
@@ -34,11 +36,12 @@ def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effec
     if terrain.is_land:
         irrigation = terrain.irrigation
         # The city tile is farmed and has a road without any settler work.
-        if irrigation is not None and irrigation.bonus and (tile.irrigation or is_center):
+        if irrigation is not None and irrigation.bonus and (
+                tile.irrigation or "irrigation" in works or is_center):
             food += irrigation.bonus
-        if tile.mine and terrain.mine is not None and terrain.mine.bonus:
+        if (tile.mine or "mine" in works) and terrain.mine is not None and terrain.mine.bonus:
             shields += terrain.mine.bonus
-        if terrain.road_trade and (tile.road or is_center):
+        if terrain.road_trade and (tile.road or "road" in works or is_center):
             trade += movement.road_trade_bonus
     if is_center and shields < 1:
         shields = 1
@@ -52,7 +55,7 @@ def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effec
         elif effect.type == "tile_food_bonus" and effect.domain == domain:
             food += effect.amount       # a Harbour: +1 food on ocean tiles
 
-    if game.map.has_railroad(tile):
+    if game.map.has_railroad(tile) or "railroad" in works:
         percent = movement.railroad_yield_percent
         food += food * percent // 100
         shields += shields * percent // 100

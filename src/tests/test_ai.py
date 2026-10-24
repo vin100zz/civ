@@ -10,7 +10,7 @@ from server.ai.knowledge import Knowledge
 from server.ai import diplomacy as ai_diplomacy, missions as M, pathfinding, strategic
 from server.engine import persistence
 from server.engine.model.entities import NO_CONTACT, PEACE, SPECIALISTS, WAR
-from server.engine.systems import cities, diplomacy, turn, visibility
+from server.engine.systems import cities, city as city_rules, diplomacy, turn, visibility
 from server.engine.view import PlayerView
 from server.sim.metrics import Metrics
 from server.sim.runner import create_game
@@ -238,8 +238,68 @@ def test_settlers_link_the_cities_by_road_then_railroad(rules):
         game.map.tile(x, 7).road = True
     game.players[1].techs.add(rules.game.movement.railroad_tech)
     jobs = settler_jobs(game, for_person=True)
-    assert {(x, 7) for x in range(5, 10)} <= set(jobs) and set(jobs.values()) == {"railroad"}
-    assert not set(jobs) & between
+    assert all(jobs[(x, 7)] == "railroad" for x in range(5, 10))
+    assert (7, 6) not in jobs, "away from the cities, the old way is left"
+    # Around the cities, a road on the forest is now worth the rails it will carry.
+    areas = {tile.pos for city in game.cities.values()
+             for _, tile in game.map.city_area(city.x, city.y)}
+    roads = {pos for pos, order in jobs.items() if order == "road"}
+    assert roads and roads <= areas
+
+
+def test_settlers_lay_roads_for_the_rails_to_come(rules):
+    # Forest, hills and a river give no trade with a road, but the rails it carries add half
+    # of what they yield.
+    patches = {(5, 6): "hills", (7, 6): "river", (6, 7): "mountains"}
+    game = make_game(rules, width=16, height=12, terrain="forest", patches=patches)
+    city = add_city(game, 1, 6, 6, size=3)
+    player = game.players[1]
+    player.government = "monarchy"
+    game.map.tile(5, 6).mine = game.map.tile(6, 7).mine = True    # the rails add 1 shield
+    game.map.tile(7, 6).irrigation = True                          # and 1 food here
+    assert settler_jobs(game, for_person=True) == {}, "nothing without the Railroad"
+
+    player.techs.update({rules.game.movement.railroad_tech, "bridge_building"})
+    jobs = settler_jobs(game, for_person=True)
+    area = {tile.pos for _, tile in game.map.city_area(city.x, city.y) if tile.city_id is None}
+    assert jobs == {pos: "road" for pos in area}
+    assert list(jobs)[0] in {(city.x + dx, city.y + dy) for dx, dy in city.worked}
+
+
+def _farm_city(rules, worked_terrain: str):
+    """A size 3 city on irrigated grassland under Monarchy, working three tiles of
+    `worked_terrain`. Still to do: a bare hill by the sea and an unwatered grassland."""
+    coast = {(x, 3): "ocean" for x in range(16)}
+    worked = [(-2, 1), (-1, 2), (1, 2)]
+    patches = {**coast, (8, 4): "hills", **{(8 + dx, 5 + dy): worked_terrain for dx, dy in worked}}
+    game = make_game(rules, width=16, height=12, patches=patches)
+    game.players[1].government = "monarchy"
+    city = add_city(game, 1, 8, 5, size=3)
+    for _, tile in game.map.city_area(city.x, city.y):
+        tile.road = tile.terrain == "grassland"
+        tile.irrigation = tile.road and tile.pos != (10, 5)
+        tile.mine = tile.terrain == "hills" and tile.pos != (8, 4)
+    city_rules.set_worked(game, city, worked)
+    city.specialists = {name: 0 for name in SPECIALISTS}
+    return game, city
+
+
+def test_settlers_mine_where_shields_are_short(rules):
+    # Irrigated grassland feeds the city plenty, but its only shield is the one of its square.
+    game, city = _farm_city(rules, "grassland")
+    stats = city_rules.compute_city(game, city)
+    assert stats.food_surplus == 6 and stats.shield_surplus == 1
+    jobs = settler_jobs(game, for_person=True)
+    assert list(jobs) == [(8, 4), (10, 5)] and jobs[(8, 4)] == "mine"
+
+
+def test_settlers_irrigate_where_food_is_short(rules):
+    # Mined hills give the city plenty of shields, but it does not grow.
+    game, city = _farm_city(rules, "hills")
+    stats = city_rules.compute_city(game, city)
+    assert stats.food_surplus == 0 and stats.shield_surplus == 10
+    jobs = settler_jobs(game, for_person=True)
+    assert list(jobs) == [(10, 5), (8, 4)] and jobs[(8, 4)] == "irrigate"
 
 
 # ── War and peace ─────────────────────────────────────────────────────────────
