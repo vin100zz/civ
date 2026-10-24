@@ -904,8 +904,7 @@ button.news-row:hover { background: var(--raise); color: var(--text); }
 #panel-cities .faces svg { flex: none; display: block; }
 #panel-cities .counts { gap: 7px; }
 #panel-cities .counts > span { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 12px; font-weight: 600; }
-#panel-cities .counts .specialist-count { color: #C79BF2; }
-#panel-cities .spec { width: 12px; height: 12px; flex: none; border-radius: 50%; background: #C79BF2; box-shadow: 0 0 0 1.5px var(--panel); color: var(--bg); font-size: 8px; font-style: normal; font-weight: 700; line-height: 1; display: grid; place-items: center; }
+#panel-cities .spec { flex: none; display: flex; }
 #panel-cities .mood { width: 20px; flex: none; display: flex; justify-content: flex-end; }
 /* Room for the veteran dot, taken back by the margin so the rows keep the height of the others. */
 #panel-cities .units { flex: 1; min-width: 0; padding: 3px 0 3px 3px; margin: -3px 0; display: flex; align-items: center; gap: 5px; overflow: hidden; font-size: 12px; }
@@ -1230,13 +1229,14 @@ button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .support-cost .amount { gap: 2px; }
 .support-cost svg.icon { width: 13px; height: 13px; }
 
-.citizens { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.citizens .faces { display: flex; gap: 3px; min-width: 0; }
-/* A face gives up its width before the row would wrap: the next one then lies over it. */
-.citizens .face { flex: 0 1 30px; min-width: 8px; height: 30px; display: flex; }
-.citizens .face svg { flex: none; }
+.citizens { display: flex; align-items: center; gap: 3px; min-width: 0; }
+/* Every citizen gives up the same width before the row would wrap, the next one then lying over
+   it; the last face and the last specialist stay whole. */
+.citizens .face, .citizens .specialist { flex: 0 1 30px; min-width: 0; height: 30px; display: flex; }
+.citizens .face:has(+ .sep), .citizens > :last-child { flex: none; }
+.citizens svg { flex: none; }
 .citizens .sep { width: 1px; height: 22px; background: var(--line); margin: 0 5px; flex: none; }
-.specialist { width: 30px; height: 30px; border-radius: 50%; border: 1.6px solid #C79BF2; background: var(--raise); color: #C79BF2; font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none; }
+.specialist { padding: 0; border: 0; background: none; overflow: visible; }
 
 .card { background: var(--raise); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card .big { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
@@ -1293,7 +1293,7 @@ button.land-cell { cursor: pointer; }
 /* Worked by another city or held by an enemy: hatched and dark. */
 .land-cell.taken { background: repeating-linear-gradient(135deg, rgba(11, 14, 19, 0.82) 0 7px, rgba(11, 14, 19, 0.6) 7px 12px); cursor: default; }
 button.specialist { cursor: pointer; }
-button.specialist:hover { background: var(--hover); }
+button.specialist:hover .head { fill: var(--hover); }
 /* What the city may build: a name and the turns it takes, the rest in the tooltip. */
 .option-group { display: flex; flex-direction: column; gap: 5px; }
 .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }

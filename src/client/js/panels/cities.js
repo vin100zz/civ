@@ -3,7 +3,7 @@
 // of it. The cities keep the order of their founding, unless a column title sorts them.
 
 import { store, U, emit, leader, player, tileIndex, turnsFor } from '../state.js';
-import { icon } from '../icons.js';
+import { icon, specialistIcon, specialistColor } from '../icons.js';
 import { setTips } from '../tips.js';
 import { unitImage } from '../renderer/sprites.js';
 
@@ -95,7 +95,7 @@ const FACE = {
   content: ['var(--soft)', 'M8.5 15h7'],
   unhappy: ['var(--bad)', 'M8.5 16c1-1.4 2.2-2 3.5-2s2.5.6 3.5 2'],
 };
-const SPECIALISTS = [['entertainer', 'E', 'Entertainers'], ['taxman', 'T', 'Taxmen'], ['scientist', 'S', 'Scientists']];
+const SPECIALISTS = [['entertainer', 'Entertainers'], ['taxman', 'Taxmen'], ['scientist', 'Scientists']];
 const MAX_FACES = 17;       // beyond, the citizens are counted rather than drawn
 const FACES_WIDTH = 144;    // pixels the faces may take in a row
 const FACE_SIZE = 12;
@@ -235,30 +235,30 @@ function face(mood, size, margin = 0) {
     <circle cx="12" cy="12" r="9.5" fill="var(--raise)"/><path d="M9 10v.6M15 10v.6"/><path d="${mouth}"/></svg>`;
 }
 
-// One face per citizen, then one disc per specialist, drawn closer together in a big city;
-// beyond MAX_FACES, one face per mood and one disc per kind of specialist, each with its count.
+// One face per citizen, then one hat per specialist, drawn closer together in a big city;
+// beyond MAX_FACES, one face per mood and one hat per kind of specialist, each with its count.
 function happinessWidget(city) {
   const moods = [['happy', city.happy], ['content', city.content], ['unhappy', city.unhappy]];
-  const kinds = SPECIALISTS.map(([kind, letter, name]) => [letter, name, city.specialists[kind] || 0]);
+  const kinds = SPECIALISTS.map(([kind, name]) => [kind, name, city.specialists[kind] || 0]);
   let people;
   if (citizens(city) > MAX_FACES) {
     const counts = moods.filter(([, count]) => count)
       .map(([mood, count]) => `<span style="color:${FACE[mood][0]}" title="${mood}">${count}${face(mood, FACE_SIZE)}</span>`);
-    for (const [letter, name, count] of kinds) {
-      if (count) counts.push(`<span class="specialist-count" title="${name}">${count}<i class="spec">${letter}</i></span>`);
+    for (const [kind, name, count] of kinds) {
+      if (count) counts.push(`<span style="color:${specialistColor(kind)}" title="${name}">${count}${specialistIcon(kind, FACE_SIZE, 2.2)}</span>`);
     }
     people = `<span class="counts">${counts.join('')}</span>`;
   } else {
     const list = [];
     for (const [mood, count] of moods) for (let i = 0; i < count; i++) list.push(['face', mood]);
-    for (const [letter, name, count] of kinds) for (let i = 0; i < count; i++) list.push(['spec', letter, name]);
+    for (const [kind, name, count] of kinds) for (let i = 0; i < count; i++) list.push(['spec', kind, name]);
     const gap = list.some(([kind]) => kind === 'spec') && list.some(([kind]) => kind === 'face') ? 5 : 0;
     const step = list.length > 1 ? Math.min(14, (FACES_WIDTH - FACE_SIZE - gap) / (list.length - 1)) : 0;
     const drawn = list.map(([kind, what, name], i) => {
       const extra = i > 0 && kind === 'spec' && list[i - 1][0] === 'face' ? gap : 0;
       const margin = i === 0 ? 0 : Math.round((step - FACE_SIZE + extra) * 10) / 10;
       return kind === 'face' ? face(what, FACE_SIZE, margin)
-        : `<i class="spec" style="margin-left:${margin}px" title="${name}">${what}</i>`;
+        : `<i class="spec" style="margin-left:${margin}px" title="${name}">${specialistIcon(what, FACE_SIZE, 2.2)}</i>`;
     });
     people = `<span class="faces">${drawn.join('')}</span>`;
   }

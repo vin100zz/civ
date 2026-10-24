@@ -88,6 +88,38 @@ export function icon(name, size = 18, stroke = 1.75) {
     + `aria-hidden="true">${PATHS[name] || ''}</svg>`;
 }
 
+// A city specialist is a citizen with a hat, in the colour of what it makes and a darker shade:
+// the jester's cap with bells (luxuries), the top hat (gold), the mortarboard (science).
+const SMILE = 'M9.4 16.7c.9 1.2 1.7 1.7 2.6 1.7s1.7-.5 2.6-1.7';
+const SPECIALISTS = {
+  entertainer: {
+    colors: ['#C79BF2', '#9A6CD6'], mouth: SMILE,
+    hat: (c, deep) => `<path d="M4.9 11.6Q3.9 8.6 2 8.6C2.3 4.4 6.2 3.4 8.6 8.2Q10.2 4.8 12 2.6Q13.8 4.8 15.4 8.2C17.8 3.4 21.7 4.4 22 8.6Q20.1 8.6 19.1 11.6Q12 8.8 4.9 11.6z" fill="${c}" stroke="${c}" stroke-width="1"/>
+      <path d="M8.6 8.2Q10.2 4.8 12 2.6Q13.8 4.8 15.4 8.2Q12 9.3 8.6 8.2z" fill="${deep}"/>
+      <circle cx="2" cy="10" r="1.4" fill="${c}"/><circle cx="12" cy="2.4" r="1.4" fill="${c}"/><circle cx="22" cy="10" r="1.4" fill="${c}"/>`,
+  },
+  taxman: {
+    colors: ['var(--gold)', '#A9822F'], mouth: 'M9.8 17.5h4.4',
+    hat: (c, deep) => `<rect x="7.6" y="2.2" width="8.8" height="7.4" rx="1" fill="${c}"/>
+      <rect x="7.6" y="6.9" width="8.8" height="1.5" fill="${deep}"/><rect x="4.2" y="8.9" width="15.6" height="2" rx="1" fill="${c}"/>`,
+  },
+  scientist: {
+    colors: ['var(--sci)', '#3F86C4'], mouth: SMILE,
+    hat: (c, deep) => `<path d="M7.2 8.4v2.3Q12 12.6 16.8 10.7V8.4z" fill="${deep}"/><path d="M12 2.8 21.6 6.6 12 10.4 2.4 6.6z" fill="${c}"/>
+      <path d="M19.4 7.4v4.2" stroke="${c}" stroke-width="1.2"/><circle cx="19.4" cy="12.2" r="1.1" fill="${c}"/>`,
+  },
+};
+
+export const specialistColor = (kind) => SPECIALISTS[kind].colors[0];
+
+export function specialistIcon(kind, size = 30, stroke = 1.6) {
+  const { colors: [color, deep], mouth, hat } = SPECIALISTS[kind];
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="${stroke}" `
+    + `stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${kind}">`
+    + `<circle class="head" cx="12" cy="14.6" r="7.2" fill="var(--raise)"/><path d="M9.5 14v.6M14.5 14v.6"/><path d="${mouth}"/>`
+    + `<g stroke="none">${hat(color, deep)}</g></svg>`;
+}
+
 // The gold chevrons of a veteran, after a unit's name, as in the unit bar.
 export function vetMark(size = 14) {
   return `<span class="vet-mark" role="img" aria-label="veteran" title="Veteran">${icon('rank', size, 2)}</span>`;

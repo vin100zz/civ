@@ -4,7 +4,7 @@
 
 import { store, U, player, leader, emit, inkOn, plural, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
-import { icon, vetMark } from '../icons.js';
+import { icon, vetMark, specialistIcon } from '../icons.js';
 import { setTips } from '../tips.js';
 import { ORDER_MARK, TASK_MARK } from '../renderer/map.js';
 import { unitImage } from '../renderer/sprites.js';
@@ -16,7 +16,6 @@ const FACE = {
   content: ['var(--soft)', 'M8.5 15h7'],
   unhappy: ['var(--bad)', 'M8.5 16c1-1.4 2.2-2 3.5-2s2.5 .6 3.5 2'],
 };
-const SPECIALIST = { entertainer: 'E', taxman: 'T', scientist: 'S' };
 const SPECIALIST_NOTE = { entertainer: '2 luxuries', taxman: '2 gold', scientist: '2 science' };
 // What a unit is busy with, for its tooltip.
 const DOING = {
@@ -101,16 +100,15 @@ function citizens(stats, specialists, manage, size) {
   }
   const others = [];
   const canChange = manage && size >= store.rules.specialist_min_size;
-  for (const [kind, letter] of Object.entries(SPECIALIST)) {
+  for (const kind of Object.keys(SPECIALIST_NOTE)) {
     for (let i = 0; i < (specialists[kind] || 0); i++) {
       others.push(canChange
-        ? `<button class="specialist" data-specialist="${kind}" title="${kind}: ${SPECIALIST_NOTE[kind]} · click to change its job">${letter}</button>`
-        : `<span class="specialist" title="${kind}: ${SPECIALIST_NOTE[kind]}">${letter}</span>`);
+        ? `<button class="specialist" data-specialist="${kind}" title="${kind}: ${SPECIALIST_NOTE[kind]} · click to change its job">${specialistIcon(kind)}</button>`
+        : `<span class="specialist" title="${kind}: ${SPECIALIST_NOTE[kind]}">${specialistIcon(kind)}</span>`);
     }
   }
-  // One line: when it runs short, the faces overlap.
-  return `<span class="faces">${faces.join('')}</span>`
-    + (others.length ? `<span class="sep"></span>${others.join('')}` : '');
+  // One line: when it runs short, every citizen overlaps the one before by the same amount.
+  return faces.join('') + (faces.length && others.length ? '<span class="sep"></span>' : '') + others.join('');
 }
 
 // The food, shield and trade icons (icons.js) drawn on the land: filled, with a dark halo so
