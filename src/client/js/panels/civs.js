@@ -71,6 +71,11 @@ function renderKnownWorld(container) {
   const state = store.state;
   const me = state.me;
   const met = state.players.filter((p) => !p.barbarian && p.id !== me.id && p.met);
+  const unknown = state.players.filter((p) => !p.barbarian && p.id !== me.id && !p.met);
+  const placeholders = unknown.map(() => `
+    <div class="civ-row civ-unknown" role="img" aria-label="Undiscovered civilization">
+      <span class="civ-unknown-mark" aria-hidden="true">?</span>
+    </div>`);
   const relation = (p) => (me.relations.find((r) => r.player === p.id) || {}).state;
   const rows = met.map((p) => {
     const state_ = relation(p);
@@ -97,7 +102,8 @@ function renderKnownWorld(container) {
           <span class="score">${me.score}</span></span>
         <span class="civ-meta" style="padding-left:20px"><span class="who">${plural(me.cities, 'city')} · ${plural(me.population, 'citizen')}
           · ${plural(me.techs, 'advance')} · ${plural(me.units, 'unit')} · ${me.gold} gold</span></span></button>
-      ${rows.join('') || '<p class="empty"><b>Nobody in sight</b>Explore: other civilizations share this world.</p>'}
+      ${rows.join('')}
+      ${placeholders.join('')}
     </div>`;
   container.querySelector('#civs-body').addEventListener('click', (e) => {
     const target = e.target.closest('[data-player], [data-peace], [data-war], [data-proposal]');

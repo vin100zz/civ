@@ -1009,14 +1009,17 @@ body.play #notice { bottom: auto; top: 72px; }
 .civ-row {
   display: flex;
   flex-direction: column;
+  min-height: 70px;
   gap: 7px;
   padding: 12px 20px;
   border-bottom: 1px solid var(--line-2);
   width: 100%;
   flex: none;
 }
-.civ-row:hover, .dead-row:hover, .event-row:hover { background: var(--raise); }
+.civ-row:not(.civ-unknown):hover, .dead-row:hover, .event-row:hover { background: var(--raise); }
 .civ-row.selected { background: var(--hover); box-shadow: inset 3px 0 0 var(--gold); }
+.civ-unknown { color: var(--mute); justify-content: center; }
+.civ-unknown-mark { width: 12px; flex: none; text-align: center; font-size: 12px; }
 .civ-line .rank { font-size: 13px; color: var(--mute); }
 .civ-line .name { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
 .civ-line .name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
