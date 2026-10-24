@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from server.api import serialize
 from server.engine import actions
 from server.engine.model.entities import ORDER_FORTIFIED, PEACE
 from server.engine.systems import combat, movement
@@ -47,6 +48,40 @@ def test_roads_make_movement_cheap(rules):
     for x in (4, 5, 6):
         assert movement.move_unit(game, unit, game.map.tile(x, 5)) == movement.MOVED
     assert unit.moves_left == 0 and (unit.x, unit.y) == (6, 5)
+
+
+def test_a_city_next_to_a_railroad_is_on_it(rules):
+    """Nobody lays rails on a city tile: a railroad reaching the city joins it."""
+    game = make_game(rules)
+    for x in range(3, 8):
+        game.map.tile(x, 5).road = True
+    add_city(game, 1, 5, 5)
+    center = game.map.tile(5, 5)
+    assert not game.map.has_railroad(center)
+    for x in (3, 4, 6, 7):
+        game.map.tile(x, 5).railroad = True
+    assert game.map.has_railroad(center) and not center.railroad
+    unit = game.add_unit("militia", 1, 3, 5)
+    for x in (4, 5, 6, 7):
+        assert movement.move_unit(game, unit, game.map.tile(x, 5)) == movement.MOVED
+    assert unit.moves_left == movement.full_moves(game, unit)
+    # A plain tile next to the railroad is not on it.
+    assert not game.map.has_railroad(game.map.tile(4, 6))
+
+
+def test_a_railroad_laid_next_to_a_city_reaches_the_map_of_the_city_tile(rules):
+    game = make_game(rules)
+    city = add_city(game, 1, 5, 5)
+    game.players[1].techs.add(rules.game.movement.railroad_tech)
+    game.map.tile(6, 5).road = True
+    settlers = game.add_unit("settlers", 1, 6, 5)
+    assert movement.set_order(game, settlers, "railroad")
+    game.changed_tiles.clear()
+    for _ in range(movement.work_left(game, settlers)):
+        start(game, 1)
+    center = game.tile_of(city)
+    assert game.map.tile(6, 5).railroad and center.index in game.changed_tiles
+    assert serialize.tile_flags(game.map, center) & serialize.F_RAILROAD
 
 
 def test_slow_unit_always_enters_rough_terrain(rules):

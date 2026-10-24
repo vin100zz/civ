@@ -89,6 +89,12 @@ class WorldMap:
         """The up to 8 tiles around `tile`."""
         return self._neighbors[tile.index]
 
+    def has_railroad(self, tile: Tile) -> bool:
+        """A railroad on the tile. A city is on the railroad as soon as a tile next to it has
+        one: nobody lays rails on a city tile."""
+        return tile.railroad or (tile.city_id is not None
+                                 and any(other.railroad for other in self._neighbors[tile.index]))
+
     def cardinal_neighbors(self, tile: Tile) -> list[Tile]:
         result = []
         for dx, dy in CARDINALS:

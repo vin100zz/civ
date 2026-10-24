@@ -46,7 +46,7 @@ def move_cost(game: Game, unit: Unit, origin: Tile, target: Tile) -> int:
     settings = game.rules.game.movement
     if game.rules.units[unit.type].domain != "land":
         return settings.points_per_move
-    if origin.railroad and target.railroad:
+    if game.map.has_railroad(origin) and game.map.has_railroad(target):
         return settings.railroad_cost
     if origin.road and target.road:
         return settings.road_cost
@@ -348,6 +348,9 @@ def _finish_work(game: Game, unit: Unit) -> None:
         tile.road = True
     elif order == "railroad":
         tile.railroad = True
+        for other in game.map.neighbors(tile):
+            if other.city_id is not None:
+                game.mark_tile(other)       # the city is on the railroad now
     elif order == "fortress":
         tile.fortress = True
     elif order == "clean":

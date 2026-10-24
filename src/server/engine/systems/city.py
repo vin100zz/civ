@@ -52,7 +52,7 @@ def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effec
         elif effect.type == "tile_food_bonus" and effect.domain == domain:
             food += effect.amount       # a Harbour: +1 food on ocean tiles
 
-    if tile.railroad:
+    if game.map.has_railroad(tile):
         percent = movement.railroad_yield_percent
         food += food * percent // 100
         shields += shields * percent // 100

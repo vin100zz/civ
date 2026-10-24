@@ -117,10 +117,11 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
 
 # ── The map ───────────────────────────────────────────────────────────────────
 
-def tile_flags(tile) -> int:
+def tile_flags(world, tile) -> int:
     return (F_SPECIAL * tile.special | F_PATTERN * tile.pattern | F_HUT * tile.hut
-            | F_ROAD * tile.road | F_RAILROAD * tile.railroad | F_IRRIGATION * tile.irrigation
-            | F_MINE * tile.mine | F_FORTRESS * tile.fortress | F_POLLUTION * tile.pollution)
+            | F_ROAD * tile.road | F_RAILROAD * world.has_railroad(tile)
+            | F_IRRIGATION * tile.irrigation | F_MINE * tile.mine | F_FORTRESS * tile.fortress
+            | F_POLLUTION * tile.pollution)
 
 
 def map_payload(game: Game, viewer: Optional[Player] = None) -> dict[str, Any]:
@@ -139,7 +140,7 @@ def map_payload(game: Game, viewer: Optional[Player] = None) -> dict[str, Any]:
         "height": game.map.height,
         "wrap_x": game.map.wrap_x,
         "terrain": [terrain_index[t.terrain] if seen(t) else sea for t in tiles],
-        "flags": [tile_flags(t) if seen(t) else 0 for t in tiles],
+        "flags": [tile_flags(game.map, t) if seen(t) else 0 for t in tiles],
         "continent": [t.continent if seen(t) else 0 for t in tiles],
     }
 
@@ -150,7 +151,7 @@ def tile_rows(game: Game, indexes) -> list[list[int]]:
     rows = []
     for index in sorted(indexes):
         tile = game.map.tiles[index]
-        rows.append([index, terrain_index[tile.terrain], tile_flags(tile)])
+        rows.append([index, terrain_index[tile.terrain], tile_flags(game.map, tile)])
     return rows
 
 

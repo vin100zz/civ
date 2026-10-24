@@ -66,6 +66,16 @@ def test_railroad_bonus_comes_before_the_government(rules):
         assert city_rules.tile_yields(game, city, tile) == Yields(*with_railroad)
 
 
+def test_city_tile_gets_the_railroad_bonus_from_a_railroad_next_to_it(rules):
+    game = make_game(rules)
+    game.players[1].government = "monarchy"
+    city = add_city(game, 1, 5, 5)
+    center = game.tile_of(city)
+    assert city_rules.tile_yields(game, city, center) == Yields(3, 1, 1)
+    game.map.tile(6, 6).road = game.map.tile(6, 6).railroad = True
+    assert city_rules.tile_yields(game, city, center) == Yields(4, 1, 1)
+
+
 def test_worker_assignment_is_consistent(rules):
     game = make_game(rules)
     city = add_city(game, 1, 5, 5, size=4)
