@@ -53,6 +53,24 @@ def test_golden_ages_rules(golden):
     assert {"mfg_plant", "hydro_plant", "nuclear_plant", "seti_program"}.isdisjoint(golden.buildings)
 
 
+def test_tech_tree_is_a_pyramid(golden):
+    """No starting advance may be skipped on the way to the late tree: Rocketry without ever
+    riding a horse or drawing a bow is not possible."""
+    def ancestors(tech_id: str) -> set[str]:
+        found: set[str] = set()
+        stack = list(golden.techs[tech_id].prerequisites)
+        while stack:
+            pre = stack.pop()
+            if pre not in found:
+                found.add(pre)
+                stack.extend(golden.techs[pre].prerequisites)
+        return found
+
+    roots = {t.id for t in golden.techs.values() if not t.prerequisites}
+    for late in ("railroad", "electricity", "rocketry", "space_flight", "future_tech"):
+        assert roots <= ancestors(late), (late, roots - ancestors(late))
+
+
 def test_no_senate_keeps_the_peace(golden, rules):
     """The governments of Civ 1, but a Republic or a Democracy may go to war and stay there."""
     assert list(golden.governments) == list(rules.governments)
