@@ -51,12 +51,15 @@ def refresh(game: Game, player: Player) -> None:
 
 
 def reveal_world(game: Game, player: Player) -> None:
-    """The player learns the whole map and where every city is (Apollo Program)."""
+    """The player learns the whole map and where every city is, and meets every civilization
+    still standing (Apollo Program)."""
     for index in range(len(player.explored)):
         player.explored[index] = 1
     for city in game.cities.values():
         if city.owner != player.id:
             remember_city(game, player, city)
+    for other in game.civilizations:
+        make_contact(game, player.id, other.id)
 
 
 def can_see(player: Player, tile: Tile) -> bool:

@@ -23,6 +23,7 @@ from .model.worldmap import WorldMap
 from .rules.loader import DEFAULT_RULESET
 from .rules.schema import Rules
 from .systems import city as city_rules
+from .systems import visibility
 
 VERSION = 1
 TILE_FLAGS = ("special", "pattern", "hut", "road", "railroad", "irrigation", "mine", "fortress",
@@ -220,6 +221,12 @@ def _build_game(rules: Rules, data: dict[str, Any]) -> Game:
         world.tile(city.x, city.y).worked_by = city.id
     for city in game.cities.values():
         city.stats = city_rules.compute_city(game, city)
+    # Saves made before the Apollo Program brought contact with everybody: meet them now.
+    for wonder_id, city_id in game.wonders.items():
+        if city_id in game.cities and any(effect.type == "reveal_map"
+                                          for effect in rules.buildings[wonder_id].effects):
+            for other in game.civilizations:
+                visibility.make_contact(game, game.cities[city_id].owner, other.id)
     return game
 
 

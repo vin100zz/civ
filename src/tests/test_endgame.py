@@ -8,7 +8,7 @@ import pytest
 
 from server.engine import actions, persistence
 from server.engine import effects as fx
-from server.engine.model.entities import Item
+from server.engine.model.entities import NO_CONTACT, Item
 from server.ai.controller import AIController
 from server.engine.systems import (cities, city as city_rules, movement, nuclear, pollution,
                                    production, spaceship, turn, visibility)
@@ -221,12 +221,23 @@ def test_spaceship_parts_need_the_apollo_program(rules):
 def test_apollo_program_reveals_the_world(rules):
     game, city, other = space_game(rules)
     player = game.players[1]
+    game.relation(1, 2).state = NO_CONTACT
     assert not all(player.explored)
     city.production = Item("building", "apollo_program")
     city.shields = rules.buildings["apollo_program"].cost
     production.complete_if_ready(game, city)
     assert all(player.explored) and other.id in player.known_cities
+    assert game.in_contact(1, 2)                             # and meets every civilization
 
+
+
+def test_old_saves_with_the_apollo_program_meet_everybody(rules):
+    game, city, other = space_game(rules)
+    city.buildings.add("apollo_program")
+    game.wonders["apollo_program"] = city.id
+    game.relation(1, 2).state = NO_CONTACT
+    data = json.loads(json.dumps(persistence.game_to_data(game)))
+    assert persistence.game_from_data(rules, data).in_contact(1, 2)
 
 def test_spaceship_launch_and_victory(rules):
     game, city, other = space_game(rules)
