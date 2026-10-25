@@ -14,6 +14,7 @@
 # empire_size_factor  - larger = more cities before extra unhappiness appears
 # collects_taxes / does_research - false during Anarchy (no maintenance either)
 # rapture_growth      - a celebrating city grows by one each turn
+# leader_title        - whom a celebrating city loves: "'We love the King' day" (Civ 1)
 # falls_on_disorder   - two consecutive turns of disorder in a city bring Anarchy
 # senate              - the senate forces the acceptance of peace offers
 
@@ -31,6 +32,7 @@
 
 - id: despotism
   name: Despotism
+  leader_title: Emperor
   tile_penalty: true
   corruption_divisor: 100
   max_rate: 60
@@ -41,6 +43,7 @@
 
 - id: monarchy
   name: Monarchy
+  leader_title: King
   requires: monarchy
   celebration_trade_bonus: true
   corruption_divisor: 120
@@ -51,6 +54,7 @@
 
 - id: communism
   name: Communism
+  leader_title: Comrade
   requires: communism
   celebration_trade_bonus: true
   corruption_divisor: 140
@@ -62,6 +66,7 @@
 
 - id: republic
   name: Republic
+  leader_title: President
   requires: republic
   trade_bonus: true
   corruption_divisor: 160
@@ -74,6 +79,7 @@
 
 - id: democracy
   name: Democracy
+  leader_title: President
   requires: democracy
   trade_bonus: true
   corruption_divisor: null

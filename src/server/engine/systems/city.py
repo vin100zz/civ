@@ -535,3 +535,17 @@ def growth_brings_disorder(game: Game, city: City) -> bool:
         specialists["entertainer"] += 1
     grown = dataclasses.replace(city, size=city.size + 1, worked=worked, specialists=specialists)
     return compute_city(game, grown).disorder
+
+
+def celebration_growth_in(game: Game, city: City, stats: CityStats) -> Optional[int]:
+    """Turns before a celebration makes the city grow by one (rapture growth, then one more
+    each turn): 1 when it celebrates already, 2 when its celebration starts at the end of this
+    turn, the first day bringing no growth (see `cities.process_city`). None when it will not
+    grow that way: no celebration, a government without rapture growth, no food surplus, or
+    the city at its largest size."""
+    government = game.government(game.players[city.owner])
+    limit = max_size(game, city)
+    if (not government.rapture_growth or not stats.celebrating or stats.food_surplus <= 0
+            or (limit is not None and city.size >= limit)):
+        return None
+    return 1 if city.celebrating else 2

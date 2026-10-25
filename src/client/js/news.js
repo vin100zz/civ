@@ -55,6 +55,8 @@ export function toneOf(event, me) {
     case 'barbarians': return 'bad';
     case 'war': return mine || against ? 'bad' : 'info';
     case 'peace': case 'order': return 'good';
+    case 'celebration': return mine ? 'good' : null;
+    case 'celebration_over': return mine ? 'info' : null;
     case 'wonder': return mine ? 'good' : 'info';
     case 'tech': return mine && event.how !== 'discover' ? 'good' : null;
     case 'sold': case 'hut': case 'contact': case 'government': case 'trade_route':

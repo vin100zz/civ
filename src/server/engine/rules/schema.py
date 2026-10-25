@@ -215,6 +215,7 @@ class GovernmentDef:
     collects_taxes: bool = True
     does_research: bool = True
     rapture_growth: bool = False
+    leader_title: str = "King"
     falls_on_disorder: bool = False
     senate: bool = False
 

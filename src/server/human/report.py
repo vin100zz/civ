@@ -11,6 +11,7 @@ from ..engine.view import PlayerView
 
 THREAT_RADIUS = 2
 TREASURY_WARNING_TURNS = 5      # the treasury is watched when it runs dry within this many turns
+FAMINE_WARNING_TURNS = 10       # a starving city is an alert when its famine comes within this
 
 
 def alerts(view: PlayerView) -> list[dict]:
@@ -36,10 +37,21 @@ def alerts(view: PlayerView) -> list[dict]:
         if city.disorder:
             result.append({"kind": "disorder", "city": city.id, "x": city.x, "y": city.y,
                            "text": f"Civil disorder in {city.name}"})
-        elif city.stats.food_surplus < 0:
+        elif (hunger := famine(city.food, city.stats.food_surplus)) and hunger["near"]:
+            when = "next turn" if hunger["turns"] == 1 else f"in {hunger['turns']} turns"
             result.append({"kind": "famine", "city": city.id, "x": city.x, "y": city.y,
-                           "text": f"{city.name} is starving"})
+                           "text": f"{city.name} is starving: famine {when}"})
     return result
+
+
+def famine(food: int, surplus: int) -> Optional[dict]:
+    """When a starving city's food box runs out (the turn it loses a citizen, 1 for the end of
+    this one), and whether that is near enough for an alert. None when it does not starve. A
+    city grown past what its land can feed eats its box slowly: no alert for a long time."""
+    if surplus >= 0:
+        return None
+    turns = food // -surplus + 1            # the box must fall below zero (cities.process_city)
+    return {"turns": turns, "near": turns <= FAMINE_WARNING_TURNS}
 
 
 def treasury_alert(view: PlayerView) -> Optional[dict]:

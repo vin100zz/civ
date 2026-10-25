@@ -376,14 +376,33 @@ function ledgerRow(glyph, tone, name, value, valueTone, detail, tip = '') {
     <span class="value ${valueTone}">${value}</span><div class="detail">${detail}</div></div>`;
 }
 
+// The "We love the King" day: the city celebrates, or starts or stops at the end of the turn,
+// and what it brings under the government.
+function celebrationState(c, s, owner, tips) {
+  const party = c.celebration;
+  const label = !party.next ? 'Celebration ends' : party.now ? 'Celebrating' : 'Celebration next turn';
+  const foot = !party.next ? 'The city no longer meets the condition: the celebration stops at the end of this turn.'
+    : party.now ? '' : 'The celebration starts at the end of this turn.';
+  tips.set('celebration', tipTitle(`<span>'We love the ${party.title}' day</span>`, governmentName(owner.government))
+    + tipRows([
+      ['Needs', `${Math.ceil(c.size / 2)} happy, none unhappy`],
+      ['Now', `${s.happy} happy, ${s.unhappy} unhappy`],
+      ['Effect', party.effect || 'None under this government'],
+    ])
+    + (foot ? `<div class="tip-foot">${foot}</div>` : ''));
+  return `<span class="city-state ${party.next ? 'gold' : 'ends'}" data-tip="celebration">${label}</span>`;
+}
+
 // Food, shields, trade and pollution: the surplus, then where what is made goes.
 function ledger(c, tips) {
   const s = c.stats;
   const rows = [];
 
-  // Food: the box filling up until the city grows.
+  // Food: the box filling up until the city grows, or a celebration making it grow each turn.
   const growth = turnsFor(c.food_box - c.food, s.food_surplus);
   const starving = s.food_surplus < 0;
+  const famine = c.famine;
+  const rapture = c.celebration?.growth_in;
   tips.set('food', tipTitle('<span>Food</span>', `box of ${c.food_box}`)
     + tipKeys([
       [key('var(--food)'), 'In the box', c.food],
@@ -394,10 +413,16 @@ function ledger(c, tips) {
       ['Produced', s.food],
       ['Eaten by the citizens', taken(s.food_eaten - s.food_settlers)],
       ['Eaten by Settlers', taken(s.food_settlers)],
-    ]));
-  rows.push(ledgerRow('food', 'food', 'Food', signed(s.food_surplus), starving ? 'bad' : 'food',
-    stock(c.food, s.food_surplus, c.food_box, 'var(--food)')
-      + (starving ? '<span class="eta bad">starving</span>' : eta(growth, 'no growth', 'none')), 'food'));
+    ])
+    + (rapture ? `<div class="tip-foot">The celebration adds one citizen at the end of ${
+      rapture === 1 ? 'each turn' : 'each turn from the next one'}, as long as some food is left over.</div>` : '')
+    + (famine ? `<div class="tip-foot">The box runs out in ${plural(famine.turns, 'turn')}: the city then loses a
+      citizen, or a Settlers unit it supports.</div>` : ''));
+  // A city living on its box for long is not in danger yet: in red only when the famine is near.
+  const due = famine ? `<span class="eta famine${famine.near ? ' near' : ''}">famine in <b>${famine.turns}</b> turn${famine.turns === 1 ? '' : 's'}</span>`
+    : rapture ? '<span class="eta party"><b>+1</b> per turn</span>' : eta(growth, 'no growth', 'none');
+  rows.push(ledgerRow('food', 'food', 'Food', signed(s.food_surplus), !starving ? 'food' : famine.near ? 'bad' : 'warn',
+    stock(c.food, s.food_surplus, c.food_box, 'var(--food)') + due, 'food'));
 
   // Shields: what is left for the production once the units are paid.
   const kept = Math.max(0, s.shield_surplus);
@@ -667,7 +692,7 @@ export function renderCity(container) {
   const decided = c.decision
     ? `${c.decision.bought ? 'bought' : 'decided'} on turn ${c.decision.turn}` : '';
   const mood = c.disorder ? `<span class="city-state bad">${icon('alert', 14, 2)}Civil disorder</span>`
-    : c.celebrating ? '<span class="city-state gold">Celebrating</span>' : '';
+    : c.celebration ? celebrationState(c, s, owner, tips) : '';
 
   // What the units cost the city each turn.
   const support = c.support;

@@ -1,7 +1,7 @@
 // "Turn" panel of the person playing: what needs a decision, what threatens, which units
 // still wait for orders, and how the cities are doing.
 
-import { store, U, emit, leader, turnsFor, queueGroups } from '../state.js';
+import { store, U, emit, leader, plural, turnsFor, queueGroups } from '../state.js';
 import { send } from '../net.js';
 import { icon, vetMark } from '../icons.js';
 import { play, queue, activate, decisions } from '../play.js';
@@ -39,7 +39,8 @@ const COLUMNS = [
 // 'bad' already costs something next turn; 'warn' stops the city short of it.
 function problems(city) {
   const list = [];
-  if (city.food_surplus < 0) list.push(['food_surplus', 'food', 'bad']);
+  // A city living on its food box for long is only stopped short, until its famine is near.
+  if (city.food_surplus < 0) list.push(['food_surplus', 'food', city.famine.near ? 'bad' : 'warn']);
   else if (city.food_surplus === 0) list.push(['food_surplus', 'food', 'warn']);
   if (city.surplus < 0) list.push(['surplus', 'shield', 'bad']);
   else if (city.surplus === 0) list.push(['surplus', 'shield', 'warn']);
@@ -57,8 +58,10 @@ const PROBLEM = {
 function cityRow(city, color) {
   const wrong = problems(city);
   const level = wrong.some(([, , l]) => l === 'bad') ? 'bad' : wrong.length ? 'warn' : '';
-  const marks = wrong.map(([field, glyph, l]) =>
-    `<span class="${l}" title="${PROBLEM[field][l]}">${icon(glyph, 14, 2)}</span>`).join('');
+  const marks = wrong.map(([field, glyph, l]) => {
+    const title = field === 'food_surplus' && city.famine ? `Famine in ${plural(city.famine.turns, 'turn')}` : PROBLEM[field][l];
+    return `<span class="${l}" title="${title}">${icon(glyph, 14, 2)}</span>`;
+  }).join('');
   const flags = [];
   // The turns before the production is done, next to it.
   if (!city.idle) {

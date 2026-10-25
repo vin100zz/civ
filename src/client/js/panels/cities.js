@@ -128,7 +128,7 @@ function unitsIn(city) {
 // Turns before the city grows; 3000 and up when it starves, 2000 without growth, 1000 at its
 // largest size: the order of a sort on growth.
 function growthRank(city) {
-  if (city.food_surplus < 0) return 3000 - Math.ceil(city.food / -city.food_surplus);
+  if (city.food_surplus < 0) return 3000 - city.famine.turns;
   if (city.food_surplus === 0) return 2000;
   if (blocked(city)) return 1000;
   return Math.max(1, turnsFor(city.food_box - city.food, city.food_surplus));
@@ -179,7 +179,7 @@ function foodWidget(city) {
     track += `<span class="next" style="width:${share(Math.min(surplus, box - food))};background:var(--food)"></span>`;
   }
   let growth;
-  if (surplus < 0) growth = num(`↓${Math.ceil(food / -surplus)}`, 'bad', true);
+  if (surplus < 0) growth = num(`↓${city.famine.turns}`, city.famine.near ? 'bad' : 'warn', true);
   else if (surplus === 0) growth = num('∞', 'warn', true);
   else if (blocked(city)) growth = num('max', 'warn chip', true);
   else {

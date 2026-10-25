@@ -4,7 +4,8 @@ import { store, emit, player, yearLabel } from '../state.js';
 import { icon } from '../icons.js';
 
 export const GROUPS = {
-  Cities: ['city_founded', 'city_captured', 'city_destroyed', 'famine', 'disorder', 'order'],
+  Cities: ['city_founded', 'city_captured', 'city_destroyed', 'famine', 'disorder', 'order',
+           'celebration', 'celebration_over'],
   War: ['combat', 'war', 'peace', 'contact', 'barbarians', 'civ_destroyed', 'disband',
         'unit_lost', 'nuclear'],
   Science: ['tech', 'wonder', 'government'],

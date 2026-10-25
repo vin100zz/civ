@@ -22,7 +22,8 @@ from .systems import cities, production, research, spaceship, trade
 WORLD_NEWS = ("wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
               "global_warming", "game_over")
 # The affairs of a city only its owner hears of, even when the city is in sight of others.
-CITY_AFFAIRS = ("disband", "famine", "sold", "disorder", "order")
+CITY_AFFAIRS = ("disband", "famine", "sold", "disorder", "order", "celebration",
+                "celebration_over")
 
 
 class PlayerView:

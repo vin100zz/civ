@@ -149,6 +149,7 @@ def process_city(game: Game, city: City) -> None:
         _pay_maintenance(game, city)
 
     # Celebration ("We love the king day").
+    was_celebrating = city.celebrating
     if stats.celebrating and not city.disorder:
         if city.celebrating and government_def.rapture_growth and stats.food_surplus > 0:
             limit = city_rules.max_size(game, city)
@@ -158,6 +159,14 @@ def process_city(game: Game, city: City) -> None:
         city.celebrating = True
     else:
         city.celebrating = False
+    # Told to the owner as in Civ 1, but for the end of the celebrations a revolution brings.
+    title = government_def.leader_title
+    if city.celebrating and not was_celebrating:
+        game.emit("celebration", f"'We love the {title}' day celebrated in {city.name}!",
+                  player=player.id, x=city.x, y=city.y, city=city.id)
+    elif was_celebrating and not city.celebrating and government_def.collects_taxes:
+        game.emit("celebration_over", f"'We love the {title}' celebration cancelled in {city.name}.",
+                  player=player.id, x=city.x, y=city.y, city=city.id)
 
     city.stats = city_rules.compute_city(game, city)
     city.base_trade = city.stats.base_trade

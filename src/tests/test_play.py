@@ -2,6 +2,7 @@
 what it is allowed to know."""
 from __future__ import annotations
 
+import dataclasses
 import json
 
 from server.ai.controller import AIController
@@ -516,6 +517,25 @@ def test_alerts(rules):
     alerts = report.alerts(view)
     assert [a["kind"] for a in alerts] == ["threat"]
     assert alerts[0]["text"] == f"2 Greek Legion near {city.name}" and alerts[0]["city"] == city.id
+
+
+def test_a_starving_city_is_an_alert_only_when_its_famine_is_near(rules):
+    """A city grown past what its land can feed lives on its food box for a long time."""
+    game = make_game(rules)
+    city = add_city(game, 1, 6, 6, size=3)
+    view = PlayerView(game, game.players[1])
+    city.stats = dataclasses.replace(city_rules.compute_city(game, city), food_surplus=-2)
+    city.food = 100
+    assert report.famine(city.food, -2) == {"turns": 51, "near": False}
+    assert not [a for a in report.alerts(view) if a["kind"] == "famine"]
+
+    city.food = 3                                           # 1 left after this turn, then -1
+    alert = next(a for a in report.alerts(view) if a["kind"] == "famine")
+    assert alert["text"] == f"{city.name} is starving: famine in 2 turns"
+    city.food = 1
+    alert = next(a for a in report.alerts(view) if a["kind"] == "famine")
+    assert alert["text"] == f"{city.name} is starving: famine next turn"
+    assert report.famine(10, 0) is None
 
 
 def test_the_treasury_warns_before_a_building_is_sold(rules):

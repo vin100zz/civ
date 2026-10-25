@@ -386,6 +386,7 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         # Buildings a wonder provides without the city having built them: building -> wonder.
         "given": fx.given_buildings(game, city),
         "food": city.food, "food_box": stats.food_box, "max_size": city_rules.max_size(game, city),
+        "famine": report.famine(city.food, stats.food_surplus),
         "shields_made": stats.shields, "shield_upkeep": stats.shield_upkeep,
         "corruption": stats.corruption, "luxury": stats.luxury, "tax": stats.tax,
         "science": stats.science, "specialists": dict(city.specialists),
@@ -453,6 +454,7 @@ def city_detail(game: Game, city: City, decision=None,
     detail: dict[str, Any] = {
         **city_payload(game, city),
         "food": city.food, "food_box": stats.food_box, "shields": city.shields,
+        "famine": report.famine(city.food, stats.food_surplus),
         "item": [item.kind, item.id] if item else None,
         "production_cost": production.item_cost(game, item) if item else None,
         "buy_cost": production.buy_cost(game, city),
@@ -467,6 +469,7 @@ def city_detail(game: Game, city: City, decision=None,
             "building_upkeep": stats.building_upkeep, "pollution": stats.pollution,
         },
         "pollution": _pollution_payload(game, city, stats, effects),
+        "celebration": _celebration_payload(game, city, stats),
         # What its units cost the city each turn; the government may keep some for free.
         "support": {"units": stats.supported_units,
                     "free": stats.supported_units - stats.shield_upkeep,
@@ -514,6 +517,26 @@ def _pollution_payload(game: Game, city: City, stats, effects) -> Optional[dict[
     industry, citizens = pollution.pollution_sources(game, city, stats.shields, effects)
     return {"industry": industry, "citizens": citizens, "tolerance": settings.tolerance,
             "risk": pollution.pollution_risk(game, player, stats.pollution)}
+
+
+def _celebration_payload(game: Game, city: City, stats) -> Optional[dict[str, Any]]:
+    """The "We love the King" day of a city: whether it celebrates now and whether it will at
+    the end of the turn (it starts or stops then), what it brings under the government and,
+    with rapture growth, in how many turns the city grows by one. None when neither."""
+    if not city.celebrating and not stats.celebrating:
+        return None
+    government = game.government(game.players[city.owner])
+    if government.rapture_growth:
+        effect = "The city grows by one citizen each turn while it has a food surplus."
+    elif government.celebration_trade_bonus:
+        effect = "+1 trade on every tile that already yields trade."
+    elif government.tile_penalty:
+        effect = "Tiles yielding more than 2 of something no longer lose 1."
+    else:
+        effect = None
+    return {"now": city.celebrating, "next": stats.celebrating,
+            "title": government.leader_title, "effect": effect,
+            "growth_in": city_rules.celebration_growth_in(game, city, stats)}
 
 
 def _city_choices(game: Game, city: City, controller: HumanController) -> dict[str, Any]:

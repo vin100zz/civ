@@ -1,12 +1,14 @@
 """City rules: yields, trade, mood, growth."""
 from __future__ import annotations
 
+import dataclasses
 import json
 
 from server.engine import actions, effects as fx, persistence
 from server.engine.model.entities import Item
 from server.engine.rules.schema import Effect, Yields
 from server.engine.systems import cities, city as city_rules, government, production
+from server.engine.view import PlayerView
 
 from .conftest import add_city, make_game
 
@@ -198,6 +200,43 @@ def test_new_government_rearranges_the_cities(rules):
     assert player.government == "democracy"
     assert city.specialists["entertainer"] == 2             # celebrating for rapture growth
     assert city.stats.celebrating
+
+
+def test_celebration_is_announced_and_grows_the_city(rules):
+    """As in Civ 1: the first day of a celebration is announced to the owner alone and brings
+    no growth, the city grows by one each following turn, and the end is announced too."""
+    game, city = _farmland_city(rules, "democracy", size=6, luxury=60)
+    assert city_rules.celebration_growth_in(game, city, city_rules.compute_city(game, city)) == 2
+    game.events.clear()
+    cities.process_city(game, city)
+    assert city.celebrating and city.size == 6
+    started = [e for e in game.events if e["type"] == "celebration"]
+    assert [e["text"] for e in started] == [f"'We love the President' day celebrated in {city.name}!"]
+    assert PlayerView(game, game.players[1]).knows_event(started[0])
+    assert not PlayerView(game, game.players[2]).knows_event(started[0])
+
+    assert city_rules.celebration_growth_in(game, city, city_rules.compute_city(game, city)) == 1
+    cities.process_city(game, city)
+    assert city.size == 7
+
+    game.players[1].tax_rate, game.players[1].luxury_rate = 100, 0
+    game.events.clear()
+    cities.process_city(game, city)
+    assert not city.celebrating
+    assert [e["text"] for e in game.events if e["type"] == "celebration_over"] == [
+        f"'We love the President' celebration cancelled in {city.name}."]
+
+
+def test_rapture_growth_forecast(rules):
+    """Only a government with rapture growth makes a celebrating city grow, and not past the
+    size its buildings allow."""
+    game, city = _farmland_city(rules, "monarchy", size=6, luxury=60)
+    stats = dataclasses.replace(city_rules.compute_city(game, city), celebrating=True)
+    assert city_rules.celebration_growth_in(game, city, stats) is None
+    game.players[1].government = "democracy"
+    assert city_rules.celebration_growth_in(game, city, stats) == 2
+    city.size = 10                                          # no aqueduct
+    assert city_rules.celebration_growth_in(game, city, stats) is None
 
 
 def test_corruption_grows_with_distance(rules):

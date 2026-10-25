@@ -1157,6 +1157,7 @@ button.news-row:hover { background: var(--raise); color: var(--text); }
 .city-state { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; border: 1px solid; font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; }
 .city-state.bad { background: rgba(242, 117, 106, 0.14); border-color: rgba(242, 117, 106, 0.5); }
 .city-state.gold { background: rgba(226, 182, 89, 0.10); border-color: rgba(226, 182, 89, 0.45); padding-left: 10px; }
+.city-state.ends { color: var(--soft); border-color: var(--line-3); padding-left: 10px; }
 .city-nav { display: flex; align-items: center; gap: 6px; flex: none; }
 .city-nav .arrows button { width: 32px; height: 30px; }
 .city-nav .btn { height: 32px; }
@@ -1259,6 +1260,12 @@ button.unit-card:hover { outline: 2px solid var(--gold); outline-offset: 2px; }
 .eta.bad, .eta.none { font-size: 12px; font-weight: 600; }
 .eta.bad { color: var(--bad); }
 .eta.none { color: var(--mute); }
+.eta.party { width: auto; }
+.eta.party b { color: var(--gold); }
+.eta.famine { width: auto; color: var(--mute); }
+.eta.famine b { color: var(--soft); }
+.eta.famine.near, .eta.famine.near b { color: var(--bad); }
+.ledger-row .value.warn { color: var(--warn); }
 
 /* What the turn makes, cut where it goes: each part as wide as its share. */
 .parts { flex: 1 1 0; min-width: 0; height: 22px; display: flex; gap: 3px; position: relative; }
