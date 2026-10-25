@@ -2,6 +2,9 @@
 # Leadership (Dragoons) and Tactics (Cavalry).
 # Source: OpenCivOne GameData.cs TechnologyAdvanceDefinition array (faithful C# rewrite of DOS binary)
 # At most 2 prerequisites each.
+# Pyramidal: every starting advance leads somewhere, so Railroad, Electricity, Rocketry and the
+# whole late tree need all of them (Civ 2 links: Horseback Riding -> The Wheel, Warrior Code ->
+# Iron Working and Feudalism, Pottery -> Seafaring -> Navigation).
 # repeatable: the advance can be researched any number of times (Future Tech).
 # era is approximate for UI grouping only
 
@@ -37,10 +40,6 @@
   era: ancient
   prerequisites: []
 
-- id: the_wheel
-  name: The Wheel
-  era: ancient
-  prerequisites: []
 
 - id: warrior_code
   name: Warrior Code
@@ -84,10 +83,15 @@
   era: ancient
   prerequisites: [bronze_working]
 
+- id: the_wheel
+  name: The Wheel
+  era: ancient
+  prerequisites: [horseback_riding]
+
 - id: iron_working
   name: Iron Working
   era: ancient
-  prerequisites: [bronze_working]
+  prerequisites: [bronze_working, warrior_code]
 
 - id: trade
   name: Trade
@@ -134,7 +138,7 @@
 - id: navigation
   name: Navigation
   era: classical
-  prerequisites: [map_making, astronomy]
+  prerequisites: [seafaring, astronomy]
 
 - id: bridge_building
   name: Bridge Building
@@ -146,7 +150,7 @@
 - id: feudalism
   name: Feudalism
   era: medieval
-  prerequisites: [masonry, monarchy]
+  prerequisites: [warrior_code, monarchy]
 
 - id: chivalry
   name: Chivalry
