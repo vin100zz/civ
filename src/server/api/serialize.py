@@ -228,19 +228,21 @@ def spaceship_payload(game: Game, player: Player, known: bool = True,
 
 
 def public_player_payload(game: Game, player: Player, viewer: Player) -> dict[str, Any]:
-    """What a person knows of another civilization: nothing before they meet; afterwards its
-    name, its government, the cities seen and what the whole world is told (wonders,
+    """What a person knows of another civilization: nothing before they meet (but its name
+    once it is destroyed); afterwards its name, its government, the cities seen and what the whole world is told (wonders,
     spaceship launches, and the parts of its spaceship). Treasury, science and armies stay
     secret (None)."""
     met = player.is_barbarian or game.in_contact(viewer.id, player.id)
+    # The whole world learns who a destroyed civilization was, met or not.
+    named = met or not player.alive
     known = [m for m in viewer.known_cities.values() if m.owner == player.id]
     payload: dict[str, Any] = {
         "id": player.id, "barbarian": player.is_barbarian, "alive": player.alive, "met": met,
-        "civ": player.civ.id if met else None,
-        "name": player.civ.name if met else "Unknown",
-        "nation": player.civ.nation if met else "Unknown",
-        "leader": player.civ.leader if met else "",
-        "color": player.civ.color if met else UNKNOWN_COLOR,
+        "civ": player.civ.id if named else None,
+        "name": player.civ.name if named else "Unknown",
+        "nation": player.civ.nation if named else "Unknown",
+        "leader": player.civ.leader if named else "",
+        "color": player.civ.color if named else UNKNOWN_COLOR,
         "government": player.government if met else None,
         "cities": len(known), "population": sum(m.size for m in known),
         "gold": None, "rates": None, "techs": None, "researching": None,

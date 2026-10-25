@@ -306,7 +306,7 @@ def test_a_person_only_hears_what_it_may_know(client):
             for player in state["players"]:
                 if player["id"] != 1:
                     assert player["gold"] is None and player["researching"] is None
-                    assert player["met"] or player["nation"] == "Unknown"
+                    assert player["met"] or not player["alive"] or player["nation"] == "Unknown"
         assert state["turn"] == 40 and exploring
         assert sum(mark != "0" for mark in explored) > 80, "the explorers uncovered the land"
 
@@ -757,3 +757,15 @@ def test_the_replay_is_saved_with_the_game(rules, tmp_path):
         for c in game.cities.values()}
     told = [e["text"] for e in data["extra"]["log"] if e["type"] in HEADLINES]
     assert told and [e["text"] for e in replay["events"]] == told
+
+
+def test_destroyed_civilizations_are_named_even_unmet(rules):
+    game = make_game(rules, civ_ids=("romans", "greeks", "russians"))
+    game.relation(1, 2).state = NO_CONTACT
+    game.relation(1, 3).state = NO_CONTACT
+    game.players[3].alive = False
+    greeks, russians = (serialize.public_player_payload(game, game.players[i], game.players[1])
+                        for i in (2, 3))
+    assert not greeks["met"] and greeks["nation"] == "Unknown"
+    assert not russians["met"] and russians["nation"] == game.players[3].civ.nation
+    assert russians["government"] is None
