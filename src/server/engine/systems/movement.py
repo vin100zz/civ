@@ -394,8 +394,8 @@ def pillage_target(game: Game, unit: Unit, known_cities=None) -> Optional[str]:
     tile = game.tile_of(unit)
     if tile.city_id is not None:
         return None
-    owner = cities.territory_owner(game.map, tile,
-                                   game.cities if known_cities is None else known_cities)
+    owner = (cities.owner_of(game, tile) if known_cities is None
+             else cities.territory_owner(game.map, tile, known_cities))
     if owner is not None and owner != unit.owner and not game.at_war(unit.owner, owner):
         return None
     return next((work for work in PILLAGED_FIRST if getattr(tile, work)), None)
@@ -417,7 +417,7 @@ def pillage(game: Game, unit: Unit) -> Optional[str]:
     cancel_order(unit)
     unit.moves_left = 0
     player = game.players[unit.owner]
-    owner = cities.territory_owner(game.map, tile, game.cities)
+    owner = cities.owner_of(game, tile)
     victim = owner if owner is not None and owner != unit.owner else None
     whose = f"{game.players[victim].civ.name} " if victim is not None else ""
     game.emit("pillage", f"{player.civ.name} {game.rules.units[unit.type].name} pillages "

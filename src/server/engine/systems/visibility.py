@@ -74,7 +74,7 @@ def remember_city(game: Game, player: Player, city: City) -> None:
     walls = any(e.type == "defense_multiplier" for e in fx.city_effects(game, city))
     player.known_cities[city.id] = CityMemory(
         city_id=city.id, name=city.name, owner=city.owner, x=city.x, y=city.y,
-        size=city.size, seen_turn=game.turn, has_walls=walls)
+        size=city.size, seen_turn=game.turn, has_walls=walls, claims=city.claims)
 
 
 def _notice(game: Game, player: Player, tile: Tile) -> None:

@@ -157,6 +157,20 @@ city:
     growth_lead: 3           # ...counted in part from this many citizens short of that size
     veterans: 2.0            # barracks while the city builds a military unit
     pollution: 0.1           # per point of pollution risk avoided (percent per turn)
+    culture: 0.5             # per point of culture a turn (Renaissance)
+
+culture:
+  # own (Renaissance): a city claims the inner ring of its area at its founding, then the 12
+  # tiles of its outer ring one by one as its culture grows, the best free tile first; then,
+  # beyond the tiles it works, the 4 corners of its 5 x 5 square and a third ring of 20 tiles,
+  # the nearest first, each next to a tile it holds, never a tile a city of another
+  # civilization could work. Its citizens only work tiles of its civilization's territory.
+  # Without culture a city claims its whole area at once.
+  enabled: false
+  per_city: 1              # culture every city makes each turn (buildings add)
+  per_wonder: 3            # culture each wonder gives its city each turn
+  tile_cost: 5             # the n-th tile won needs n x this more culture (12: 390, 36: 3330)
+  # A city in civil disorder makes no culture.
 
 production:
   # Cost in gold to finish production, r = remaining shields (CityWorker.cs L4bf7)
@@ -267,6 +281,7 @@ score:
   future_tech: 5
   polluted_tile: -10
   spaceship_arrival: 100
+  culture_per_point: 200       # own: a point per this much culture of the civilization's cities
 
 victory:
   conquest: true               # the last civilization standing wins

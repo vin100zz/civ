@@ -200,21 +200,28 @@ function landGrid(detail, owner, manage) {
       const classes = ['land-cell'];
       if (tile.worked) classes.push('worked');
       if (center) classes.push('center');
+      // With culture, the city works only tiles inside the borders of its civilization.
+      const outside = 'owner' in tile && tile.owner !== detail.owner;
+      const border = !outside ? ''
+        : tile.owner === null ? ' — outside the borders, culture will claim it'
+          : ` — ${player(tile.owner).nation} territory`;
+      if (outside) classes.push(tile.owner === null ? 'outside' : 'taken');
       // The city square as on the map, its size above the yields of its tile.
       const mark = center ? `<span class="city-square" style="background:${owner.color}"></span>`
         + `<span class="city-size" style="color:${inkOn(owner.color)}">${detail.size}</span>` : '';
       // Only the worked tiles show what they yield.
       const yields = center || tile.worked ? yieldPad(tile.yields) : '';
       if (!manage) {
-        cells.push(`<div class="${classes.join(' ')}" title="${terrain.name}${tile.worked ? ' — worked' : ''}">${mark}${yields}</div>`);
+        cells.push(`<div class="${classes.join(' ')}" title="${terrain.name}${tile.worked ? ' — worked' : border}">${mark}${yields}</div>`);
         continue;
       }
       // The person moves its citizens by clicking: the centre hands the city back to its mayor.
       const usable = center || tile.worked || workable.has(`${dx},${dy}`);
       const title = center ? 'Let the mayor place the citizens'
         : tile.worked ? `${terrain.name} — worked · click to free its citizen`
-          : usable ? `${terrain.name} · click to work this tile` : `${terrain.name} — taken by another city or an enemy`;
-      if (!usable) classes.push('taken');
+          : usable ? `${terrain.name} · click to work this tile`
+            : `${terrain.name}${border || ' — taken by another city or an enemy'}`;
+      if (!usable && !outside) classes.push('taken');
       cells.push(`<button class="${classes.join(' ')}" data-dx="${dx}" data-dy="${dy}" title="${title}"
         aria-pressed="${tile.worked}" ${usable ? '' : 'disabled'}>${mark}${yields}</button>`);
     }
@@ -453,6 +460,31 @@ function ledger(c, tips) {
     `<div class="parts">${shares || net > 0 ? `<span class="parts" style="flex-grow:${Math.max(1, net)}">${shares}</span>` : ''}${
       s.corruption ? part('lost', s.corruption, 'lost', s.corruption) : ''
     }</div>${made(s.trade, 'trade')}`, 'trade'));
+
+  // Culture, with culture rules: what it makes each turn and the next tile of its borders.
+  if ('culture' in c) {
+    const next = c.culture_next;
+    const span = next === null ? 0 : next - c.culture_from;
+    const turns = next === null ? null : turnsFor(next - c.culture, c.culture_rate);
+    const full = c.land >= c.area;
+    tips.set('culture', tipTitle('<span>Culture</span>', `${c.culture} in all`)
+      + tipRows([
+        ['Per turn', signed(c.culture_rate)],
+        ['Territory', `${c.land} of the ${c.area} tiles around the city`],
+        ['Beyond', `${c.beyond} of ${c.beyond_max} tiles`],
+        ['Next tile', next === null ? (c.beyond >= c.beyond_max ? 'None: the borders are complete'
+          : 'None: the rest is foreign territory or out of reach') : `at ${next} culture`],
+      ])
+      + '<div class="tip-foot">The culture of a city wins it the tiles of its outer ring one by one, the best free '
+      + 'tile first, then beyond: the corners of its square and a third ring, the nearest first. Its citizens only '
+      + 'work the territory of their civilization; nobody may found a city in it. Temples, Theatres, Museums and '
+      + 'wonders add culture; a city in disorder makes none.</div>');
+    const due = next === null ? `<span class="eta none">${c.beyond >= c.beyond_max ? 'complete' : 'blocked'}</span>`
+      : eta(turns, 'never', 'none');
+    rows.push(ledgerRow('mask', 'culture', 'Culture', signed(c.culture_rate), 'culture',
+      (next === null ? '<div class="stock"></div>' : stock(c.culture - c.culture_from, c.culture_rate, span, 'var(--culture)'))
+      + due + `<span class="made"><b>${c.land}</b>/${c.area}</span>`, 'culture'));
+  }
 
   // Pollution, once the city gives off more than the land takes.
   const fumes = c.pollution;

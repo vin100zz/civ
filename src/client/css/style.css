@@ -18,6 +18,7 @@
   --shield: #A9B8D0;
   --trade: #E9C452;
   --sci: #6DB7F2;
+  --culture: #A07CF7;
   --glass: rgba(11, 14, 19, 0.88);
   --hair: rgba(255, 255, 255, 0.10);
   --mono: "Geist Mono", ui-monospace, Consolas, monospace;
@@ -59,6 +60,7 @@ svg.icon { flex: none; display: block; }
 .shield { color: var(--shield); }
 .trade { color: var(--trade); }
 .sci { color: var(--sci); }
+.culture { color: var(--culture); }
 .gold { color: var(--gold); }
 .spacer { flex: 1; }
 
@@ -1300,6 +1302,8 @@ button.land-cell { cursor: pointer; }
 .land.manage button.land-cell:not(:disabled):hover { box-shadow: inset 0 0 0 2px #FFFFFF; background: rgba(255, 255, 255, 0.12); }
 /* Worked by another city or held by an enemy: hatched and dark. */
 .land-cell.taken { background: repeating-linear-gradient(135deg, rgba(11, 14, 19, 0.82) 0 7px, rgba(11, 14, 19, 0.6) 7px 12px); cursor: default; }
+/* Outside the borders, nobody's yet: dimmed, a dashed violet edge for the culture to come. */
+.land-cell.outside { background: rgba(11, 14, 19, 0.62); box-shadow: none; outline: 1px dashed rgba(160, 124, 247, 0.55); outline-offset: -3px; cursor: default; }
 button.specialist { cursor: pointer; }
 button.specialist:hover .head { fill: var(--hover); }
 /* What the city may build: a name and the turns it takes, the rest in the tooltip. */

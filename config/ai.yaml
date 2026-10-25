@@ -78,6 +78,7 @@ production:
   wonder: 30
   caravan: 12
   courthouse: 30
+  culture: 30                     # culture buildings, twice as much while the city lacks land
   ferry: 65                       # the ship an expedition waits for
   sea_explore: 25
   navy: 40
@@ -127,6 +128,7 @@ research:
   building_happiness: 12
   building_economy: 12
   building_shields: 10
+  building_culture: 10
   wonder: 10
   government: 70
   terraform: 20                   # advances that allow new terrain work (bridges, railroad)

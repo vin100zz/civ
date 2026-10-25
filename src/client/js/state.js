@@ -138,6 +138,14 @@ const CITY_OFFSETS = [
   [-2, 1], [-2, -1],
 ];
 const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+// The tiles a city may hold beyond its area (culture): the corners of its 5 x 5 square, then
+// its third ring, in the order of worldmap.py (TERRITORY_OFFSETS).
+const FAR_OFFSETS = [
+  [2, -2], [2, 2], [-2, 2], [-2, -2],
+  [0, -3], [1, -3], [2, -3], [3, -2], [3, -1], [3, 0], [3, 1], [3, 2], [2, 3], [1, 3],
+  [0, 3], [-1, 3], [-2, 3], [-3, 2], [-3, 1], [-3, 0], [-3, -1], [-3, -2], [-2, -3], [-1, -3],
+];
+const TERRITORY_OFFSETS = [...CITY_OFFSETS, ...FAR_OFFSETS];
 
 // The terrain the ground is painted from. The server sends plain sea for the tiles a person
 // has not explored; painted as such, the edge of the known world would look like a coast.
@@ -184,12 +192,16 @@ function rebuildIndexes() {
   store.owner = territoryOf(state.cities);
 }
 
-// Land owned by each civilization: the tiles its cities can work. First city wins.
+// Land owned by each civilization: the tiles its cities claim, by default all those they can
+// work (with culture, bit i - 1 of city.claims stands for TERRITORY_OFFSETS[i], up to 44 bits:
+// read by division, JavaScript bitwise operators stop at 32). First city wins.
 export function territoryOf(cities) {
   const { map } = store;
   const owner = new Int16Array(map.width * map.height).fill(-1);
   for (const city of [...cities].sort((a, b) => a.id - b.id)) {
-    for (const [dx, dy] of CITY_OFFSETS) {
+    const claims = city.claims ?? 2 ** (CITY_OFFSETS.length - 1) - 1;
+    for (const [i, [dx, dy]] of TERRITORY_OFFSETS.entries()) {
+      if (i > 0 && Math.floor(claims / 2 ** (i - 1)) % 2 === 0) continue;
       const y = city.y + dy;
       if (y < 0 || y >= map.height) continue;
       const index = tileIndex(city.x + dx, y);

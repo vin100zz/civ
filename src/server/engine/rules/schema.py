@@ -29,7 +29,7 @@ EFFECT_TYPES = (
     "allow_size_above", "acts_as_building", "free_government", "free_techs",
     "shared_knowledge", "military_unhappiness", "peace_keeper", "unit_moves",
     "no_population_pollution", "pollution_percent", "meltdown_risk", "nuclear_shield",
-    "reveal_map", "spaceship_part",
+    "reveal_map", "spaceship_part", "culture",
 )
 SPACESHIP_PARTS = ("structural", "component", "module")
 FREE_UNITS = ("none", "city_size")
@@ -375,6 +375,7 @@ class SaleWeights:
     growth_lead: int                # citizens short of that size from which it starts to count
     veterans: float                 # barracks while the city builds a military unit
     pollution: float                # per point of pollution risk avoided, in percent
+    culture: float                  # per point of culture a turn
 
 
 @dataclass(frozen=True)
@@ -394,6 +395,14 @@ class CitySettings:
     no_palace_distance: int
     worker_weights: WorkerWeights
     sale_weights: SaleWeights
+
+
+@dataclass(frozen=True)
+class CultureSettings:
+    enabled: bool                   # borders grow with the culture of each city
+    per_city: int                   # culture of every city each turn, before its buildings
+    per_wonder: int                 # culture of each wonder for its city each turn
+    tile_cost: int                  # the n-th tile won needs n x this more
 
 
 @dataclass(frozen=True)
@@ -530,6 +539,7 @@ class ScoreSettings:
     future_tech: int
     polluted_tile: int
     spaceship_arrival: int
+    culture_per_point: int
 
 
 @dataclass(frozen=True)
@@ -546,6 +556,7 @@ class GameSettings:
     enabled_unit_domains: tuple[str, ...]
     difficulty: DifficultySettings
     city: CitySettings
+    culture: CultureSettings
     production: ProductionSettings
     research: ResearchSettings
     movement: MovementSettings

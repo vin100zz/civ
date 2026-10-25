@@ -1,0 +1,10 @@
+# A set of rules of its own (see config/rulesets/civ1/ruleset.yaml for how it works).
+# Golden Ages (config/rulesets/golden_ages/, whose files these are a copy of), with culture:
+# each city makes culture that pushes back its borders, as far as a third ring around it, and
+# its citizens only work the territory of their civilization (game.yaml, culture). Culture
+# comes from the Temple, the Theatre (Drama), the Museum (Humanism), every wonder, the
+# Parthenon and the Louvre. A change to Golden Ages is to be made here too.
+# Golden Ages design notes and odds: https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu
+
+name: Renaissance
+description: Golden Ages with culture. Theatres, Museums and wonders push back the borders of each city, whose citizens only work their own territory.

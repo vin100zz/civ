@@ -16,14 +16,14 @@ from .model.game import Game
 from .model.worldmap import Tile, WorldMap
 from .rules.schema import Effect, Rules, Yields
 from .systems import budget, city as city_rules, combat, diplomacy, government, movement
-from .systems import cities, production, research, spaceship, trade
+from .systems import cities, culture, production, research, spaceship, trade
 
 # Events every civilization hears of, wherever they happen.
 WORLD_NEWS = ("wonder", "civ_destroyed", "spaceship_launched", "spaceship_lost", "nuclear",
               "global_warming", "game_over")
 # The affairs of a city only its owner hears of, even when the city is in sight of others.
 CITY_AFFAIRS = ("disband", "famine", "sold", "disorder", "order", "celebration",
-                "celebration_over")
+                "celebration_over", "borders")
 
 
 class PlayerView:
@@ -164,6 +164,16 @@ class PlayerView:
     def building_to_sell(self) -> Optional[tuple[City, str]]:
         """The building the treasury would sell if it could not pay the upkeep now."""
         return budget.building_to_sell(self._game, self.player)
+
+    def culture_per_turn(self, city: City) -> int:
+        return culture.culture_per_turn(self._game, city)
+
+    def lacks_land(self, city: City) -> bool:
+        """With culture, the city will soon have more citizens than tiles of its territory
+        to work, and its borders can still grow over tiles it could work."""
+        if not self.rules.game.culture.enabled or not culture.free_tiles(self._game, city):
+            return False
+        return len(city_rules.workable_tiles(self._game, city)) < city.size + 2
 
     def workable_offsets(self, city: City) -> set[tuple[int, int]]:
         """Offsets of the tiles around the city its citizens may work."""

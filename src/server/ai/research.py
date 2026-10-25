@@ -84,6 +84,8 @@ def choose(view: PlayerView) -> Optional[ResearchChoice]:
                     value += get("building_economy") * civil
                 elif effect.type == "content":
                     value += get("building_happiness")
+                elif effect.type == "culture" and rules.game.culture.enabled:
+                    value += get("building_culture") * civil
         for government in rules.governments.values():
             if government.requires == tech_id:
                 value += get("government") * (1 + rules.ai.government_preference.get(government.id, 0) / 50)

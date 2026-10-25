@@ -11,7 +11,10 @@ The cities are noted as changes, a few entries per turn for the whole world:
     ["found", turn, city id, owner, x, y, name, size]
     ["owner", turn, city id, owner]
     ["size", turn, city id, size]
+    ["claims", turn, city id, claims]     (the tiles of its area it holds, worldmap.py)
     ["gone", turn, city id]
+
+A city whose claims were never noted holds its whole area (games without culture).
 
 `turn` is that of the History row they belong to: the world as it stands when that turn
 begins. The events keep their own turn, the one they happened in.
@@ -21,6 +24,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Optional
 
 from ..engine.model.game import Game
+from ..engine.model.worldmap import ALL_CLAIMS
 
 # The events the replay tells of, in its chronicle and on the map. Combats are kept apart,
 # as battles: where, who won, who lost.
@@ -36,7 +40,8 @@ class Replay:
         self.cities: list[list[Any]] = []
         self.events: list[dict[str, Any]] = []
         self.battles: list[list[int]] = []      # [turn, x, y, winner, loser]
-        self._noted: dict[int, tuple[int, int]] = {}    # city id -> (owner, size) last noted
+        # city id -> (owner, size, claims) last noted
+        self._noted: dict[int, tuple[int, int, int]] = {}
 
     def note_cities(self, game: Game) -> None:
         """Notes what changed in the cities since the last turn, as `game.turn` begins."""
@@ -46,12 +51,14 @@ class Replay:
             if noted is None:
                 self.cities.append(["found", turn, city.id, city.owner, city.x, city.y,
                                     city.name, city.size])
-            else:
-                if noted[0] != city.owner:
-                    self.cities.append(["owner", turn, city.id, city.owner])
-                if noted[1] != city.size:
-                    self.cities.append(["size", turn, city.id, city.size])
-            self._noted[city.id] = (city.owner, city.size)
+                noted = (city.owner, city.size, ALL_CLAIMS)
+            if noted[0] != city.owner:
+                self.cities.append(["owner", turn, city.id, city.owner])
+            if noted[1] != city.size:
+                self.cities.append(["size", turn, city.id, city.size])
+            if noted[2] != city.claims:
+                self.cities.append(["claims", turn, city.id, city.claims])
+            self._noted[city.id] = (city.owner, city.size, city.claims)
         for city_id in [c for c in self._noted if c not in game.cities]:
             self.cities.append(["gone", turn, city_id])
             del self._noted[city_id]
@@ -82,11 +89,14 @@ class Replay:
             for change in replay.cities:
                 kind, city_id = change[0], change[2]
                 if kind == "found":
-                    replay._noted[city_id] = (change[3], change[7])
+                    replay._noted[city_id] = (change[3], change[7], ALL_CLAIMS)
                 elif kind == "owner":
-                    replay._noted[city_id] = (change[3], replay._noted[city_id][1])
+                    replay._noted[city_id] = (change[3], *replay._noted[city_id][1:])
                 elif kind == "size":
-                    replay._noted[city_id] = (replay._noted[city_id][0], change[3])
+                    owner, _, claims = replay._noted[city_id]
+                    replay._noted[city_id] = (owner, change[3], claims)
+                elif kind == "claims":
+                    replay._noted[city_id] = (*replay._noted[city_id][:2], change[3])
                 else:
                     del replay._noted[city_id]
             return replay
@@ -94,7 +104,9 @@ class Replay:
         for city in sorted(game.cities.values(), key=lambda c: (c.founded_turn, c.id)):
             replay.cities.append(["found", city.founded_turn + 1, city.id, city.owner, city.x,
                                   city.y, city.name, city.size])
-            replay._noted[city.id] = (city.owner, city.size)
+            if city.claims != ALL_CLAIMS:
+                replay.cities.append(["claims", city.founded_turn + 1, city.id, city.claims])
+            replay._noted[city.id] = (city.owner, city.size, city.claims)
         replay.note_events(log)
         return replay
 

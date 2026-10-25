@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 
 export const GROUPS = {
   Cities: ['city_founded', 'city_captured', 'city_destroyed', 'famine', 'disorder', 'order',
-           'celebration', 'celebration_over'],
+           'celebration', 'celebration_over', 'borders'],
   War: ['combat', 'war', 'peace', 'contact', 'barbarians', 'civ_destroyed', 'disband',
         'unit_lost', 'pillage', 'nuclear'],
   Science: ['tech', 'wonder', 'government'],
