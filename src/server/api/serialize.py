@@ -16,7 +16,8 @@ from ..engine.model.game import Game
 from ..engine.model.worldmap import Tile
 from ..engine.rules.schema import LAND_STEPS, MapShape, Rules
 from ..engine.systems import city as city_rules
-from ..engine.systems import calendar, pollution, production, research, spaceship
+from ..engine.systems import calendar, culture, pollution, production, research, spaceship
+from ..engine.systems.territory import owner_of
 from ..engine.view import PlayerView
 from ..human import orders, report
 from ..human.controller import HumanController
@@ -101,6 +102,7 @@ def rules_payload(rules: Rules) -> dict[str, Any]:
                              "historical_starts": rules.game.map.historical_starts,
                              **{name: getattr(rules.game.map, name) for name in MAP_LEVELS}}},
         "land_steps": list(LAND_STEPS),
+        "culture": rules.game.culture.enabled,
         "map_shapes": [map_shape_payload(shape_id, shape)
                        for shape_id, shape in rules.game.map.shapes.items()],
         "spaceship": {"min_parts": dict(rules.game.spaceship.min_parts),
@@ -358,6 +360,7 @@ def city_payload(game: Game, city: City) -> dict[str, Any]:
         "capital": fx.is_capital(game, city),
         "walls": has_walls(game, city),
         "wonders": sum(1 for b in city.buildings if game.rules.buildings[b].wonder),
+        "claims": city.claims,
     }
 
 
@@ -399,7 +402,26 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
         "completed": production.item_name(game, done) if done is not None else None,
         "governed": controller.governed(city.id),
         "queue": queue_payload(game, city, stats.shield_surplus),
+        **culture_payload(game, city),
     }
+
+
+def culture_payload(game: Game, city: City) -> dict[str, Any]:
+    """The culture of a city and the borders it wins: what it has made, what it makes each
+    turn, the culture its last tile needed and its next one needs (None once no tile is left
+    to claim), and how many tiles of its area are in its civilization's territory (`land`,
+    out of `area`): its own, those of its other cities, those it may still win."""
+    if not game.rules.game.culture.enabled:
+        return {}
+    next_cost = culture.next_tile_cost(game, city)
+    if next_cost is not None and not culture.free_tiles(game, city):
+        next_cost = None
+    area = game.map.city_area(city.x, city.y)
+    claimed = culture.outer_claims(city)
+    return {"culture": city.culture, "culture_rate": culture.culture_per_turn(game, city),
+            "culture_from": culture.culture_for(game, claimed), "culture_next": next_cost,
+            "land": sum(1 for _, tile in area if owner_of(game, tile) == city.owner),
+            "area": len(area)}
 
 
 def queue_payload(game: Game, city: City, surplus: int) -> list[dict[str, Any]]:
@@ -422,7 +444,7 @@ def remembered_city_payload(memory: CityMemory) -> dict[str, Any]:
         "id": memory.city_id, "name": memory.name, "owner": memory.owner,
         "x": memory.x, "y": memory.y, "size": memory.size, "production": None,
         "disorder": False, "celebrating": False, "capital": False, "walls": memory.has_walls,
-        "wonders": 0, "seen": memory.seen_turn, "foreign": True,
+        "wonders": 0, "seen": memory.seen_turn, "foreign": True, "claims": memory.claims,
     }
 
 
@@ -430,12 +452,17 @@ def city_detail(game: Game, city: City, decision=None,
                 controller: Optional[HumanController] = None) -> dict[str, Any]:
     stats = city_rules.compute_city(game, city)
     effects = fx.city_effects(game, city)
+    borders = game.rules.game.culture.enabled
     tiles = []
     for (dx, dy), tile in [((0, 0), game.tile_of(city))] + game.map.city_area(city.x, city.y):
         y = city_rules.tile_yields(game, city, tile, effects)
-        tiles.append({"dx": dx, "dy": dy, "x": tile.x, "y": tile.y,
-                      "yields": [y.food, y.shields, y.trade],
-                      "worked": (dx, dy) == (0, 0) or (dx, dy) in city.worked})
+        entry = {"dx": dx, "dy": dy, "x": tile.x, "y": tile.y,
+                 "yields": [y.food, y.shields, y.trade],
+                 "worked": (dx, dy) == (0, 0) or (dx, dy) in city.worked}
+        if borders:
+            # Whose territory the tile is in: the city's citizens only work their own.
+            entry["owner"] = owner_of(game, tile)
+        tiles.append(entry)
     item = city.production
     player = game.players[city.owner]
     here = game.units_at(game.tile_of(city))
@@ -495,6 +522,7 @@ def city_detail(game: Game, city: City, decision=None,
                    if tile.city_id in game.cities},
         "trade_routes": [game.cities[c].name for c in city.trade_routes if c in game.cities],
         "founded_turn": city.founded_turn,
+        **culture_payload(game, city),
     }
     if decision is not None:
         detail["decision"] = {

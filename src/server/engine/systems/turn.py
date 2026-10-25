@@ -10,7 +10,7 @@ from typing import Callable, Optional, Protocol
 from ..model.entities import Player
 from ..model.game import Game
 from . import barbarians, calendar, cities, diplomacy, government, movement, pollution
-from . import research, spaceship, visibility
+from . import culture, research, spaceship, visibility
 
 
 class Controller(Protocol):
@@ -62,7 +62,7 @@ def advance_calendar(game: Game) -> None:
 
 
 def update_scores(game: Game) -> None:
-    """Citizens, wonders, advances and pollution, weighted by game.yaml (score)."""
+    """Citizens, wonders, advances, pollution and culture, weighted by game.yaml (score)."""
     weights = game.rules.game.score
     for player in game.players:
         if player.is_barbarian:
@@ -79,6 +79,8 @@ def update_scores(game: Game) -> None:
             if city_id in game.cities and game.cities[city_id].owner == player.id)
         score += weights.advance * len(player.techs) + weights.future_tech * player.future_techs
         score += weights.polluted_tile * len(polluted)
+        if weights.culture_per_point > 0:
+            score += culture.civilization_culture(game, player.id) // weights.culture_per_point
         ship = player.spaceship
         if ship.arrival_turn is not None and ship.arrival_turn <= game.turn:
             score += weights.spaceship_arrival

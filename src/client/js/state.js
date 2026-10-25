@@ -184,12 +184,15 @@ function rebuildIndexes() {
   store.owner = territoryOf(state.cities);
 }
 
-// Land owned by each civilization: the tiles its cities can work. First city wins.
+// Land owned by each civilization: the tiles its cities claim, by default all those they can
+// work (with culture, bit i - 1 of city.claims stands for CITY_OFFSETS[i]). First city wins.
 export function territoryOf(cities) {
   const { map } = store;
   const owner = new Int16Array(map.width * map.height).fill(-1);
   for (const city of [...cities].sort((a, b) => a.id - b.id)) {
-    for (const [dx, dy] of CITY_OFFSETS) {
+    const claims = city.claims ?? -1;
+    for (const [i, [dx, dy]] of CITY_OFFSETS.entries()) {
+      if (i > 0 && !(claims & (1 << (i - 1)))) continue;
       const y = city.y + dy;
       if (y < 0 || y >= map.height) continue;
       const index = tileIndex(city.x + dx, y);

@@ -15,8 +15,11 @@ const TABS = [
   { id: 'gold', label: 'Gold', icon: 'coin', color: 'var(--gold)' },
   { id: 'science', label: 'Science', icon: 'flask', color: 'var(--sci)' },
   { id: 'happiness', label: 'Happiness', icon: 'happy', color: 'var(--good)' },
+  { id: 'culture', label: 'Culture', icon: 'mask', color: 'var(--culture)', culture: true },
   { id: 'military', label: 'Military', icon: 'sword', color: '#D3D9E2' },
 ];
+// The tabs of the rules on screen: Culture only with culture rules (Golden Ages).
+const tabsOf = (rules) => TABS.filter((t) => !t.culture || rules.culture);
 
 // The tab each kind of effect serves (a function when it depends on the effect). A building
 // or a wonder goes to the tab of its first effect that serves one; a wonder that serves none
@@ -28,6 +31,7 @@ const SERVES = {
   corruption_percent: 'trade', tile_trade_bonus: 'trade',
   shared_knowledge: 'science', free_techs: 'science',
   content: 'happiness', happy: 'happiness', no_unhappy: 'happiness', military_unhappiness: 'happiness',
+  culture: 'culture',
   veteran_units: 'military', defense_multiplier: 'military', nuclear_shield: 'military', unit_moves: 'military',
   acts_as_building: (effect) => tabOf(store.buildingDefs[effect.building]),
 };
@@ -87,6 +91,9 @@ const WIDGETS = {
     figs: [['upkeep', 32, 'UPK', 'Building upkeep'], ['net', 32, 'NET', 'Net gold']] },
   science: { value: 'Science per turn', figs: [['share', 36, '%', 'Share of research']] },
   happiness: { label: ['citizens', 'Citizens'], figs: [['mood', 20, icon('unhappy', 14), 'Unhappiness']] },
+  culture: { value: 'Culture per turn',
+    figs: [['next', 36, icon('hourglass', 14), 'Turns before the next tile of the borders'],
+      ['borders', 44, icon('border', 14), 'Tiles of the city area in your territory']] },
   military: { label: ['units', 'In the city', 'Units in the city'], figs: [['away', 34, 'AWAY', 'Units away']] },
 };
 
@@ -268,6 +275,38 @@ function happinessWidget(city) {
   return `${people}<span class="mood">${mood}</span>`;
 }
 
+// The culture made each turn, the way to the next tile of the borders, the tiles of the city
+// area in the territory. With no tile left to win, the area is all the empire's, or the rest
+// belongs to a neighbour.
+function cultureWidget(city) {
+  const next = city.culture_next;
+  const full = city.land >= city.area;
+  let track = '';
+  let when;
+  if (next === null) {
+    if (full) track = '<span style="width:100%;background:var(--culture);opacity:0.45"></span>';
+    when = full ? num('all', 'culture', true) : `<span title="The rest of the area is foreign territory">${num('—', 'faint', true)}</span>`;
+  } else {
+    const span = next - city.culture_from;
+    const share = (part) => `${Math.max(0, Math.min(100, (100 * part) / span))}%`;
+    const have = city.culture - city.culture_from;
+    track = `<span style="width:${share(have)};background:var(--culture)"></span>`;
+    if (city.culture_rate > 0) {
+      track += `<span class="next" style="width:${share(Math.min(city.culture_rate, span - have))};background:var(--culture)"></span>`;
+    }
+    const turns = turnsFor(next - city.culture, city.culture_rate);
+    when = turns === null ? num('∞', 'warn', true) : num(Math.max(1, turns), turns <= 1 ? 'good' : 'soft', true);
+  }
+  return value(city.culture_rate, 'culture', true) + `<span class="track">${track}</span>` + fig(36, when)
+    + fig(44, num(`${city.land}/${city.area}`, full ? 'culture' : 'soft', true));
+}
+
+// Turns before the next tile, 1000 when no tile is coming: the order of a sort.
+function cultureRank(city) {
+  if (city.culture_next === null) return 1000;
+  return turnsFor(city.culture_next - city.culture, city.culture_rate) ?? 999;
+}
+
 function militaryWidget(city, color) {
   const cards = unitsIn(city).map((unit) => {
     const definition = store.unitDefs[unit[U.TYPE]];
@@ -295,7 +334,7 @@ function sortValue(key, city) {
   switch (key) {
     case 'value':
       return { food: city.food_surplus, production: city.surplus, trade: city.trade, gold: city.tax,
-        science: city.science }[tab];
+        science: city.science, culture: city.culture_rate }[tab];
     case 'growth': return growthRank(city);
     case 'made': return city.shields_made;
     case 'pollution': return city.pollution_risk;
@@ -304,6 +343,8 @@ function sortValue(key, city) {
     case 'net': return city.tax - city.building_upkeep;
     case 'share': return city.science;
     case 'citizens': return citizens(city);
+    case 'next': return cultureRank(city);
+    case 'borders': return city.land;
     case 'mood': return (city.unhappy > city.happy ? 2 : city.growth_disorder ? 1 : 0) + city.unhappy / 100;
     case 'units': return unitsIn(city).length;
     case 'away': return city.units_away;
@@ -343,6 +384,8 @@ export function renderCities(container) {
   }
   const me = store.state.me;
   const color = player(id).color;
+  const tabs = tabsOf(store.rules);
+  if (!tabs.some((t) => t.id === tab)) tab = 'food';
   const spec = TABS.find((t) => t.id === tab);
   const widget = WIDGETS[tab];
   const cities = store.state.cities.filter((city) => city.owner === id).sort((a, b) => a.id - b.id);
@@ -372,6 +415,7 @@ export function renderCities(container) {
     gold: (city) => goldWidget(city, scale),
     science: (city) => scienceWidget(city, best, total),
     happiness: happinessWidget,
+    culture: cultureWidget,
     military: (city) => militaryWidget(city, color),
   }[tab];
 
@@ -394,14 +438,14 @@ export function renderCities(container) {
       ${cells.join('')}<span class="widget">${draw(city)}</span></button>`;
   });
 
-  const tabs = TABS.map((t) => `<button data-tab-id="${t.id}" aria-pressed="${t.id === tab}" style="--tab:${t.color}">
+  const tabButtons = tabs.map((t) => `<button data-tab-id="${t.id}" aria-pressed="${t.id === tab}" style="--tab:${t.color}">
     ${icon(t.icon, 16, 1.9)}<span>${t.label}</span></button>`).join('');
   const scroll = container.scrollTop;
   container.style.setProperty('--tab', spec.color);
   container.innerHTML = `
     <div class="panel-head"><div class="titles"><h1>Cities</h1></div></div>
     <div class="top">
-      <div class="tabs" role="group" aria-label="What to show">${tabs}</div>
+      <div class="tabs" role="group" aria-label="What to show">${tabButtons}</div>
       <div class="cols">
         ${title('founding', `Cities<span>${cities.length}</span>`, '', 'city-label', tips)}
         ${heads.join('')}

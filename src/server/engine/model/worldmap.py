@@ -20,6 +20,13 @@ CITY_RING_OUTER: tuple[tuple[int, int], ...] = (
 )
 CITY_OFFSETS: tuple[tuple[int, int], ...] = CITY_RING_INNER + CITY_RING_OUTER
 
+# The tiles of its area a city claims for its civilization's territory, as a mask: the bit
+# 1 << i stands for CITY_OFFSETS[i]. Without culture a city claims its whole area; with it
+# (Golden Ages), its inner ring at first, then the outer ring one tile at a time.
+CLAIM_BITS: dict[tuple[int, int], int] = {offset: 1 << i for i, offset in enumerate(CITY_OFFSETS)}
+ALL_CLAIMS = (1 << len(CITY_OFFSETS)) - 1
+INNER_CLAIMS = (1 << len(CITY_RING_INNER)) - 1
+
 
 class Tile:
     __slots__ = ("x", "y", "index", "terrain", "special", "pattern", "hut", "road", "railroad",

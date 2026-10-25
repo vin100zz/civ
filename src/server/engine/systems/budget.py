@@ -13,7 +13,7 @@ from typing import Optional
 
 from ..model.entities import City, Player
 from ..model.game import Game
-from . import city as city_rules, pollution
+from . import city as city_rules, culture, pollution
 
 
 def building_worth(game: Game, city: City, building_id: str) -> float:
@@ -35,6 +35,8 @@ def building_worth(game: Game, city: City, building_id: str) -> float:
         worth += weights.disorder
     worth += weights.pollution * (pollution.pollution_risk(game, player, without.pollution)
                                   - pollution.pollution_risk(game, player, with_it.pollution))
+    worth += weights.culture * (culture.culture_per_turn(game, city) - culture.culture_per_turn(
+        game, dataclasses.replace(city, buildings=city.buildings - {building_id})))
 
     for effect in rules.buildings[building_id].effects:
         if effect.requires_tech is not None and effect.requires_tech not in player.techs:

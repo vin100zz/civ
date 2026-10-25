@@ -460,6 +460,14 @@ class Governor:
                 if self._nuclear_threat() and city.size >= 8:
                     consider(self.w("sdi") * self.scale["defense"] * (1.0 + 0.05 * city.size),
                              "nuclear weapons exist")
+            elif effect.type == "culture" and self.rules.game.culture.enabled:
+                # Culture wins the city its borders: worth most while it lacks land to work.
+                made = self.view.culture_per_turn(city)
+                gain = effect.amount + (made + effect.amount) * effect.percent / 100
+                urgency = 2.0 if self.view.lacks_land(city) else 0.5
+                if gain > 0:
+                    consider(self.w("culture") * scale * gain * urgency * 10 / cost,
+                             f"culture: +{gain:.0f}/turn")
             elif effect.type == "veteran_units":
                 # One arsenal is enough: the city that produces the most.
                 arsenal = self.plan.wonder_city == city.id
@@ -575,7 +583,7 @@ class Governor:
         """Nothing is needed right now. In order: a cheap civil building the treasury can
         maintain, a caravan (no upkeep, useful for wonders and trade), a useful project
         however long it takes, a unit for the standing army if the city can support it."""
-        civil = ("content", "yield_bonus", "food_box_keep", "corruption_percent")
+        civil = ("content", "yield_bonus", "food_box_keep", "corruption_percent", "culture")
         affordable = [b for b in buildings
                       if not b.wonder and b.upkeep <= min(1, self.upkeep_room)
                       and any(e.type in civil for e in b.effects)]

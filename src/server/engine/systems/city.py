@@ -13,6 +13,7 @@ from ..model.entities import SPECIALISTS, City, CityStats, Unit
 from ..model.game import Game
 from ..model.worldmap import CITY_OFFSETS, Tile
 from ..rules.schema import Effect, Yields
+from .territory import owner_of
 
 
 # ── Tile yields ───────────────────────────────────────────────────────────────
@@ -76,12 +77,16 @@ def tile_yields(game: Game, city: City, tile: Tile, effects: Optional[list[Effec
 
 
 def workable_tiles(game: Game, city: City) -> list[tuple[tuple[int, int], Tile]]:
-    """Tiles of the city area this city may work: free of other cities' workers and of enemies."""
+    """Tiles of the city area this city may work: free of other cities' workers and of enemies,
+    and, with culture, in the territory of its civilization."""
+    borders = game.rules.game.culture.enabled
     result = []
     for offset, tile in game.map.city_area(city.x, city.y):
         if tile.city_id is not None:
             continue
         if tile.worked_by is not None and tile.worked_by != city.id:
+            continue
+        if borders and owner_of(game, tile) != city.owner:
             continue
         if tile.unit_ids:
             occupant = game.units[tile.unit_ids[0]].owner

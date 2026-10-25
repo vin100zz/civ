@@ -59,7 +59,8 @@ config/                 données de jeu (YAML)
                         buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
     golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
                         sans obsolescence, des gouvernements sans Sénat (governments.yaml),
-                        le pillage (game.yaml)
+                        le pillage et la culture (game.yaml), Drama et Humanism, Théâtre,
+                        Musée, Parthénon et Louvre
                         (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
 resources/              sprites, servis tels quels
 saves/                  parties sauvegardées (JSON, hors dépôt)
@@ -77,7 +78,9 @@ src/
       systems/          city, cities, budget (ce que vaut un bâtiment, lequel vendre),
                         production, research, movement (terre, mer, air, transport),
                         combat, visibility, diplomacy, government, trade, huts, barbarians,
-                        pollution, nuclear, spaceship, calendar, turn
+                        pollution, nuclear, spaceship, calendar, turn,
+                        territory (les cases que tient chaque ville), culture (Golden Ages :
+                        la culture d'une ville et les cases qu'elle gagne)
       effects.py        effets typés des bâtiments et merveilles
       actions.py        commandes acceptées par le moteur
       view.py           PlayerView : ce qu'un joueur sait
@@ -328,6 +331,7 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 | Trésor vide : le bâtiment vendu est celui dont l'empire a le moins besoin (ce qu'il rapporte à sa ville, moins son entretien), pas celui dont l'entretien tombe | L'original vend celui dont l'entretien fait passer le trésor sous zéro, quel qu'il soit : des Universités et des Cathédrales partaient avant des Casernes inutiles |
 | Le maire replace tous les citoyens quand la ville grandit ou rétrécit | Les retouches à la main du joueur valent jusque-là |
 | En paix : pas d'attaque ni d'entrée dans les villes de l'autre, mais pas d'expulsion du territoire | Simplicité |
+| Golden Ages : culture et frontières (Civ 3 et suivants). Une ville tient son anneau intérieur, sa culture lui gagne l'anneau extérieur case par case ; ses citoyens ne travaillent que le territoire de leur civilisation. Le territoire reste le rayon des villes (masque `City.claims`), la plus ancienne gagne un chevauchement ; pas de vol de cases, pas de frontières fermées | Une première version qui ne demande rien à l'IA pour se déplacer |
 | Zones de contrôle exercées seulement par les ennemis | Évite les blocages entre civs en paix |
 | Barbares : la moitié des raids débarque d'un navire, l'autre apparaît à terre, hors de vue | Les villes de l'intérieur ne sont pas à l'abri |
 | Transport explicite : une unité est à bord d'un navire précis | L'original déduit le chargement de la position ; l'explicite est plus lisible |

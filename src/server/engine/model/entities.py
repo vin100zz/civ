@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..rules.schema import CivDef
+from .worldmap import ALL_CLAIMS
 
 # Unit orders
 ORDER_NONE = "none"
@@ -106,6 +107,8 @@ class City:
     # What it builds next, in order, once its production is finished (the person's queue).
     queue: list[Item] = field(default_factory=list)
     from_queue: bool = False                # its production was the next item of its queue
+    culture: int = 0                        # culture made since it was founded (Golden Ages)
+    claims: int = ALL_CLAIMS                # tiles of its area in its territory (worldmap.py)
 
     @property
     def pos(self) -> tuple[int, int]:
@@ -127,6 +130,7 @@ class CityMemory:
     size: int
     seen_turn: int
     has_walls: bool = False
+    claims: int = ALL_CLAIMS
 
 
 @dataclass

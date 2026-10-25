@@ -4,33 +4,25 @@ Source: OpenCivOne CityWorker.cs (F0_1d12_0045_ProcessCityState) for the yearly 
 """
 from __future__ import annotations
 
-from typing import Mapping, Optional
+from typing import Optional
 
 from .. import effects as fx
-from ..model.entities import City, CityMemory, Player, Unit
+from ..model.entities import City, Player, Unit
 from ..model.game import Game
-from ..model.worldmap import CITY_OFFSETS, Tile, WorldMap
+from ..model.worldmap import ALL_CLAIMS, INNER_CLAIMS, Tile
 from . import city as city_rules
-from . import (budget, government, nuclear, pollution, production, research, spaceship,
-               visibility)
+from . import (budget, culture, government, nuclear, pollution, production, research,
+               spaceship, visibility)
+from .territory import owner_of, territory_owner  # noqa: F401  (rules and views use them)
 
 
 # ── Founding ──────────────────────────────────────────────────────────────────
-
-def territory_owner(world: WorldMap, tile: Tile,
-                    known_cities: Mapping[int, City | CityMemory]) -> Optional[int]:
-    """Match the map's territory overlay: city radius, oldest city id wins overlaps."""
-    claim = min((city_id for city_id, city in known_cities.items()
-                 if (world.dx(city.x, tile.x), tile.y - city.y) in ((0, 0), *CITY_OFFSETS)),
-                default=None)
-    return known_cities[claim].owner if claim is not None else None
-
 
 def can_found_city(game: Game, tile: Tile, player_id: int) -> bool:
     if not game.terrain(tile).is_land or tile.city_id is not None:
         return False
     if game.rules.game.city.forbid_foreign_territory:
-        owner = territory_owner(game.map, tile, game.cities)
+        owner = owner_of(game, tile)
         if owner is not None and owner != player_id:
             return False
     min_distance = game.rules.game.city.min_distance
@@ -56,7 +48,8 @@ def next_city_name(game: Game, player: Player) -> str:
 def found_city(game: Game, player: Player, tile: Tile, *, size: int = 1,
                quiet: bool = False) -> City:
     city = City(id=game.new_city_id(), name=next_city_name(game, player), owner=player.id,
-                x=tile.x, y=tile.y, size=size, founded_turn=game.turn, founder=player.id)
+                x=tile.x, y=tile.y, size=size, founded_turn=game.turn, founder=player.id,
+                claims=INNER_CLAIMS if game.rules.game.culture.enabled else ALL_CLAIMS)
     game.cities[city.id] = city
     tile.city_id = city.id
     tile.hut = False
@@ -167,6 +160,9 @@ def process_city(game: Game, city: City) -> None:
     elif was_celebrating and not city.celebrating and government_def.collects_taxes:
         game.emit("celebration_over", f"'We love the {title}' celebration cancelled in {city.name}.",
                   player=player.id, x=city.x, y=city.y, city=city.id)
+
+    if not city.disorder:
+        culture.add_culture(game, city)
 
     city.stats = city_rules.compute_city(game, city)
     city.base_trade = city.stats.base_trade

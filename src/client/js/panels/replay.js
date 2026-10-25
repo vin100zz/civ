@@ -98,6 +98,7 @@ function prepare() {
       if (kind === 'found') live.set(id, { id, owner: value, x, y, name, size });
       else if (kind === 'gone') live.delete(id);
       else if (city && kind === 'owner') city.owner = value;
+      else if (city && kind === 'claims') city.claims = value;
       else if (city) city.size = value;
     }
     cities.push([...live.values()].map((city) => ({ ...city })));

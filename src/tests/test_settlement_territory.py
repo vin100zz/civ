@@ -1,8 +1,12 @@
-"""Alternative rules prevent settling inside another civilization's map territory."""
+"""Alternative rules prevent settling inside another civilization's map territory.
+
+Golden Ages cities win their outer ring with culture: these tests give them their whole area,
+as a city whose borders have grown (see test_culture.py for the growth)."""
 import pytest
 
 from server.engine import actions
 from server.engine.model.entities import PEACE, WAR
+from server.engine.model.worldmap import ALL_CLAIMS
 from server.engine.systems import cities, visibility
 from server.engine.view import PlayerView
 from server.human.controller import HumanController
@@ -18,6 +22,7 @@ def test_foreign_territory_founding(rulesets, ruleset, relation, city_x, target)
     game = make_game(rulesets[ruleset], relation=relation)
     game.current_player = 1
     foreign = add_city(game, 2, city_x, 5)
+    foreign.claims = ALL_CLAIMS
     player = game.players[1]
     visibility.remember_city(game, player, foreign)
     unit = game.add_unit("settlers", player.id, *target)
@@ -59,6 +64,8 @@ def test_overlap_belongs_to_oldest_city(rulesets, first_owner):
     game = make_game(rulesets["golden_ages"])
     add_city(game, first_owner, 5, 5)
     add_city(game, 3 - first_owner, 9, 5)
+    for city in game.cities.values():
+        city.claims = ALL_CLAIMS
     player = game.players[1]
     for city in game.player_cities(2):
         visibility.remember_city(game, player, city)
@@ -71,7 +78,7 @@ def test_overlap_belongs_to_oldest_city(rulesets, first_owner):
 def test_unknown_territory_is_still_enforced_by_engine(rulesets):
     game = make_game(rulesets["golden_ages"])
     game.current_player = 1
-    add_city(game, 2, 5, 5)
+    add_city(game, 2, 5, 5).claims = ALL_CLAIMS
     unit = game.add_unit("settlers", 1, 7, 5)
     view = PlayerView(game, game.players[1])
     assert not view.known_foreign_cities()
