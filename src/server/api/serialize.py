@@ -13,7 +13,7 @@ from typing import Any, Optional
 from ..engine import effects as fx
 from ..engine.model.entities import WORK_ORDERS, City, CityMemory, Player, Unit
 from ..engine.model.game import Game
-from ..engine.model.worldmap import Tile
+from ..engine.model.worldmap import CLAIM_BITS, Tile
 from ..engine.rules.schema import LAND_STEPS, MapShape, Rules
 from ..engine.systems import city as city_rules
 from ..engine.systems import calendar, culture, pollution, production, research, spaceship
@@ -409,19 +409,24 @@ def own_city_payload(game: Game, city: City, controller: HumanController) -> dic
 def culture_payload(game: Game, city: City) -> dict[str, Any]:
     """The culture of a city and the borders it wins: what it has made, what it makes each
     turn, the culture its last tile needed and its next one needs (None once no tile is left
-    to claim), and how many tiles of its area are in its civilization's territory (`land`,
-    out of `area`): its own, those of its other cities, those it may still win."""
+    to claim), how many tiles of its area are in its civilization's territory (`land`, out of
+    `area`): its own, those of its other cities, those it may still win, and how many tiles
+    beyond its area it holds (`beyond`, out of `beyond_max`)."""
     if not game.rules.game.culture.enabled:
         return {}
     next_cost = culture.next_tile_cost(game, city)
-    if next_cost is not None and not culture.free_tiles(game, city):
+    if next_cost is not None and not (culture.free_tiles(game, city)
+                                      or culture.far_free_tiles(game, city)):
         next_cost = None
     area = game.map.city_area(city.x, city.y)
-    claimed = culture.outer_claims(city)
     return {"culture": city.culture, "culture_rate": culture.culture_per_turn(game, city),
-            "culture_from": culture.culture_for(game, claimed), "culture_next": next_cost,
+            "culture_from": culture.culture_for(game, culture.won_tiles(city)),
+            "culture_next": next_cost,
             "land": sum(1 for _, tile in area if owner_of(game, tile) == city.owner),
-            "area": len(area)}
+            "area": len(area),
+            "beyond": sum(1 for offset in culture.FAR_TILES
+                          if city.claims & CLAIM_BITS[offset]),
+            "beyond_max": len(culture.FAR_TILES)}
 
 
 def queue_payload(game: Game, city: City, surplus: int) -> list[dict[str, Any]]:

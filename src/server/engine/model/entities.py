@@ -108,7 +108,7 @@ class City:
     queue: list[Item] = field(default_factory=list)
     from_queue: bool = False                # its production was the next item of its queue
     culture: int = 0                        # culture made since it was founded (Golden Ages)
-    claims: int = ALL_CLAIMS                # tiles of its area in its territory (worldmap.py)
+    claims: int = ALL_CLAIMS                # tiles around it in its territory (worldmap.py)
 
     @property
     def pos(self) -> tuple[int, int]:

@@ -161,13 +161,15 @@ city:
 
 culture:
   # own (Golden Ages): a city claims the inner ring of its area at its founding, then the 12
-  # tiles of its outer ring one by one as its culture grows, the best free tile first. Its
-  # citizens only work tiles of its civilization's territory. Without culture a city claims
-  # its whole area at once.
+  # tiles of its outer ring one by one as its culture grows, the best free tile first; then,
+  # beyond the tiles it works, the 4 corners of its 5 x 5 square and a third ring of 20 tiles,
+  # the nearest first, each next to a tile it holds, never a tile a city of another
+  # civilization could work. Its citizens only work tiles of its civilization's territory.
+  # Without culture a city claims its whole area at once.
   enabled: false
   per_city: 1              # culture every city makes each turn (buildings add)
   per_wonder: 3            # culture each wonder gives its city each turn
-  tile_cost: 5             # the n-th tile of the outer ring needs n x this more culture
+  tile_cost: 5             # the n-th tile won needs n x this more culture (12: 390, 36: 3330)
   # A city in civil disorder makes no culture.
 
 production:

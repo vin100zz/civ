@@ -471,13 +471,15 @@ function ledger(c, tips) {
       + tipRows([
         ['Per turn', signed(c.culture_rate)],
         ['Territory', `${c.land} of the ${c.area} tiles around the city`],
-        ['Next tile', next === null ? (full ? 'None: all the area is yours' : 'None: the rest is foreign territory')
-          : `at ${next} culture`],
+        ['Beyond', `${c.beyond} of ${c.beyond_max} tiles`],
+        ['Next tile', next === null ? (c.beyond >= c.beyond_max ? 'None: the borders are complete'
+          : 'None: the rest is foreign territory or out of reach') : `at ${next} culture`],
       ])
       + '<div class="tip-foot">The culture of a city wins it the tiles of its outer ring one by one, the best free '
-      + 'tile first. Its citizens only work the territory of their civilization. Temples, Theatres, Museums and '
+      + 'tile first, then beyond: the corners of its square and a third ring, the nearest first. Its citizens only '
+      + 'work the territory of their civilization; nobody may found a city in it. Temples, Theatres, Museums and '
       + 'wonders add culture; a city in disorder makes none.</div>');
-    const due = next === null ? `<span class="eta none">${full ? 'complete' : 'blocked'}</span>`
+    const due = next === null ? `<span class="eta none">${c.beyond >= c.beyond_max ? 'complete' : 'blocked'}</span>`
       : eta(turns, 'never', 'none');
     rows.push(ledgerRow('mask', 'culture', 'Culture', signed(c.culture_rate), 'culture',
       (next === null ? '<div class="stock"></div>' : stock(c.culture - c.culture_from, c.culture_rate, span, 'var(--culture)'))

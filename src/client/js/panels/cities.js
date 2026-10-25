@@ -276,7 +276,7 @@ function happinessWidget(city) {
 }
 
 // The culture made each turn, the way to the next tile of the borders, the tiles of the city
-// area in the territory. With no tile left to win, the area is all the empire's, or the rest
+// area in the territory. With no tile left to win, the borders are complete, or the rest
 // belongs to a neighbour.
 function cultureWidget(city) {
   const next = city.culture_next;
@@ -285,7 +285,8 @@ function cultureWidget(city) {
   let when;
   if (next === null) {
     if (full) track = '<span style="width:100%;background:var(--culture);opacity:0.45"></span>';
-    when = full ? num('all', 'culture', true) : `<span title="The rest of the area is foreign territory">${num('—', 'faint', true)}</span>`;
+    when = city.beyond >= city.beyond_max ? num('all', 'culture', true)
+      : `<span title="The rest is foreign territory or out of reach">${num('—', 'faint', true)}</span>`;
   } else {
     const span = next - city.culture_from;
     const share = (part) => `${Math.max(0, Math.min(100, (100 * part) / span))}%`;
@@ -344,7 +345,7 @@ function sortValue(key, city) {
     case 'share': return city.science;
     case 'citizens': return citizens(city);
     case 'next': return cultureRank(city);
-    case 'borders': return city.land;
+    case 'borders': return city.land + city.beyond / 100;
     case 'mood': return (city.unhappy > city.happy ? 2 : city.growth_disorder ? 1 : 0) + city.unhappy / 100;
     case 'units': return unitsIn(city).length;
     case 'away': return city.units_away;

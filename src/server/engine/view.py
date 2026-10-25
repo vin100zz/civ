@@ -170,8 +170,8 @@ class PlayerView:
 
     def lacks_land(self, city: City) -> bool:
         """With culture, the city will soon have more citizens than tiles of its territory
-        to work, and its borders can still grow."""
-        if not self.rules.game.culture.enabled or culture.next_tile_cost(self._game, city) is None:
+        to work, and its borders can still grow over tiles it could work."""
+        if not self.rules.game.culture.enabled or not culture.free_tiles(self._game, city):
             return False
         return len(city_rules.workable_tiles(self._game, city)) < city.size + 2
 

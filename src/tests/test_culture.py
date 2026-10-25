@@ -3,8 +3,9 @@ import json
 
 from server.api.replay import Replay
 from server.engine import persistence
-from server.engine.model.worldmap import (ALL_CLAIMS, CITY_RING_INNER, CITY_RING_OUTER,
-                                          CLAIM_BITS, INNER_CLAIMS)
+from server.engine.model.worldmap import (ALL_CLAIMS, CITY_CORNERS, CITY_RING_INNER,
+                                          CITY_RING_OUTER, CITY_RING_THIRD, CLAIM_BITS,
+                                          INNER_CLAIMS)
 from server.engine.systems import city as city_rules
 from server.engine.systems import cities, culture, territory, turn
 
@@ -76,9 +77,56 @@ def test_borders_grow_tile_by_tile(rulesets):
     assert culture.outer_claims(city) == 1          # the second needs 15
     city.culture = 5 * 78 - 1
     culture.add_culture(game, city)
-    assert city.claims == ALL_CLAIMS
-    assert culture.next_tile_cost(game, city) is None
+    assert city.claims == ALL_CLAIMS                 # the outer ring first
+    assert culture.next_tile_cost(game, city) == 5 * 13 * 14 // 2
     assert any(e["type"] == "borders" for e in game.events)
+
+
+def test_beyond_its_area_the_corners_come_before_the_third_ring(rulesets):
+    game = golden(rulesets)
+    city = add_city(game, 1, 8, 6)
+    city.claims, city.culture = ALL_CLAIMS, 5 * 78
+    for _ in CITY_CORNERS:
+        city.culture = culture.next_tile_cost(game, city) - 1
+        culture.add_culture(game, city)
+    assert all(city.claims & CLAIM_BITS[offset] for offset in CITY_CORNERS)
+    assert not any(city.claims & CLAIM_BITS[offset] for offset in CITY_RING_THIRD)
+    city.culture = 5 * 666
+    culture.add_culture(game, city)
+    assert all(city.claims & CLAIM_BITS[offset] for offset in CITY_RING_THIRD)
+    assert culture.next_tile_cost(game, city) is None
+    assert territory.owner_of(game, game.map.tile(8, 3)) == 1
+    assert not territory.owner_of(game, game.map.tile(11, 9))      # a corner of the 7 x 7
+
+
+def test_tiles_beyond_the_area_touch_the_territory(rulesets):
+    game = golden(rulesets)
+    city = add_city(game, 1, 8, 6)
+    # Its outer ring held, but for the three tiles north of it.
+    city.claims = ALL_CLAIMS & ~sum(CLAIM_BITS[o] for o in ((0, -2), (1, -2), (-1, -2)))
+    reach = {offset for offset, _ in culture.far_free_tiles(game, city)}
+    assert (0, -3) not in reach and (3, 0) in reach and (2, -2) in reach
+
+
+def test_no_city_reaches_beyond_its_area_for_land_a_foreign_city_could_work(rulesets):
+    game = golden(rulesets, width=24)
+    mine = add_city(game, 1, 8, 6)
+    theirs = add_city(game, 2, 13, 6)      # its area reaches x = 11, the third ring of mine
+    mine.claims = ALL_CLAIMS
+    reach = {offset for offset, _ in culture.far_free_tiles(game, mine)}
+    assert (3, 0) not in reach and (-3, 0) in reach
+    mine.culture = 5 * 666
+    culture.add_culture(game, mine)
+    assert territory.owner_of(game, game.map.tile(11, 6)) is None
+    assert (-2, 0) in {offset for offset, _ in culture.free_tiles(game, theirs)}
+
+
+def test_nobody_founds_a_city_beyond_the_area_of_a_cultured_city(rulesets):
+    game = golden(rulesets, width=24)
+    city = add_city(game, 2, 8, 6)
+    city.claims = ALL_CLAIMS | sum(CLAIM_BITS[o] for o in CITY_CORNERS + CITY_RING_THIRD)
+    assert not cities.can_found_city(game, game.map.tile(11, 6), 1)
+    assert cities.can_found_city(game, game.map.tile(12, 6), 1)
 
 
 def test_the_best_free_tile_is_claimed_first(rulesets):
@@ -104,9 +152,9 @@ def test_foreign_territory_is_never_claimed(rulesets):
 
 def test_territory_owner_agrees_with_the_fast_lookup(rulesets):
     game = golden(rulesets)
-    add_city(game, 1, 5, 5).claims = ALL_CLAIMS
-    add_city(game, 2, 8, 6)
-    add_city(game, 1, 1, 8)
+    add_city(game, 1, 5, 5).claims = ALL_CLAIMS | CLAIM_BITS[(0, 3)] | CLAIM_BITS[(-3, -1)]
+    add_city(game, 2, 8, 6).claims |= CLAIM_BITS[(3, 2)] | CLAIM_BITS[(2, -2)]
+    add_city(game, 1, 1, 8).claims |= CLAIM_BITS[(-3, 0)]      # across the edge of the world
     for tile in game.map:
         assert territory.owner_of(game, tile) == cities.territory_owner(game.map, tile, game.cities)
 

@@ -402,7 +402,7 @@ class CultureSettings:
     enabled: bool                   # borders grow with the culture of each city
     per_city: int                   # culture of every city each turn, before its buildings
     per_wonder: int                 # culture of each wonder for its city each turn
-    tile_cost: int                  # the n-th tile of the outer ring needs n x this more
+    tile_cost: int                  # the n-th tile won needs n x this more
 
 
 @dataclass(frozen=True)

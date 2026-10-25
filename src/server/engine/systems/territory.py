@@ -1,8 +1,9 @@
 """Territory: the tiles each civilization holds around its cities.
 
-A city claims tiles of its area (`City.claims`, a mask over CITY_OFFSETS): all of them without
-culture, its inner ring and then the tiles its culture wins with it (systems/culture.py). A
-tile claimed by several cities belongs to the oldest of them (the smallest id).
+A city claims tiles around it (`City.claims`, a mask over TERRITORY_OFFSETS): its whole area
+without culture; with it, its inner ring and then the tiles its culture wins, as far as its
+third ring (systems/culture.py). A tile claimed by several cities belongs to the oldest of
+them (the smallest id).
 """
 from __future__ import annotations
 
@@ -10,13 +11,14 @@ from typing import Mapping, Optional
 
 from ..model.entities import City, CityMemory
 from ..model.game import Game
-from ..model.worldmap import CITY_OFFSETS, CLAIM_BITS, Tile, WorldMap
+from ..model.worldmap import CLAIM_BITS, TERRITORY_OFFSETS, Tile, WorldMap
 
-AROUND = ((0, 0), *CITY_OFFSETS)
+AROUND = ((0, 0), *TERRITORY_OFFSETS)
 
 
 def claims(city: City | CityMemory, offset: tuple[int, int]) -> bool:
-    """The tile at `offset` from the city is part of what it claims (its own tile always)."""
+    """The tile at `offset` from the city is part of what it claims (its own tile always).
+    `offset` is the shortest one, x wrapping around the world."""
     return offset == (0, 0) or bool(city.claims & CLAIM_BITS.get(offset, 0))
 
 
