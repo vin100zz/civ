@@ -58,6 +58,12 @@ class SetOrder:
 
 
 @dataclass(frozen=True)
+class Pillage:
+    """A military land unit destroys one improvement of its tile (rules with pillage only)."""
+    unit_id: int
+
+
+@dataclass(frozen=True)
 class Disband:
     unit_id: int
 
@@ -180,7 +186,7 @@ class LaunchSpaceship:
     """Sends the spaceship to Alpha Centauri with the parts built so far."""
 
 
-Action = Union[MoveUnit, Board, Disembark, FoundCity, JoinCity, SetOrder, Disband, Rehome,
+Action = Union[MoveUnit, Board, Disembark, FoundCity, JoinCity, SetOrder, Pillage, Disband, Rehome,
                HelpBuildWonder, EstablishTradeRoute, SetProduction, QueueProduction,
                UnqueueProduction, Buy, ArrangeWorkers, ToggleTile, ChangeSpecialist,
                SellBuilding, SetResearch, SetResearchGoal, SetRates, Revolution, DeclareWar,
@@ -284,6 +290,13 @@ def _set_order(game: Game, player, action: SetOrder) -> Result:
     if unit is None:
         return _refuse("no such unit")
     return OK if movement.set_order(game, unit, action.order) else _refuse("order refused")
+
+
+def _pillage(game: Game, player, action: Pillage) -> Result:
+    unit = _own_unit(game, player, action.unit_id)
+    if unit is None:
+        return _refuse("no such unit")
+    return OK if movement.pillage(game, unit) else _refuse("nothing to pillage here")
 
 
 def _disband(game: Game, player, action: Disband) -> Result:
@@ -451,7 +464,7 @@ def _launch(game: Game, player, action: LaunchSpaceship) -> Result:
 
 _HANDLERS = {
     MoveUnit: _move_unit, Board: _board, Disembark: _disembark, LaunchSpaceship: _launch,
-    FoundCity: _found_city, JoinCity: _join_city, SetOrder: _set_order,
+    FoundCity: _found_city, JoinCity: _join_city, SetOrder: _set_order, Pillage: _pillage,
     Disband: _disband, Rehome: _rehome, HelpBuildWonder: _help_wonder,
     EstablishTradeRoute: _trade_route, SetProduction: _set_production, Buy: _buy,
     QueueProduction: _queue_production, UnqueueProduction: _unqueue_production,

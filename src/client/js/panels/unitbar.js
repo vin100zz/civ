@@ -16,6 +16,7 @@ const LOOK = {
   found_city: ['Found city', 'flag'], join_city: ['Join the city', 'people'],
   road: ['Road', 'road'], railroad: ['Railroad', 'rail'], irrigate: ['Irrigate', 'drop'],
   mine: ['Mine', 'pick'], fortress: ['Fortress', 'fortress'], clean: ['Clean up', 'broom'],
+  pillage: ['Pillage', 'torch'],
   help_wonder: ['Help the wonder', 'temple'], trade_route: ['Trade route', 'route'],
   board: ['Board', 'anchor'], disembark: ['Go ashore', 'ashore'],
   goto: ['Go to', 'target'], fortify: ['Fortify', 'shield'], sentry: ['Sentry', 'eye'],
@@ -71,6 +72,7 @@ function orderButton(order, tips) {
   let sub = '';
   if (order.turns) sub = plural(order.turns, 'turn') + (order.becomes ? ` · becomes ${order.becomes}` : '');
   else if (order.city) sub = order.city;
+  else if (order.work) sub = `Destroys the ${order.work}`;
   else if (picking) sub = 'Pick a tile';
   const key = keyOf(order.id);
   const classes = ['unit-order'];

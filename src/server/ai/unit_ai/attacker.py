@@ -5,7 +5,7 @@ from ...engine.model.entities import Unit
 from .. import missions as M
 from ..missions import Mission
 from . import explorer
-from .common import (Context, alive, embark, fortify, go_home, go_to, sentry, step_to,
+from .common import (Context, alive, embark, fortify, go_home, go_to, pillage, sentry, step_to,
                      strike_adjacent)
 
 
@@ -74,7 +74,8 @@ def _siege(ctx: Context, unit: Unit, mission: Mission) -> None:
         here = view.tile_of(unit)
 
     if not view.can_enter(unit, target):
-        fortify(ctx, unit)
+        if not pillage(ctx, unit):
+            fortify(ctx, unit)
         return
     if not view.foreign_units_at(target):
         step_to(ctx, unit, target)          # undefended: walk in
@@ -88,5 +89,5 @@ def _siege(ctx: Context, unit: Unit, mission: Mission) -> None:
         minimum *= 0.5                       # in numbers, accept worse odds
     if odds is not None and odds.win_chance >= minimum:
         step_to(ctx, unit, target)
-    else:
+    elif not pillage(ctx, unit):            # waiting for better odds: starve the city meanwhile
         fortify(ctx, unit)

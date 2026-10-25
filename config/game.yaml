@@ -185,6 +185,7 @@ movement:
   fortress_tech: construction
   lost_at_sea_chance: 0.5      # a `coastal` ship (Trireme) ending its turn away from land
   pollution_clean_turns: 4
+  pillage: false               # a military land unit destroys one improvement of its tile
 
 combat:
   fortified_multiplier: 1.5

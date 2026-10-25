@@ -18,6 +18,7 @@ ORDERS: dict[str, tuple[type, tuple[tuple[str, str, type], ...]]] = {
     "found_city": (actions.FoundCity, (("unit", "unit_id", int),)),
     "join_city": (actions.JoinCity, (("unit", "unit_id", int),)),
     "order": (actions.SetOrder, (("unit", "unit_id", int), ("order", "order", str))),
+    "pillage": (actions.Pillage, (("unit", "unit_id", int),)),
     "disband": (actions.Disband, (("unit", "unit_id", int),)),
     "home": (actions.Rehome, (("unit", "unit_id", int),)),
     "help_wonder": (actions.HelpBuildWonder, (("unit", "unit_id", int),)),
