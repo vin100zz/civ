@@ -1,7 +1,6 @@
 # Wonders of the World of Golden Ages: one of each in the whole world. None of them becomes
 # obsolete, and none gives a one-off gift but Marco Polo's map: every effect lasts.
 # Many act as a building in each of your cities: they are worth that building's cost and upkeep.
-# Each also gives its city culture.per_wonder culture per turn (game.yaml).
 #
 # Effects use the same format as buildings.yaml, plus:
 #   happy                - makes `amount` content citizens happy
@@ -77,14 +76,6 @@
     - {type: shared_knowledge, min_civs: 2, scope: player}
     - {type: acts_as_building, building: library}
 
-- id: parthenon
-  name: Parthenon
-  cost: 250
-  requires: drama
-  description: +2 culture in each of your cities.
-  effects:
-    - {type: culture, amount: 2, scope: player}
-
 - id: great_wall
   name: Great Wall
   cost: 300
@@ -149,14 +140,6 @@
   description: Two more content citizens in each of your cities.
   effects:
     - {type: content, amount: 2, scope: player}
-
-- id: louvre
-  name: Louvre
-  cost: 400
-  requires: humanism
-  description: Acts as a Museum in each of your cities.
-  effects:
-    - {type: acts_as_building, building: museum, scope: player}
 
 - id: magellans_expedition
   name: Magellan's Expedition

@@ -107,7 +107,7 @@ class City:
     # What it builds next, in order, once its production is finished (the person's queue).
     queue: list[Item] = field(default_factory=list)
     from_queue: bool = False                # its production was the next item of its queue
-    culture: int = 0                        # culture made since it was founded (Golden Ages)
+    culture: int = 0                        # culture made since it was founded (Renaissance)
     claims: int = ALL_CLAIMS                # tiles around it in its territory (worldmap.py)
 
     @property

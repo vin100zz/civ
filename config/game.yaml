@@ -157,10 +157,10 @@ city:
     growth_lead: 3           # ...counted in part from this many citizens short of that size
     veterans: 2.0            # barracks while the city builds a military unit
     pollution: 0.1           # per point of pollution risk avoided (percent per turn)
-    culture: 0.5             # per point of culture a turn (Golden Ages)
+    culture: 0.5             # per point of culture a turn (Renaissance)
 
 culture:
-  # own (Golden Ages): a city claims the inner ring of its area at its founding, then the 12
+  # own (Renaissance): a city claims the inner ring of its area at its founding, then the 12
   # tiles of its outer ring one by one as its culture grows, the best free tile first; then,
   # beyond the tiles it works, the 4 corners of its 5 x 5 square and a third ring of 20 tiles,
   # the nearest first, each next to a tile it holds, never a tile a city of another

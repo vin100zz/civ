@@ -2,9 +2,8 @@
 # Civilization I, rebalanced: a new unit at every era for each line (defense, fast units, siege,
 # transports, warships), cannons that ignore walls, one Power Plant, a Sewer System and a
 # Harbour, wonders that never become obsolete, no senate to keep a Republic or a Democracy at
-# peace, pillage, culture that pushes back the borders of each city (Theatre, Museum, Drama,
-# Humanism, the Parthenon and the Louvre). Design notes and odds:
+# peace, pillage. Design notes and odds:
 # https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu
 
 name: Golden Ages
-description: A new unit at every era, cannons that break walls, wonders that never grow old, no senate to stop a war, pillage, culture that pushes back borders, and no founding cities in foreign territory.
+description: A new unit at every era, cannons that break walls, wonders that never grow old, no senate to stop a war, pillage, and no founding cities in foreign territory.

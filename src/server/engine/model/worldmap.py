@@ -20,7 +20,7 @@ CITY_RING_OUTER: tuple[tuple[int, int], ...] = (
 )
 CITY_OFFSETS: tuple[tuple[int, int], ...] = CITY_RING_INNER + CITY_RING_OUTER
 
-# Beyond the tiles it works, the culture of a city (Golden Ages) may win it the four corners
+# Beyond the tiles it works, the culture of a city (Renaissance) may win it the four corners
 # of its 5 x 5 square, then a third ring, rounded like the area (no corners of its own).
 CITY_CORNERS: tuple[tuple[int, int], ...] = ((2, -2), (2, 2), (-2, 2), (-2, -2))
 CITY_RING_THIRD: tuple[tuple[int, int], ...] = (
@@ -32,7 +32,7 @@ TERRITORY_OFFSETS: tuple[tuple[int, int], ...] = CITY_OFFSETS + CITY_CORNERS + C
 
 # The tiles a city claims for its civilization's territory, as a mask: the bit 1 << i stands
 # for TERRITORY_OFFSETS[i]. Without culture a city claims its whole area (ALL_CLAIMS); with it
-# (Golden Ages), its inner ring at first, then one tile at a time, as far as its third ring.
+# (Renaissance), its inner ring at first, then one tile at a time, as far as its third ring.
 CLAIM_BITS: dict[tuple[int, int], int] = {offset: 1 << i
                                           for i, offset in enumerate(TERRITORY_OFFSETS)}
 ALL_CLAIMS = (1 << len(CITY_OFFSETS)) - 1

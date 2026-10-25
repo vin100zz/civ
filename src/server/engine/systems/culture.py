@@ -1,4 +1,4 @@
-"""Culture (Golden Ages): what a city makes each turn, and the borders it wins with it.
+"""Culture (Renaissance): what a city makes each turn, and the borders it wins with it.
 
 A city claims the inner ring of its area at its founding. Its culture, made each turn and
 never spent, wins it more tiles one by one, the n-th needing n x tile_cost more culture than

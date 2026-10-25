@@ -1,4 +1,4 @@
-"""Culture (Golden Ages): what a city makes, the borders it wins, the land its citizens work."""
+"""Culture (Renaissance): what a city makes, the borders it wins, the land its citizens work."""
 import json
 
 from server.api.replay import Replay
@@ -12,17 +12,19 @@ from server.engine.systems import cities, culture, territory, turn
 from .conftest import add_city, make_game
 
 
-def golden(rulesets, **options):
-    return make_game(rulesets["golden_ages"], **options)
+def renaissance(rulesets, **options):
+    return make_game(rulesets["renaissance"], **options)
 
 
 def test_new_city_claims_its_inner_ring_with_culture_only(rulesets):
-    assert add_city(golden(rulesets), 1, 5, 5).claims == INNER_CLAIMS
-    assert add_city(make_game(rulesets["civ1"]), 1, 5, 5).claims == ALL_CLAIMS
+    assert add_city(renaissance(rulesets), 1, 5, 5).claims == INNER_CLAIMS
+    for ruleset in ("civ1", "golden_ages"):
+        assert not rulesets[ruleset].game.culture.enabled
+        assert add_city(make_game(rulesets[ruleset]), 1, 5, 5).claims == ALL_CLAIMS
 
 
 def test_citizens_only_work_their_territory(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     offsets = {offset for offset, _ in city_rules.workable_tiles(game, city)}
     assert offsets == set(CITY_RING_INNER)
@@ -32,7 +34,7 @@ def test_citizens_only_work_their_territory(rulesets):
 
 
 def test_own_territory_of_another_city_may_be_worked(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     add_city(game, 1, 5, 5)
     second = add_city(game, 1, 8, 5)
     # (6, 5) is in the inner ring of the first city, the outer ring of the second.
@@ -40,7 +42,7 @@ def test_own_territory_of_another_city_may_be_worked(rulesets):
 
 
 def test_culture_per_turn_from_buildings_and_wonders(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     assert culture.culture_per_turn(game, city) == 1
     city.buildings |= {"temple", "theatre"}
@@ -55,7 +57,7 @@ def test_culture_per_turn_from_buildings_and_wonders(rulesets):
 
 
 def test_player_wide_wonders_reach_every_city(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     capital = add_city(game, 1, 3, 5)
     other = add_city(game, 1, 9, 5)
     capital.buildings.add("parthenon")
@@ -67,7 +69,7 @@ def test_player_wide_wonders_reach_every_city(rulesets):
 
 
 def test_borders_grow_tile_by_tile(rulesets):
-    game = golden(rulesets, patches={(5, 3): "hills", (7, 4): "ocean"})
+    game = renaissance(rulesets, patches={(5, 3): "hills", (7, 4): "ocean"})
     city = add_city(game, 1, 5, 5)
     city.culture = 4
     culture.add_culture(game, city)                 # 5: the first tile
@@ -83,7 +85,7 @@ def test_borders_grow_tile_by_tile(rulesets):
 
 
 def test_beyond_its_area_the_corners_come_before_the_third_ring(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 8, 6)
     city.claims, city.culture = ALL_CLAIMS, 5 * 78
     for _ in CITY_CORNERS:
@@ -100,7 +102,7 @@ def test_beyond_its_area_the_corners_come_before_the_third_ring(rulesets):
 
 
 def test_tiles_beyond_the_area_touch_the_territory(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 8, 6)
     # Its outer ring held, but for the three tiles north of it.
     city.claims = ALL_CLAIMS & ~sum(CLAIM_BITS[o] for o in ((0, -2), (1, -2), (-1, -2)))
@@ -109,7 +111,7 @@ def test_tiles_beyond_the_area_touch_the_territory(rulesets):
 
 
 def test_no_city_reaches_beyond_its_area_for_land_a_foreign_city_could_work(rulesets):
-    game = golden(rulesets, width=24)
+    game = renaissance(rulesets, width=24)
     mine = add_city(game, 1, 8, 6)
     theirs = add_city(game, 2, 13, 6)      # its area reaches x = 11, the third ring of mine
     mine.claims = ALL_CLAIMS
@@ -122,7 +124,7 @@ def test_no_city_reaches_beyond_its_area_for_land_a_foreign_city_could_work(rule
 
 
 def test_nobody_founds_a_city_beyond_the_area_of_a_cultured_city(rulesets):
-    game = golden(rulesets, width=24)
+    game = renaissance(rulesets, width=24)
     city = add_city(game, 2, 8, 6)
     city.claims = ALL_CLAIMS | sum(CLAIM_BITS[o] for o in CITY_CORNERS + CITY_RING_THIRD)
     assert not cities.can_found_city(game, game.map.tile(11, 6), 1)
@@ -130,14 +132,14 @@ def test_nobody_founds_a_city_beyond_the_area_of_a_cultured_city(rulesets):
 
 
 def test_the_best_free_tile_is_claimed_first(rulesets):
-    game = golden(rulesets, terrain="desert", patches={(7, 6): "grassland"})
+    game = renaissance(rulesets, terrain="desert", patches={(7, 6): "grassland"})
     game.map.tile(7, 6).special = True
     city = add_city(game, 1, 5, 5)
     assert culture.best_free_tile(game, city) == (2, 1)
 
 
 def test_foreign_territory_is_never_claimed(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     mine = add_city(game, 1, 5, 5)
     theirs = add_city(game, 2, 8, 5)
     # The inner ring of the foreign city covers the tiles 2 steps east of mine.
@@ -151,7 +153,7 @@ def test_foreign_territory_is_never_claimed(rulesets):
 
 
 def test_territory_owner_agrees_with_the_fast_lookup(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     add_city(game, 1, 5, 5).claims = ALL_CLAIMS | CLAIM_BITS[(0, 3)] | CLAIM_BITS[(-3, -1)]
     add_city(game, 2, 8, 6).claims |= CLAIM_BITS[(3, 2)] | CLAIM_BITS[(2, -2)]
     add_city(game, 1, 1, 8).claims |= CLAIM_BITS[(-3, 0)]      # across the edge of the world
@@ -160,7 +162,7 @@ def test_territory_owner_agrees_with_the_fast_lookup(rulesets):
 
 
 def test_a_city_makes_culture_each_turn(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     cities.process_city(game, city)
     cities.process_city(game, city)
@@ -168,7 +170,7 @@ def test_a_city_makes_culture_each_turn(rulesets):
 
 
 def test_score_counts_culture(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     turn.update_scores(game)
     before = game.players[1].score
@@ -178,21 +180,21 @@ def test_score_counts_culture(rulesets):
 
 
 def test_saves_keep_culture_and_borders(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     city.culture, city.claims = 42, INNER_CLAIMS | CLAIM_BITS[(0, -2)]
     data = json.loads(json.dumps(persistence.game_to_data(game)))
-    again = persistence.game_from_data(rulesets["golden_ages"], data)
+    again = persistence.game_from_data(rulesets["renaissance"], data)
     assert (again.cities[city.id].culture, again.cities[city.id].claims) == (42, city.claims)
     # A save from before culture: its cities hold their whole area.
     for saved in data["cities"]:
         del saved["culture"], saved["claims"]
-    old = persistence.game_from_data(rulesets["golden_ages"], data)
+    old = persistence.game_from_data(rulesets["renaissance"], data)
     assert old.cities[city.id].claims == ALL_CLAIMS
 
 
 def test_replay_notes_the_borders(rulesets):
-    game = golden(rulesets)
+    game = renaissance(rulesets)
     city = add_city(game, 1, 5, 5)
     replay = Replay()
     replay.note_cities(game)
@@ -205,3 +207,21 @@ def test_replay_notes_the_borders(rulesets):
     game.turn += 1
     again.note_cities(game)
     assert again.cities == replay.cities
+
+
+def test_renaissance_is_golden_ages_with_culture(rulesets):
+    """Its files are a copy of those of Golden Ages: they only add culture."""
+    golden, renaissance_rules = rulesets["golden_ages"], rulesets["renaissance"]
+    assert renaissance_rules.units == golden.units
+    assert renaissance_rules.governments == golden.governments
+    assert set(renaissance_rules.techs) - set(golden.techs) == {"drama", "humanism"}
+    assert set(golden.techs) <= set(renaissance_rules.techs)
+    assert set(renaissance_rules.buildings) - set(golden.buildings) == {
+        "theatre", "museum", "parthenon", "louvre"}
+    for building_id, building in golden.buildings.items():
+        other = renaissance_rules.buildings[building_id]
+        assert [e for e in other.effects if e.type != "culture"] == list(building.effects)
+        assert (other.cost, other.upkeep, other.requires) == (building.cost, building.upkeep,
+                                                               building.requires)
+    for tech_id, tech in golden.techs.items():
+        assert renaissance_rules.techs[tech_id] == tech

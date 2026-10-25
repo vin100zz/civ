@@ -1,6 +1,6 @@
 """Alternative rules prevent settling inside another civilization's map territory.
 
-Golden Ages cities win their outer ring with culture: these tests give them their whole area,
+Renaissance cities win their outer ring with culture: these tests give them their whole area,
 as a city whose borders have grown (see test_culture.py for the growth)."""
 import pytest
 
@@ -15,7 +15,7 @@ from server.human.orders import unit_orders
 from .conftest import add_city, make_game
 
 
-@pytest.mark.parametrize("ruleset", ["civ1", "golden_ages"])
+@pytest.mark.parametrize("ruleset", ["civ1", "golden_ages", "renaissance"])
 @pytest.mark.parametrize("relation", [PEACE, WAR])
 @pytest.mark.parametrize("city_x, target", [(5, (7, 5)), (5, (7, 6)), (0, (14, 5))])
 def test_foreign_territory_founding(rulesets, ruleset, relation, city_x, target):

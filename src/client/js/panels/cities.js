@@ -18,7 +18,7 @@ const TABS = [
   { id: 'culture', label: 'Culture', icon: 'mask', color: 'var(--culture)', culture: true },
   { id: 'military', label: 'Military', icon: 'sword', color: '#D3D9E2' },
 ];
-// The tabs of the rules on screen: Culture only with culture rules (Golden Ages).
+// The tabs of the rules on screen: Culture only with culture rules (Renaissance).
 const tabsOf = (rules) => TABS.filter((t) => !t.culture || rules.culture);
 
 // The tab each kind of effect serves (a function when it depends on the effect). A building

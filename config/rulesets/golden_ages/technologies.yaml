@@ -1,6 +1,5 @@
 # Golden Ages technology tree: the Civ 1 tree, plus Warrior Code (Archers), Seafaring (Harbour),
-# Leadership (Dragoons), Tactics (Cavalry), Drama (Theatre, Parthenon) and Humanism (Museum,
-# Louvre).
+# Leadership (Dragoons) and Tactics (Cavalry).
 # Source: OpenCivOne GameData.cs TechnologyAdvanceDefinition array (faithful C# rewrite of DOS binary)
 # At most 2 prerequisites each.
 # Pyramidal: every starting advance leads somewhere, so Railroad, Electricity, Rocketry and the
@@ -111,11 +110,6 @@
 
 # ── CLASSICAL ─────────────────────────────────────────────────────────────────
 
-- id: drama
-  name: Drama
-  era: classical
-  prerequisites: [mysticism, writing]
-
 - id: philosophy
   name: Philosophy
   era: classical
@@ -177,11 +171,6 @@
   name: University
   era: medieval
   prerequisites: [mathematics, philosophy]
-
-- id: humanism
-  name: Humanism
-  era: medieval
-  prerequisites: [drama, university]
 
 - id: physics
   name: Physics

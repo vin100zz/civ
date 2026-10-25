@@ -1,6 +1,5 @@
 # City improvements of Golden Ages: those of Civ 1, with one Power Plant instead of the
-# Power, Hydro, Nuclear and Mfg. Plants, a Sewer System (cities above 20), a Harbour, and the
-# Theatre and the Museum for culture.
+# Power, Hydro, Nuclear and Mfg. Plants, a Sewer System (cities above 20) and a Harbour.
 # Source: OpenCivOne GameData.cs (ImprovementDefinition array) for cost, upkeep and tech;
 # CityWorker.cs for the effects. cost = shields, upkeep = gold per turn.
 #
@@ -28,8 +27,6 @@
 #   meltdown_risk        - may melt down during civil disorder until `safe_tech` is known
 #   nuclear_shield       - protects the city tile from nuclear attacks
 #   tile_food_bonus      - +amount food on every worked tile of `domain` (sea: oceans and lakes)
-#   culture              - +amount culture per turn, then +percent on the city's whole culture
-#                          (game.yaml, culture: the culture of a city wins it its borders)
 #   spaceship_part       - not a building: adds a `part` (structural | component | module)
 #                          to the owner's spaceship; can be built many times
 # requires_wonder: some civilization must have built this wonder.
@@ -78,24 +75,13 @@
 - id: temple
   name: Temple
   short: TMP
-  description: Makes 1 unhappy citizen content, 2 with Mysticism. +1 culture.
+  description: Makes 1 unhappy citizen content, 2 with Mysticism.
   cost: 40
   upkeep: 1
   requires: ceremonial_burial
   effects:
     - {type: content, amount: 1}
     - {type: content, amount: 1, requires_tech: mysticism}
-    - {type: culture, amount: 1}
-
-- id: theatre
-  name: Theatre
-  short: THE
-  description: +3 culture.
-  cost: 60
-  upkeep: 1
-  requires: drama
-  effects:
-    - {type: culture, amount: 3}
 
 - id: marketplace
   name: Marketplace
@@ -180,17 +166,6 @@
   requires: religion
   effects:
     - {type: content, amount: 4}
-
-- id: museum
-  name: Museum
-  short: MUS
-  description: +2 culture, then +50% culture, on top of the Theatre.
-  cost: 120
-  upkeep: 2
-  requires: humanism
-  requires_building: theatre
-  effects:
-    - {type: culture, amount: 2, percent: 50}
 
 - id: university
   name: University
