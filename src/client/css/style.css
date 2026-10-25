@@ -1039,7 +1039,8 @@ button.news-row:hover { background: var(--raise); color: var(--text); }
 }
 .civ-row:not(.civ-unknown):hover, .dead-row:hover, .event-row:hover { background: var(--raise); }
 .civ-row.selected { background: var(--hover); box-shadow: inset 3px 0 0 var(--gold); }
-.civ-unknown { color: var(--mute); justify-content: center; }
+.civ-unknown { color: var(--mute); }
+.civ-unknown .name { font-weight: 500; }
 .civ-unknown-mark { width: 12px; flex: none; text-align: center; font-size: 12px; }
 .civ-line .rank { font-size: 13px; color: var(--mute); }
 .civ-line .name { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }

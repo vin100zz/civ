@@ -66,15 +66,16 @@ function diplomacy(me, p, relation) {
 }
 
 // What a person knows of the world: its own figures, and of the civilizations it has met
-// their name, their government and how they stand with it.
+// their name, their government and how they stand with it. Destroyed ones are named too.
 function renderKnownWorld(container) {
   const state = store.state;
   const me = state.me;
-  const met = state.players.filter((p) => !p.barbarian && p.id !== me.id && p.met);
-  const unknown = state.players.filter((p) => !p.barbarian && p.id !== me.id && !p.met);
+  const met = state.players.filter((p) => !p.barbarian && p.id !== me.id && (p.met || !p.alive));
+  const unknown = state.players.filter((p) => !p.barbarian && p.id !== me.id && p.alive && !p.met);
   const placeholders = unknown.map(() => `
-    <div class="civ-row civ-unknown" role="img" aria-label="Undiscovered civilization">
-      <span class="civ-unknown-mark" aria-hidden="true">?</span>
+    <div class="civ-row civ-unknown">
+      <span class="civ-line"><span class="name"><span class="civ-unknown-mark" aria-hidden="true">?</span><span>Unknown civilization</span></span></span>
+      <span class="civ-meta" style="padding-left:20px"><span class="who">Not met yet</span></span>
     </div>`);
   const relation = (p) => (me.relations.find((r) => r.player === p.id) || {}).state;
   const rows = met.map((p) => {
