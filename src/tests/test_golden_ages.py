@@ -8,13 +8,15 @@ from server.ai.city_governor import Governor
 from server.ai.knowledge import Knowledge
 from server.ai import strategic
 from server.api import serialize
-from server.engine import effects as fx
-from server.engine.model.entities import PEACE, Item
+from server.ai.unit_ai.common import Context, pillage as unit_ai_pillage
+from server.engine import actions, effects as fx
+from server.engine.model.entities import PEACE, WAR, Item
 from server.engine.rules.loader import load_rules
 from server.engine.systems import city as city_rules
 from server.engine.systems import diplomacy, movement, production, visibility
 from server.engine.view import PlayerView
 from server.human.controller import HumanController
+from server.human.orders import unit_orders
 
 from .conftest import add_city, make_game
 
@@ -156,3 +158,87 @@ def test_ai_brings_cannons_to_walled_cities(golden, walls, expected):
     governor = Governor(view, know, plan)
     offense = [c for c in governor.evaluate(city, view.city_stats(city)) if c.reason.startswith("offense")]
     assert offense and offense[0].item.id == expected
+
+
+def _improved(game, x, y):
+    tile = game.map.tile(x, y)
+    tile.road = tile.railroad = tile.irrigation = True
+    return tile
+
+
+def test_pillage_destroys_one_improvement_a_turn(golden):
+    game = make_game(golden)
+    add_city(game, 2, 8, 5)
+    tile = _improved(game, 9, 5)
+    legion = game.add_unit("legion", 1, 9, 5)
+    game.current_player = 1
+    destroyed = []
+    for _ in range(3):
+        legion.moves_left = movement.full_moves(game, legion)
+        assert actions.apply(game, 1, actions.Pillage(legion.id))
+        assert legion.moves_left == 0
+        destroyed.append(game.events[-1]["work"])
+    assert destroyed == ["irrigation", "railroad", "road"]
+    assert not (tile.road or tile.railroad or tile.irrigation)
+    assert game.events[-1]["type"] == "pillage" and game.events[-1]["other"] == 2
+    legion.moves_left = movement.full_moves(game, legion)
+    assert not actions.apply(game, 1, actions.Pillage(legion.id))      # nothing left
+
+
+def test_who_may_pillage_where(golden):
+    game = make_game(golden, relation=PEACE)
+    add_city(game, 1, 3, 5)
+    add_city(game, 2, 8, 5)
+    for x in (4, 8, 9, 12):
+        _improved(game, x, 5)
+    game.current_player = 1
+    at_home = game.add_unit("legion", 1, 4, 5)
+    assert movement.pillage_target(game, at_home) == "irrigation"     # scorched earth
+    abroad = game.add_unit("legion", 1, 9, 5)
+    assert movement.pillage_target(game, abroad) is None              # at peace
+    game.relation(1, 2).state = WAR
+    assert movement.pillage_target(game, abroad) == "irrigation"
+    assert movement.pillage_target(game, game.add_unit("legion", 1, 12, 5)) == "irrigation"
+    assert movement.pillage_target(game, game.add_unit("legion", 1, 8, 5)) is None   # a city
+    assert movement.pillage_target(game, game.add_unit("settlers", 1, 9, 5)) is None
+    tired = game.add_unit("legion", 1, 9, 5)
+    tired.moves_left = 0
+    assert movement.pillage_target(game, tired) is None
+
+
+def test_no_pillage_in_civ1(rules):
+    game = make_game(rules)
+    add_city(game, 2, 8, 5)
+    _improved(game, 9, 5)
+    legion = game.add_unit("legion", 1, 9, 5)
+    game.current_player = 1
+    assert not actions.apply(game, 1, actions.Pillage(legion.id))
+    view = PlayerView(game, game.players[1])
+    assert "pillage" not in [o["id"] for o in unit_orders(view, HumanController(), legion)]
+
+
+def test_pillage_order_names_what_goes(golden):
+    game = make_game(golden)
+    city = add_city(game, 2, 8, 5)
+    _improved(game, 9, 5)
+    legion = game.add_unit("legion", 1, 9, 5)
+    player = game.players[1]
+    visibility.remember_city(game, player, city)
+    orders = unit_orders(PlayerView(game, player), HumanController(), legion)
+    assert {"id": "pillage", "work": "irrigation"} in orders
+
+
+def test_ai_pillages_what_feeds_an_enemy_city(golden):
+    game = make_game(golden)
+    city = add_city(game, 2, 8, 5)
+    ai = game.players[1]
+    visibility.remember_city(game, ai, city)
+    ctx = Context(PlayerView(game, ai), None, None, {})
+    game.current_player = 1
+    game.map.tile(9, 5).road = True
+    legion = game.add_unit("legion", 1, 9, 5)
+    assert not unit_ai_pillage(ctx, legion)                 # a road helps the besiegers too
+    game.map.tile(9, 5).mine = True
+    assert unit_ai_pillage(ctx, legion) and not game.map.tile(9, 5).mine
+    game.map.tile(1, 1).irrigation = True
+    assert not unit_ai_pillage(ctx, game.add_unit("legion", 1, 1, 1))   # nobody's land

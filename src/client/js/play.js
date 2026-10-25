@@ -228,7 +228,7 @@ export function keyOf(orderId) {
   for (const [key, ids] of Object.entries(KEYS)) {
     if (ids.find((id) => available.includes(id)) === orderId) return key.toUpperCase();
   }
-  return orderId === 'disband' ? 'Shift D' : '';
+  return { disband: 'Shift D', pillage: 'Shift P' }[orderId] || '';
 }
 
 function step(dx, dy) {
@@ -308,6 +308,11 @@ export function handleKey(e) {
   if (!play.detail || play.detail.id !== play.unit) return false;
   if (key === 'd' && e.shiftKey) {
     give({ id: 'disband' });
+    return true;
+  }
+  if (key === 'p' && e.shiftKey) {
+    const order = play.detail.orders.find((candidate) => candidate.id === 'pillage');
+    if (order) give(order);
     return true;
   }
   for (const id of KEYS[key] || []) {

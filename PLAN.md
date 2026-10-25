@@ -58,7 +58,8 @@ config/                 données de jeu (YAML)
     civ1/               Civilization I : ruleset.yaml (nom), technologies.yaml, units.yaml,
                         buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
     golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
-                        sans obsolescence, des gouvernements sans Sénat (governments.yaml)
+                        sans obsolescence, des gouvernements sans Sénat (governments.yaml),
+                        le pillage (game.yaml)
                         (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
 resources/              sprites, servis tels quels
 saves/                  parties sauvegardées (JSON, hors dépôt)
@@ -341,7 +342,7 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 ## 10. Limites connues
 
 - Diplomate désactivé (ambassade, vol de tech, sabotage non codés).
-- Pas de guerre civile à la prise d'une capitale, pas de catastrophes aléatoires, pas de pillage.
+- Pas de guerre civile à la prise d'une capitale, pas de catastrophes aléatoires ; pas de pillage avec les règles Civilization I (Golden Ages l'a).
 - Le maire n'utilise que des amuseurs (ni percepteurs ni savants).
 - L'IA ne construit pas de forteresses et ne construit pas de porte-avions (le moteur les gère).
 - Le bombardier peut attaquer plusieurs fois par tour ; le sous-marin n'est pas invisible ; les chasseurs n'interceptent pas pendant le tour adverse.
@@ -349,4 +350,4 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 - La course à l'espace clôt en général la partie avant que l'arme nucléaire et le réchauffement n'aient pesé.
 - Un test joue une partie entière et dure environ une minute (`python -m pytest -m "not slow"` pour l'éviter).
 - L'IA n'a été réglée que contre elle-même : son niveau face à un joueur humain n'a pas été mesuré.
-- Mode jeu : un seul joueur humain ; pas de pillage ; les unités débarquées par un navire restent endormies jusqu'à ce que le joueur les réveille ; une seule sauvegarde automatique, écrasée tous les cinq tours.
+- Mode jeu : un seul joueur humain ; les unités débarquées par un navire restent endormies jusqu'à ce que le joueur les réveille ; une seule sauvegarde automatique, écrasée tous les cinq tours.

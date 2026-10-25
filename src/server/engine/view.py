@@ -79,8 +79,7 @@ class PlayerView:
         if not self.is_land(tile):
             return False
         if self.rules.game.city.forbid_foreign_territory:
-            known = {**self.player.known_cities, **{c.id: c for c in self.my_cities()}}
-            owner = cities.territory_owner(self.map, tile, known)
+            owner = self.territory_owner(tile)
             if owner is not None and owner != self.player.id:
                 return False
         minimum = self.rules.game.city.min_distance
@@ -88,6 +87,13 @@ class PlayerView:
             if self._game.map.steps(tile.x, tile.y, x, y) < minimum:
                 return False
         return True
+
+    def territory_owner(self, tile: Tile) -> Optional[int]:
+        """Whose territory the tile is in, drawn from the cities the player knows."""
+        return cities.territory_owner(self.map, tile, self._known_cities())
+
+    def _known_cities(self) -> dict:
+        return {**self.player.known_cities, **{c.id: c for c in self.my_cities()}}
 
     # ── Own cities and units ──────────────────────────────────────────────────
 
@@ -233,6 +239,10 @@ class PlayerView:
 
     def work_turns_at(self, tile: Tile, order: str, works: Collection[str] = ()) -> Optional[int]:
         return movement.work_turns_at(self._game, self.player, tile, order, works)
+
+    def pillage_target(self, unit: Unit) -> Optional[str]:
+        """What pillaging would destroy, the territory drawn from the cities the player knows."""
+        return movement.pillage_target(self._game, unit, self._known_cities())
 
     def has_water_source(self, tile: Tile) -> bool:
         return movement.has_water_source(self._game, tile)

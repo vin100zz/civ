@@ -433,6 +433,7 @@ class MovementSettings:
     fortress_tech: str
     lost_at_sea_chance: float       # for `coastal` ships ending their turn away from land
     pollution_clean_turns: int
+    pillage: bool                   # military land units may destroy tile improvements
 
 
 @dataclass(frozen=True)

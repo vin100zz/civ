@@ -48,6 +48,9 @@ def unit_orders(view: PlayerView, controller: HumanController, unit: Unit) -> li
             work = getattr(terrain, TERRAIN_WORK[order], None) if order in TERRAIN_WORK else None
             becomes = rules.terrains[work.becomes].name if work and work.becomes else None
             add(order, turns=turns, becomes=becomes)
+    pillaged = view.pillage_target(unit)
+    if pillaged is not None:
+        add("pillage", work=pillaged)
     if definition.can("trade"):
         if city is not None and view.wonder_in_progress(city):
             add("help_wonder", city=city.name)

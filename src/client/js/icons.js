@@ -45,6 +45,7 @@ const PATHS = {
   drop: '<path d="M12 3s6 6.500 6 11a6 6 0 0 1-12 0c0-4.500 6-11 6-11z"/>',
   pick: '<path d="M14 10 4 20M8 4c5-1 9 1 12 6M12.500 6.500l5 5"/>',
   fortress: '<path d="M5 21V8h3v3h2V8h4v3h2V8h3v13zM10 21v-5h4v5"/>',
+  torch: '<path d="M10 21h4l1-9H9zM8 12h8M12 3c2 2.500 3 4 3 5.500a3 3 0 0 1-6 0C9 7 10 5.500 12 3z"/>',
   broom: '<path d="M12 3v9M8 12h8l1.500 9h-11z"/>',
   shield: '<path d="M12 3l7 3v5c0 4.500-3 8.200-7 10-4-1.800-7-5.500-7-10V6z"/>',
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>',

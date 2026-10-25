@@ -70,6 +70,21 @@ def fortify(ctx: Context, unit: Unit) -> None:
         ctx.view.do(actions.SetOrder(unit.id, ORDER_FORTIFY))
 
 
+# Worth a turn of a siege: what feeds the enemy city, makes its shields or brings its help.
+# Roads and fortresses are left, the besiegers use them too.
+PILLAGE_WORTH = ("irrigation", "mine", "railroad")
+
+
+def pillage(ctx: Context, unit: Unit) -> bool:
+    """Destroys what is worth it on the unit's tile, if the tile is the territory of an
+    enemy. Spends the unit's turn."""
+    view = ctx.view
+    owner = view.territory_owner(view.tile_of(unit))
+    if owner is None or not view.at_war(owner) or view.pillage_target(unit) not in PILLAGE_WORTH:
+        return False
+    return view.do(actions.Pillage(unit.id)).ok
+
+
 def sentry(ctx: Context, unit: Unit) -> None:
     if unit.order != ORDER_SENTRY:
         ctx.view.do(actions.SetOrder(unit.id, ORDER_SENTRY))

@@ -1,8 +1,12 @@
-# Golden Ages changes to config/game.yaml (merged key by key): the units the shared file names.
+# Golden Ages changes to config/game.yaml (merged key by key): founding, pillage, and the units
+# the shared file names.
 # "cavalry" is the industrial unit here, the ancient one is "horsemen"; "sail" is the "caravel".
 
 city:
   forbid_foreign_territory: true
+
+movement:
+  pillage: true
 
 huts:
   mercenaries: [legion, horsemen]

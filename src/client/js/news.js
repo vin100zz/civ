@@ -54,6 +54,7 @@ export function toneOf(event, me) {
     case 'city_destroyed': case 'meltdown': return mine ? 'bad' : 'info';
     case 'barbarians': return 'bad';
     case 'war': return mine || against ? 'bad' : 'info';
+    case 'pillage': return against ? 'bad' : mine ? 'info' : null;
     case 'peace': case 'order': return 'good';
     case 'celebration': return mine ? 'good' : null;
     case 'celebration_over': return mine ? 'info' : null;
