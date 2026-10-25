@@ -1,5 +1,5 @@
 # Renaissance (Golden Ages with culture) changes to config/game.yaml (merged key by key):
-# founding, culture, pillage, and the units the shared file names.
+# culture, and the units the shared file names.
 # "cavalry" is the industrial unit here, the ancient one is "horsemen"; "sail" is the "caravel".
 
 city:
@@ -7,9 +7,6 @@ city:
 
 culture:
   enabled: true
-
-movement:
-  pillage: true
 
 huts:
   mercenaries: [legion, horsemen]

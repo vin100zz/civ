@@ -58,8 +58,7 @@ config/                 données de jeu (YAML)
     civ1/               Civilization I : ruleset.yaml (nom), technologies.yaml, units.yaml,
                         buildings.yaml, wonders.yaml ; ses fichiers passent avant ceux de config/
     golden_ages/        Golden Ages : la progression des unités à chaque époque, des merveilles
-                        sans obsolescence, des gouvernements sans Sénat (governments.yaml),
-                        le pillage (game.yaml)
+                        sans obsolescence, des gouvernements sans Sénat (governments.yaml)
                         (propositions : https://claude.ai/artifact/U8n59wP4ADT1XQV78eBpsu)
     renaissance/        Renaissance : une copie de golden_ages/ avec la culture (game.yaml),
                         Drama et Humanism, Théâtre, Musée, Parthénon et Louvre ; un changement
@@ -348,7 +347,7 @@ En mer, la case montre le navire et non ses passagers. Les transitions de côte 
 ## 10. Limites connues
 
 - Diplomate désactivé (ambassade, vol de tech, sabotage non codés).
-- Pas de guerre civile à la prise d'une capitale, pas de catastrophes aléatoires ; pas de pillage avec les règles Civilization I (Golden Ages et Renaissance l'ont).
+- Pas de guerre civile à la prise d'une capitale, pas de catastrophes aléatoires.
 - Le maire n'utilise que des amuseurs (ni percepteurs ni savants).
 - L'IA ne construit pas de forteresses et ne construit pas de porte-avions (le moteur les gère).
 - Le bombardier peut attaquer plusieurs fois par tour ; le sous-marin n'est pas invisible ; les chasseurs n'interceptent pas pendant le tour adverse.
