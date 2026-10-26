@@ -283,8 +283,8 @@
             <button id="btn-do-save" class="btn tall"><span data-icon="save" data-size="16"></span>Save</button>
           </div>
           <span class="sub">Letters, digits, - and _ · 40 characters at most. A game you play also saves
-            itself every 5 turns under that name ("autosave" until it has one); the save it replaces
-            is kept as name-year, and the one before goes.</span>
+            itself every 5 turns under that name, the one given when it was started; the save it
+            replaces is kept as name-year, and the one before goes.</span>
         </div>
       </section>
       <section class="dialog-col alt">
@@ -297,6 +297,12 @@
 
     <div class="dialog-bar">
       <p id="dialog-status" class="sub" role="status"></p>
+      <div id="new-name-field" class="bar-name">
+        <label for="new-name" class="field-label">Save as</label>
+        <input id="new-name" class="input mono" type="text" maxlength="40" autocomplete="off"
+          spellcheck="false" required aria-describedby="new-name-hint">
+        <span id="new-name-hint" class="name-hint" role="status"></span>
+      </div>
       <button class="btn ghost tall" data-close>Cancel</button>
       <button id="btn-start" class="btn primary tall">Start new game</button>
     </div>

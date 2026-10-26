@@ -105,6 +105,7 @@ function refreshChoices() {
   const civ = playableCivs().find((c) => c.id === choice.civ);
   $('btn-start').textContent = !playing ? 'Start new game'
     : civ ? `Play as the ${civ.nation}` : 'Play a civilization drawn at random';
+  refreshName();
 
   for (const button of $('game-tabs').children) {
     button.setAttribute('aria-pressed', String(button.dataset.gameTab === choice.tab));
@@ -112,6 +113,48 @@ function refreshChoices() {
   $('game-new').hidden = choice.tab !== 'new';
   $('game-saves').hidden = choice.tab !== 'saves';
   $('btn-start').hidden = choice.tab !== 'new';
+  $('new-name-field').hidden = choice.tab !== 'new';
+  $('dialog-status').hidden = choice.tab === 'new';
+}
+
+// The name a new game saves itself under: required, and best one no saved game has yet.
+const SAVE_NAME = /^[A-Za-z0-9_-]{1,40}$/;
+
+function suggestedName(base = choice.mode !== 'play' ? 'watch' : choice.civ || 'game') {
+  let name = base;
+  for (let n = 2; store.saves.includes(name); n++) name = `${base}${n}`;
+  return name;
+}
+
+function newGameName() {
+  const name = $('new-name').value.trim();
+  return SAVE_NAME.test(name) ? name : null;
+}
+
+function refreshName() {
+  const input = $('new-name');
+  const hint = $('new-name-hint');
+  const typed = input.value.trim();
+  const name = newGameName();
+  const state = !typed ? 'empty' : !name ? 'invalid' : store.saves.includes(name) ? 'taken' : 'free';
+  const suggestion = suggestedName(state === 'taken' ? name.slice(0, 38) : undefined);
+  const use = `<button class="link" data-use-name="${suggestion}">Use ${suggestion}</button>`;
+  input.placeholder = suggestedName();
+  input.classList.toggle('invalid', state === 'invalid');
+  input.classList.toggle('taken', state === 'taken');
+  input.setAttribute('aria-invalid', String(state === 'invalid' || state === 'empty'));
+  hint.className = `name-hint ${state}`;
+  hint.innerHTML = {
+    empty: `Required: the file the game saves itself in. ${use}`,
+    invalid: 'Letters, digits, - and _ only, 40 at most.',
+    taken: `<b>${name}</b> is already saved: it will be replaced. ${use}`,
+    free: `The game saves itself as <b>${name}</b> every 5 turns.`,
+  }[state];
+  const start = $('btn-start');
+  start.disabled = !name;
+  if (state === 'taken') {
+    start.textContent = `Replace ${name} and ${choice.mode === 'play' ? 'play' : 'start'}`;
+  }
 }
 
 // The World column: a generated world (its shape, land and nature) or a fixed one.
@@ -178,6 +221,7 @@ export function refreshSaves() {
       <button class="btn small" data-load="${name}">Load</button></div>`);
   $('saves').innerHTML = rows.join('')
     || '<div class="save-none">No saved game yet. Saves appear here, most recent first.</div>';
+  refreshName();
 }
 
 // Called for each new set of rules and game: fills the form, keeps the person's choices.
@@ -218,24 +262,31 @@ export function openGameDialog(focus) {
   const dialog = $('game-dialog');
   choice.tab = focus === 'save' ? 'saves' : 'new';
   if (store.state) $('save-name').value = store.saveName || `seed${store.state.seed}-turn${store.state.turn}`;
+  $('new-name').value = '';
   const map = `${store.map.width} × ${store.map.height}`;
   const current = store.rulesets.length > 1 ? `${store.rules.ruleset.name} rules, map ${map}` : `Map ${map}`;
   setDialogStatus(`${current} · a new or loaded game replaces the current one.`);
+  $('btn-start').title = `${current} · the new game replaces the current one.`;
   refreshChoices();
   show(dialog);
   if (focus === 'save') {
     $('save-name').focus();
     $('save-name').select();
   } else {
-    $('btn-start').focus();
+    $('new-name').focus();
   }
 }
 
 function startNewGame() {
+  const name = newGameName();
+  if (!name) {
+    $('new-name').focus();
+    return;
+  }
   // The server draws the seed. A fixed world is never a surprise.
   const map = { ...choice.map, shape: choice.fixed || choice.map.shape,
     surprise: !choice.fixed && choice.map.surprise };
-  const message = { cmd: 'new_game', seed: null, players: choice.players, map, ruleset: choice.ruleset };
+  const message = { cmd: 'new_game', name, seed: null, players: choice.players, map, ruleset: choice.ruleset };
   if (choice.mode === 'play') {
     const civs = playableCivs();
     message.mode = 'play';
@@ -248,7 +299,7 @@ function startNewGame() {
 
 function save() {
   const name = $('save-name').value.trim();
-  if (!/^[A-Za-z0-9_-]{1,40}$/.test(name)) {
+  if (!SAVE_NAME.test(name)) {
     setDialogStatus('Use letters, digits, - and _ for the name.', 'error');
     return;
   }
@@ -306,6 +357,17 @@ export function initDialogs() {
   $('players-less').addEventListener('click', () => setPlayers(choice.players - 1));
   $('players-more').addEventListener('click', () => setPlayers(choice.players + 1));
   $('btn-start').addEventListener('click', startNewGame);
+  $('new-name').addEventListener('input', refreshName);
+  $('new-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') startNewGame();
+  });
+  $('new-name-hint').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-use-name]');
+    if (!button) return;
+    $('new-name').value = button.dataset.useName;
+    refreshName();
+    $('new-name').focus();
+  });
   $('btn-do-save').addEventListener('click', save);
   $('save-name').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') save();

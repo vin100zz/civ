@@ -57,7 +57,7 @@ Vous ne voyez que ce que votre civilisation connaît : les terres explorées, le
 | Maj + D | Dissoudre l'unité (à confirmer) |
 | Entrée | Finir le tour |
 
-La partie s'enregistre d'elle-même tous les cinq tours sous le nom `autosave`. Si votre civilisation est détruite, la partie continue et vous pouvez la regarder jusqu'au bout. À la fin de la partie, **Replay the game** (fenêtre de fin de partie) rejoue toute la partie sur la carte du monde (voir Observer). Le replay montre toutes les civilisations : il n'est ouvert qu'une fois la partie finie, ou votre civilisation détruite.
+Une nouvelle partie se nomme avant d'être lancée (champ **Save as**, obligatoire, à côté du bouton de lancement) : elle s'enregistre d'elle-même tous les cinq tours sous ce nom. Si une sauvegarde porte déjà ce nom, le dialogue prévient qu'elle sera remplacée et propose un nom libre. Si votre civilisation est détruite, la partie continue et vous pouvez la regarder jusqu'au bout. À la fin de la partie, **Replay the game** (fenêtre de fin de partie) rejoue toute la partie sur la carte du monde (voir Observer). Le replay montre toutes les civilisations : il n'est ouvert qu'une fois la partie finie, ou votre civilisation détruite.
 
 ## Observer
 
