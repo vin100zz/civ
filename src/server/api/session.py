@@ -53,7 +53,7 @@ HISTORY_FIELDS = ("cities", "population", "techs", "score", "gold", "units")
 DEFAULT_SAVES_DIR = PROJECT_ROOT / "saves"
 SAVE_NAME = re.compile(r"[A-Za-z0-9_-]{1,40}")
 SAVED_NAME = re.compile(r"[A-Za-z0-9_-]{1,48}")    # a backup adds the year to the name
-AUTOSAVE = "autosave"                          # where a game that has no name yet saves itself
+AUTOSAVE = "autosave"                          # where a game that has no name saves itself (the first one)
 AUTOSAVE_EVERY = 5                             # turns between two automatic saves of a played game
 
 
@@ -133,14 +133,15 @@ class Session:
     def new_game(self, seed: int, players: Optional[int] = None,
                  map_settings: Optional[MapSettings] = None,
                  civ: Optional[str] = None, level: Optional[str] = None,
-                 ruleset: Optional[str] = None) -> None:
+                 ruleset: Optional[str] = None, name: Optional[str] = None) -> None:
         """Starts a game with the rules `ruleset` (those of the current game if None). With
-        `civ`, a person leads that civilization at this `level`."""
+        `civ`, a person leads that civilization at this `level`. The game saves itself as
+        `name`."""
         rules = self._ruleset(ruleset)
         self.playing = False
         self.game = create_game(rules, seed, player_count=players,
                                 map_settings=map_settings, human_civ=civ, level=level)
-        self.save_name = None
+        self.save_name = name
         self._reset(humans=[p.id for p in self.game.players if turn.is_interactive(self.game, p)])
         self.history = []
         self.replay = Replay()
@@ -660,6 +661,11 @@ class Session:
                 await self._replay(client)
 
     async def _new_game(self, client: WebSocket, message: dict) -> None:
+        # A new game is named: it never saves itself over the game played before it.
+        name = message.get("name")
+        if not isinstance(name, str) or not SAVE_NAME.fullmatch(name):
+            await self._notice(client, "Name the new game: letters, digits, - and _.", False)
+            return
         seed = message.get("seed")
         if not isinstance(seed, int):
             seed = random.randrange(1, 100000)
@@ -679,7 +685,7 @@ class Session:
                 level = None
         async with self._busy:
             await asyncio.to_thread(self.new_game, seed, players, map_settings, civ, level,
-                                    rules.ruleset.id)
+                                    rules.ruleset.id, name)
         await self.broadcast_init()
         if civ is not None and not self.in_play():
             await self._notice(client, "No room on this world for your civilization: "

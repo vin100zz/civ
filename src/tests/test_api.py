@@ -56,7 +56,7 @@ def test_observer_session(client):
         assert len(init["map"]["terrain"]) == tiles == len(init["map"]["flags"])
         assert init["state"]["turn"] == 0 and init["state"]["pov"] is None
 
-        socket.send_json({"cmd": "new_game", "seed": 42, "players": 4})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 42, "players": 4})
         init = socket.receive_json()
         assert init["type"] == "init" and init["state"]["seed"] == 42
         assert len([p for p in init["state"]["players"] if not p["barbarian"]]) == 4
@@ -90,7 +90,7 @@ def test_observer_session(client):
 def test_save_and_load(client):
     with client.websocket_connect("/ws") as socket:
         assert socket.receive_json()["saves"] == []
-        socket.send_json({"cmd": "new_game", "seed": 9, "players": 3})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 9, "players": 3})
         socket.receive_json()
         for _ in range(3):
             socket.send_json({"cmd": "step"})
@@ -106,7 +106,7 @@ def test_save_and_load(client):
         assert socket.receive_json() == {"type": "saves", "saves": ["my-game"],
                                          "save_name": "my-game"}
 
-        socket.send_json({"cmd": "new_game", "seed": 10, "players": 3})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 10, "players": 3})
         assert socket.receive_json()["state"]["turn"] == 0
 
         socket.send_json({"cmd": "load", "name": "my-game"})
@@ -124,25 +124,37 @@ def test_save_and_load(client):
         assert socket.receive_json()["ok"] is False
 
 
+def test_a_new_game_needs_a_name(client):
+    with client.websocket_connect("/ws") as socket:
+        socket.receive_json()
+        for name in (None, "", "bad name!", "x" * 41):
+            socket.send_json({"cmd": "new_game", "name": name, "seed": 3, "players": 3})
+            assert socket.receive_json() == {
+                "type": "notice", "text": "Name the new game: letters, digits, - and _.", "ok": False}
+        socket.send_json({"cmd": "new_game", "name": "first", "seed": 3, "players": 3})
+        assert socket.receive_json()["type"] == "init"
+        assert client.app.state.session.save_name == "first"
+
+
 def test_new_game_with_a_chosen_map(client):
     def land_masses(init):
         return len({c for c in init["map"]["continent"] if c > 0})
 
     with client.websocket_connect("/ws") as socket:
         socket.receive_json()
-        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 5, "players": 3})
         default = socket.receive_json()
-        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 5, "players": 3,
                           "map": {"shape": "small_islands", "relief": 2, "climate": 0}})
         islands = socket.receive_json()
         assert islands["state"]["seed"] == 5
         assert islands["map"]["terrain"] != default["map"]["terrain"]
         # Invalid choices fall back on the defaults of the rules.
-        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 5, "players": 3,
                           "map": {"shape": ["atlantis"], "relief": 9, "climate": 1.0,
                                   "land": 25, "huts": True, "historical_starts": 1}})
         assert socket.receive_json()["map"]["terrain"] == default["map"]["terrain"]
-        socket.send_json({"cmd": "new_game", "seed": 5, "players": 3,
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 5, "players": 3,
                           "map": {"shape": "continents", "land": 60}})
         more = socket.receive_json()["map"]["terrain"]
         assert more != default["map"]["terrain"]
@@ -179,7 +191,7 @@ def order(socket, **message):
 
 def start_playing(socket, **options):
     socket.receive_json()
-    socket.send_json({"cmd": "new_game", "seed": 42, "players": 4, "mode": "play",
+    socket.send_json({"cmd": "new_game", "name": "game", "seed": 42, "players": 4, "mode": "play",
                       "civ": "romans", **options})
     return socket.receive_json()
 
@@ -315,23 +327,23 @@ def test_play_save_and_load(client):
     # The saves the tests before left being written would tell their list in the middle.
     client.portal.call(client.app.state.session.flush)
     with client.websocket_connect("/ws") as socket:
-        init = start_playing(socket)
+        init = start_playing(socket, name="rome")
         settlers = next(u for u in init["state"]["units"] if u[1] == "settlers")
         order(socket, action="found_city", unit=settlers[0])
         for _ in range(5):
             socket.send_json({"cmd": "end_turn"})
             message = socket.receive_json()
-        # Turn 5: the game was saved by itself, in the middle of the person's turn.
+        # Turn 5: the game was saved by itself, under its name, in the middle of the person's turn.
         assert message["state"]["turn"] == 5
         saves = socket.receive_json()
-        assert saves["saves"][0] == "autosave" and saves["save_name"] is None
+        assert saves["saves"][0] == "rome" and saves["save_name"] == "rome"
         cities = message["state"]["cities"]
 
-        socket.send_json({"cmd": "new_game", "seed": 10, "players": 3})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 10, "players": 3})
         observed = socket.receive_json()
         assert observed["state"]["play"] is None and observed["state"]["pov"] is None
 
-        socket.send_json({"cmd": "load", "name": "autosave"})
+        socket.send_json({"cmd": "load", "name": "rome"})
         loaded = socket.receive_json()
         assert loaded["type"] == "init" and loaded["state"]["turn"] == 5
         assert loaded["state"]["play"] == {"human": 1, "active": True}
@@ -616,7 +628,7 @@ def test_each_game_has_its_rules(rulesets, tmp_path):
     assert [entry["id"] for entry in init["rulesets"]] == list(rulesets)
 
     # The rules are chosen with the new game, and recorded in its saves.
-    asyncio.run(session._new_game(None, {"cmd": "new_game", "seed": 7, "ruleset": "golden_ages"}))
+    asyncio.run(session._new_game(None, {"cmd": "new_game", "name": "game", "seed": 7, "ruleset": "golden_ages"}))
     assert session.rules is rulesets["golden_ages"] and session.game.seed == 7
     session.save("other")
     assert json.loads((tmp_path / "other.json").read_text())["ruleset"] == "golden_ages"
@@ -705,7 +717,7 @@ def test_the_replay_notes_what_changes_in_the_cities(rules):
 def test_the_replay_of_an_observed_game(client):
     with client.websocket_connect("/ws") as socket:
         socket.receive_json()
-        socket.send_json({"cmd": "new_game", "seed": 11, "players": 3})
+        socket.send_json({"cmd": "new_game", "name": "game", "seed": 11, "players": 3})
         socket.receive_json()
         for _ in range(25):
             socket.send_json({"cmd": "step"})
