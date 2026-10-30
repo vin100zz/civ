@@ -334,24 +334,37 @@ function openTurn(message) {
   ask();
 }
 
-// Asks the person the next question of the turn that has not been asked yet.
-function ask() {
-  const me = store.state.me;
-  if (leader() === null || !me || document.querySelector('dialog[open]')) return;
+// What was already asked this turn: a new turn asks everything again.
+function askedThisTurn() {
   const key = `${store.state.seed}:${store.state.turn}`;
   if (prompted.turn !== key) {
     prompted.turn = key;
     prompted.research = false;
     prompted.proposals = new Set();
   }
-  const proposal = me.proposals.find((id) => !prompted.proposals.has(id));
+  return prompted;
+}
+
+// Asks the person the next question of the turn that has not been asked yet.
+function ask() {
+  const me = store.state.me;
+  if (leader() === null || !me || document.querySelector('dialog[open]')) return;
+  const asked = askedThisTurn();
+  const proposal = me.proposals.find((id) => !asked.proposals.has(id));
   if (proposal !== undefined) {
-    prompted.proposals.add(proposal);
+    asked.proposals.add(proposal);
     openProposal(proposal);
-  } else if (me.researching === null && me.research_options.length && !prompted.research) {
-    prompted.research = true;
-    openResearchDialog(prompted.discovered);
+  } else if (me.researching === null && me.research_options.length && !asked.research) {
+    openResearch(prompted.discovered);
   }
+}
+
+// However it is opened, the research dialog is this turn's research question: once it is
+// closed, ask() must not put it again while the person's choice is still on its way to the
+// server (an advance stolen mid-turn leaves nothing researched until the server answers).
+function openResearch(discovered = null) {
+  askedThisTurn().research = true;
+  openResearchDialog(discovered);
 }
 
 function refreshPlay() {
@@ -530,7 +543,7 @@ on('play-replay', () => {
   playFromStart();
   showTab('replay');
 });
-on('open-research', () => openResearchDialog());
+on('open-research', () => openResearch());
 on('open-proposal', openProposal);
 on('confirm-war', openWarConfirm);
 on('activate-unit', (id) => {
@@ -558,7 +571,7 @@ $('btn-end-turn').addEventListener('click', endTurn);
 $('empire-chips').addEventListener('click', (e) => {
   const chip = e.target.closest('[data-chip]');
   if (!chip) return;
-  if (chip.dataset.chip === 'research') openResearchDialog();
+  if (chip.dataset.chip === 'research') openResearch();
   else emit('select-player', leader());
 });
 for (const id of ['research-dialog', 'message-dialog']) {
