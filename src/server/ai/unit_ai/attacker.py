@@ -6,15 +6,19 @@ from .. import missions as M
 from ..missions import Mission
 from . import explorer
 from .common import (Context, alive, embark, fortify, go_home, go_to, pillage, sentry, step_to,
-                     strike_adjacent)
+                     strike_adjacent, take_empty_city)
 
 
 def act(ctx: Context, unit: Unit, mission: Mission | None) -> None:
     view = ctx.view
 
+    # An enemy city next to us without defenders is taken at once, whatever the mission:
+    # the missions were planned at the start of the turn, before our attacks emptied it.
+    if take_empty_city(ctx, unit):
+        return
     # Any enemy next to us that we are likely to beat is attacked first.
     if strike_adjacent(ctx, unit, ctx.ai("military", "attack_min_odds")):
-        if not alive(ctx, unit) or unit.moves_left <= 0:
+        if not alive(ctx, unit) or unit.moves_left <= 0 or take_empty_city(ctx, unit):
             return
 
     if mission is None:
@@ -89,5 +93,7 @@ def _siege(ctx: Context, unit: Unit, mission: Mission) -> None:
         minimum *= 0.5                       # in numbers, accept worse odds
     if odds is not None and odds.win_chance >= minimum:
         step_to(ctx, unit, target)
+        if alive(ctx, unit):
+            take_empty_city(ctx, unit)      # the last defender fell: walk in with what is left
     elif not pillage(ctx, unit):            # waiting for better odds: starve the city meanwhile
         fortify(ctx, unit)

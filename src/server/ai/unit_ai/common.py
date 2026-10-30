@@ -171,6 +171,26 @@ def strike_adjacent(ctx: Context, unit: Unit, min_odds: float,
     return True
 
 
+def take_empty_city(ctx: Context, unit: Unit) -> bool:
+    """Walks into an adjacent enemy city left without defenders, the biggest one first.
+    True if the unit took it."""
+    view = ctx.view
+    if unit.moves_left <= 0:
+        return False
+    best = None
+    for tile in view.map.neighbors(view.tile_of(unit)):
+        memory = view.foreign_city_at(tile)
+        if memory is None or not view.at_war(memory.owner) or view.foreign_units_at(tile):
+            continue
+        if not view.can_enter(unit, tile):
+            continue
+        if best is None or memory.size > best[0]:
+            best = (memory.size, tile)
+    if best is None:
+        return False
+    return step_to(ctx, unit, best[1]).outcome == "captured"
+
+
 def danger_near(ctx: Context, tile: Tile, radius: int = 2) -> bool:
     """An enemy military unit is seen within `radius` steps of the tile."""
     world = ctx.view.map

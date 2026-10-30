@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 import json
+import random
 
 from server.ai.controller import AIController
 from server.ai.knowledge import Knowledge
@@ -462,3 +463,33 @@ def test_invaders_call_for_a_counter_attack(rules):
     landed = plan()
     hunters = [m for m in landed.assignment.values() if m.kind == M.ATTACK_UNIT]
     assert hunters and all(game.units[uid].type == "mech_inf" for m in hunters for uid in m.assigned)
+
+
+# ── Assault ───────────────────────────────────────────────────────────────────
+
+class HighRolls(random.Random):
+    """Every roll at its highest: the stronger side always wins its fight."""
+
+    def randrange(self, start, stop=None, step=1):
+        return (start if stop is None else stop) - 1
+
+
+def test_an_emptied_city_is_taken_at_once(rules):
+    """A lone attacker that kills the last defender of a city walks in with the move it has
+    left, though it was planned to wait for reinforcements."""
+    game = make_game(rules, width=20)
+    add_city(game, 1, 3, 5, size=4)
+    for _ in range(2):
+        game.add_unit("phalanx", 1, 3, 5)
+    theirs = add_city(game, 2, 8, 5, size=3)
+    defender = game.add_unit("militia", 2, 8, 5)
+    chariot = game.add_unit("chariot", 1, 7, 5)
+    ai = game.players[1]
+    ai.explored = bytearray([1]) * len(game.map.tiles)
+    visibility.remember_city(game, ai, theirs)
+    game.rng = HighRolls(1)
+    game.current_player = 1
+    turn.begin_player_turn(game, ai)
+    AIController().play_turn(game, ai)
+    assert defender.id not in game.units
+    assert theirs.owner == 1 and (chariot.x, chariot.y) == (theirs.x, theirs.y)
