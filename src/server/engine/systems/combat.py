@@ -16,6 +16,7 @@ from ..model.game import Game
 from ..model.worldmap import Tile
 from . import cities
 from . import city as city_rules
+from . import visibility
 
 SCALE = 8
 
@@ -246,3 +247,7 @@ def _defender_lost(game: Game, attacker: Unit, defender: Unit, tile: Tile) -> No
             and city_wall_factor(game, tile, None) is None:
         city.size -= 1
         city_rules.auto_arrange(game, city)
+        # Those who watch the city see it shrink: their memory of it is what the map shows.
+        for player in game.players:
+            if player.id != city.owner and player.visible and visibility.can_see(player, tile):
+                visibility.remember_city(game, player, city)

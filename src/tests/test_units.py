@@ -231,10 +231,12 @@ def test_city_protects_the_stack_but_shrinks(rules):
     game.add_unit("phalanx", 2, 5, 6)
     game.add_unit("militia", 2, 5, 6)
     attacker = game.add_unit("legion", 1, 5, 5)
+    visibility.reveal_unit(game, attacker)
     game.rng = RiggedRandom([23, 0])
     assert movement.move_unit(game, attacker, game.map.tile(5, 6)) == movement.ATTACK_WON
     assert [u.type for u in game.units_at(game.map.tile(5, 6))] == ["militia"]
     assert city.size == 2
+    assert game.players[1].known_cities[city.id].size == 2     # the attacker sees it shrink
 
 
 def test_losing_attacker_dies(rules):
