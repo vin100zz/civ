@@ -1556,7 +1556,7 @@ dialog[open] { display: flex; flex-direction: column; }
 dialog::backdrop { background: rgba(6, 8, 11, 0.74); backdrop-filter: blur(6px); }
 
 #game-dialog { width: 1120px; }
-.dialog-head { height: 68px; padding: 0 20px 0 28px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid var(--line); flex: none; }
+.dialog-head { height: 68px; padding: 12px 20px 12px 28px; display: flex; align-items: center; gap: 20px; border-bottom: 1px solid var(--line); flex: none; }
 .dialog-head > .btn:last-child { margin-left: auto; }
 .dialog-head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
 .dialog-body { display: flex; flex: 1; min-height: 0; overflow-y: auto; }
@@ -1591,7 +1591,7 @@ dialog::backdrop { background: rgba(6, 8, 11, 0.74); backdrop-filter: blur(6px);
 .civ-grid svg { color: var(--gold); visibility: hidden; }
 .civ-grid button[aria-pressed="true"] { border-color: var(--gold); background: rgba(226, 182, 89, 0.08); }
 .civ-grid button[aria-pressed="true"] svg { visibility: visible; }
-.dialog-bar { height: 76px; padding: 0 28px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; flex: none; }
+.dialog-bar { height: 76px; padding: 14px 28px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; flex: none; }
 .dialog-bar .sub { margin-right: auto; }
 #game-saves .dialog-col { min-height: 420px; }
 .retire-field { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--line); }
