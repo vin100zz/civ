@@ -176,6 +176,12 @@ class BuildingDef:
         return any(e.type == effect_type for e in self.effects)
 
     @property
+    def sea_tiles_only(self) -> bool:
+        """Every effect is a bonus on ocean tiles (a Harbour): of no use without one."""
+        return bool(self.effects) and all(
+            e.type.startswith("tile_") and e.domain == "sea" for e in self.effects)
+
+    @property
     def spaceship_part(self) -> Optional[str]:
         """The kind of spaceship part this is, if it is one (it then goes to the ship,
         not to the city, and can be built many times)."""

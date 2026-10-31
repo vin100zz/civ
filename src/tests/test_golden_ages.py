@@ -95,6 +95,16 @@ def test_harbour_feeds_ocean_tiles(golden):
     assert after == (before[0] + 1, before[1])
 
 
+@pytest.mark.parametrize("ocean_at, offered", [((7, 6), True), ((7, 7), False), (None, False)])
+def test_harbour_needs_an_ocean_tile_in_the_city_area(golden, ocean_at, offered):
+    """The corners of the 5 x 5 square are not in the city area: an ocean there is no use."""
+    patches = {ocean_at: "ocean"} if ocean_at else {}
+    game = make_game(golden, patches=patches)
+    city = add_city(game, 1, 5, 5)
+    game.players[1].techs.add("seafaring")
+    assert production.can_build(game, city, Item("building", "harbour")) is offered
+
+
 def test_buildings_given_by_a_wonder(golden):
     game = make_game(golden, width=30, height=20)
     home = add_city(game, 1, 3, 3)

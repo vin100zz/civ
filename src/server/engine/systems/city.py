@@ -101,6 +101,11 @@ def is_coastal(game: Game, city: City) -> bool:
     return any(not game.terrain(tile).is_land for tile in game.map.neighbors(game.tile_of(city)))
 
 
+def has_sea_in_area(game: Game, city: City) -> bool:
+    """A city with an ocean tile it could work: a Harbour is of use to it."""
+    return any(not game.terrain(tile).is_land for _, tile in game.map.city_area(city.x, city.y))
+
+
 # ── Worker placement ──────────────────────────────────────────────────────────
 
 def set_worked(game: Game, city: City, offsets: list[tuple[int, int]]) -> None:

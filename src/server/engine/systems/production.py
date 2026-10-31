@@ -63,6 +63,8 @@ def can_build(game: Game, city: City, item: Item) -> bool:
             return False
         if building.requires_wonder is not None and building.requires_wonder not in game.wonders:
             return False
+        if building.sea_tiles_only and not city_rules.has_sea_in_area(game, city):
+            return False
         if building.spaceship_part is not None:
             return spaceship.can_add_part(game, player, building.spaceship_part)
         if building.wonder:
