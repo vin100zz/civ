@@ -21,6 +21,7 @@ class Region:
     my_cities: list[City] = field(default_factory=list)
     foreign_cities: list[CityMemory] = field(default_factory=list)
     frontier: list[Tile] = field(default_factory=list)      # explored tiles next to the unknown
+    huts: list[Tile] = field(default_factory=list)          # explored tiles with a hut
     sites: list[tuple[float, Tile]] = field(default_factory=list)   # (appeal, tile), best first
 
 
@@ -97,6 +98,8 @@ class Knowledge:
                             stack.append(other)
                 if on_frontier:
                     region.frontier.append(tile)
+                if tile.hut:
+                    region.huts.append(tile)
             self.regions[next_id] = region
             next_id += 1
         # Foreign cities seen from the sea only, with no land explored around them.

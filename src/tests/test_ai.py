@@ -180,6 +180,26 @@ def test_railroads_do_not_trap_explorers(rules):
     assert sum(player.explored) > 60
 
 
+def test_huts_in_explored_land_are_opened(rules):
+    """A continent with nothing left to explore still sends someone to its known huts."""
+    game = make_game(rules, width=30)
+    add_city(game, 1, 5, 5)
+    game.add_unit("militia", 1, 5, 5)
+    game.add_unit("cavalry", 1, 5, 5)
+    hut = game.map.tile(14, 6)
+    hut.hut = True
+    player = game.players[1]
+    player.explored = bytearray([1]) * len(game.map.tiles)
+    game.turn = int(rules.ai.get("strategy", "explore_until_turn")) + 1
+    game.controllers[1] = AIController()
+    for _ in range(6):
+        turn.begin_player_turn(game, player)
+        game.controllers[1].play_turn(game, player)
+        turn.end_player_turn(game, player)
+        game.turn += 1
+    assert not hut.hut
+
+
 # ── Terrain work ──────────────────────────────────────────────────────────────
 
 def settler_jobs(game, for_person=False, player_id=1):

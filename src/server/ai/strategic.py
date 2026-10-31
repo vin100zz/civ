@@ -476,21 +476,26 @@ def _explore_missions(view: PlayerView, know: Knowledge, plan: Plan) -> int:
     per_region = int(get("explorers_per_continent"))
     capacity = 0
     for region in know.regions.values():
-        if not region.frontier:
+        if not region.frontier and not region.huts:
             continue
         has_presence = bool(region.my_cities) or any(
             know.region_of[view.tile_of(u).index] == region.id for u in know.units
             if view.rules.units[u.type].domain == "land")
         if not has_presence:
             continue
+        # Known huts keep one explorer busy on the continent, however late it is.
         if view.turn > get("explore_until_turn") and len(region.frontier) < 6:
-            continue
+            if not region.huts:
+                continue
+            slots = 1
+        else:
+            slots = per_region
         anchor = region.my_cities[0] if region.my_cities else None
-        tile = region.frontier[0]
+        tile = (region.frontier or region.huts)[0]
         x, y = (anchor.x, anchor.y) if anchor is not None else (tile.x, tile.y)
-        plan.missions.append(Mission(M.EXPLORE, x, y, weight * 0.9, capacity=per_region,
-                                     target=region.id, note=f"{len(region.frontier)} frontier"))
-        capacity += per_region
+        plan.missions.append(Mission(M.EXPLORE, x, y, weight * 0.9, capacity=slots, target=region.id,
+                                     note=f"{len(region.frontier)} frontier, {len(region.huts)} huts"))
+        capacity += slots
     return capacity
 
 

@@ -1,4 +1,4 @@
-"""Explorers: go to the nearest unknown land or sea, open huts on the way."""
+"""Explorers: go to the nearest unknown land or sea or known hut, open huts on the way."""
 from __future__ import annotations
 
 from collections import deque
@@ -51,8 +51,10 @@ def _adjacent_hut(ctx: Context, unit: Unit, here: Tile) -> Optional[Tile]:
 
 
 def _next_step_to_frontier(ctx: Context, unit: Unit) -> Optional[Tile]:
-    """First step of the shortest known walk to a tile that borders the unknown."""
+    """First step of the shortest known walk to a tile that borders the unknown, or to a
+    known hut (land units only: ships and aircraft do not open them)."""
     view, world = ctx.view, ctx.view.map
+    opens_huts = ctx.rules.units[unit.type].domain == "land"
     start = view.tile_of(unit)
     first_step: dict[int, Tile] = {}
     queue: deque[Tile] = deque([start])
@@ -63,7 +65,8 @@ def _next_step_to_frontier(ctx: Context, unit: Unit) -> Optional[Tile]:
         visited += 1
         if visited > MAX_SEARCH:
             break
-        if tile is not start and any(not view.explored(n) for n in world.neighbors(tile)):
+        if tile is not start and (opens_huts and tile.hut
+                                  or any(not view.explored(n) for n in world.neighbors(tile))):
             if not danger_near(ctx, tile, 1):
                 return first_step[tile.index]
         for other in world.neighbors(tile):
