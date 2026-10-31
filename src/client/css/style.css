@@ -1624,7 +1624,20 @@ dialog::backdrop { background: rgba(6, 8, 11, 0.74); backdrop-filter: blur(6px);
 .share-track button:hover { box-shadow: inset 0 0 0 1px var(--line-3); }
 .share-ticks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); font-family: var(--mono); font-size: 11px; font-weight: 500; line-height: 1; color: var(--mute); text-align: center; }
 .share-ticks .usual { color: var(--gold); }
-.secret { opacity: 0.42; pointer-events: none; }
+/* A setting a surprise world draws: out of sight, but a click on a value still keeps it. */
+.secret { opacity: 0.42; transition: opacity 0.12s; }
+.secret:hover { opacity: 0.75; }
+.share-track.secret button { background: repeating-linear-gradient(135deg, #4F9D3A 0 4px, #2B5FA8 4px 8px); opacity: 0.9; }
+.share-value.drawn { color: var(--gold); }
+.surprise-hint b { color: var(--gold); font-weight: 500; }
+.surprise-hint em { color: var(--soft); font-style: normal; font-weight: 500; }
+/* The lock of a setting in a surprise world: open (gold) while drawn, shut once kept. */
+#world-generated .between { align-items: center; min-height: 22px; }
+.keep-end { display: flex; align-items: center; gap: 8px; }
+.keep { height: 22px; padding: 0 8px 0 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--raise); color: var(--gold); display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; flex: none; }
+.keep:hover { border-color: var(--line-3); }
+.keep[aria-pressed="true"] { color: var(--soft); background: var(--hover); border-color: var(--line-3); }
+.keep[aria-pressed="true"]:hover { color: var(--text); }
 .field-group { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
 .field-group::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .nature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }

@@ -15,15 +15,17 @@ const VICTORY = {
   retired: ['Game ended', '', 'flag'],
 };
 // The choices of the next new game. They survive from one game to the next. `map.shape` is the
-// generated world picked last; `fixed` the fixed world (the Earth) when that is the choice.
+// generated world picked last; `fixed` the fixed world (the Earth) when that is the choice;
+// `surprise` a surprise world, which draws the settings of SURPRISES except those `kept`.
 const choice = { mode: 'play', ruleset: null, civ: null, level: null, players: 7, map: null, fixed: null,
-  tab: 'new' };
+  surprise: false, kept: [], tab: 'new' };
+const SURPRISE = 'surprise';
+const SURPRISES = ['shape', 'land', 'relief', 'climate', 'temperature', 'age'];
 
 // Pictogram of each map shape in a 36 x 22 box: [cx, cy, rx, ry] blobs, or a path. A blob drawn
 // inside another one is a hole (a lake, an inner sea). `marks` are drawn over the land as they are.
 const blob = ([cx, cy, rx, ry]) =>
   `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${2 * rx},0a${rx},${ry} 0 1,0 ${-2 * rx},0Z`;
-const SURPRISE = 'surprise';
 const SHAPE_GLYPHS = {
   continents: [[9, 8, 7, 5], [26, 14, 8, 6], [21, 4, 2.5, 2], [6, 18, 2, 1.5]],
   small_islands: [[5, 5, 2, 2], [15, 4, 2, 2], [27, 5, 2, 2], [9, 12, 2, 2], [20, 11, 2, 2],
@@ -44,8 +46,6 @@ const SHAPE_GLYPHS = {
     [30, 10.5, 1.8, 1.5], [33.5, 7, 1.5, 1.3]],
   broken_continent: blob([18, 11, 16, 9]) + 'M11.4,3.6L13.2,3.5L10.8,11L14.2,18.4L12.4,18.5L9,11Z'
     + 'M23.4,3.5L25.2,3.6L23.4,11L26.6,18.3L24.8,18.4L21.6,11Z',
-  [SURPRISE]: { land: '', marks: `<path d="${blob([18, 11, 15, 9])}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.4 1.8"/>`
-    + '<text x="18" y="15.4" font-size="12" font-weight="700" text-anchor="middle" fill="currentColor">?</text>' },
 };
 
 function shapeGlyph(id) {
@@ -158,12 +158,25 @@ function refreshName() {
   }
 }
 
-// The World column: a generated world (its shape, land and nature) or a fixed one.
+// What a surprise world draws, and what it keeps as chosen.
+function surpriseSummary() {
+  const drawn = SURPRISES.filter((setting) => !choice.kept.includes(setting));
+  if (!drawn.length) return 'Everything is kept: nothing left to draw.';
+  const shape = store.rules.map_shapes.find((s) => s.id === choice.map.shape);
+  const kept = SURPRISES.filter((setting) => choice.kept.includes(setting)).map((setting) =>
+    setting === 'land' ? `land ${choice.map.land} %` : setting === 'shape' && shape ? shape.name : setting);
+  return `Drawn and kept secret: <b>${drawn.join(', ')}</b>.`
+    + (kept.length ? ` Kept: <em>${kept.join(', ')}</em>.` : '');
+}
+
+// The World column: a generated world (its shape, land and nature), a surprise one (the same,
+// drawn but for what is kept) or a fixed one.
 function refreshWorld() {
   const shapes = store.rules.map_shapes;
   const fixed = shapes.find((s) => s.id === choice.fixed);
   for (const button of $('world-mode').children) {
-    button.setAttribute('aria-pressed', String(button.dataset.world === (choice.fixed || '')));
+    const world = choice.fixed || (choice.surprise ? SURPRISE : '');
+    button.setAttribute('aria-pressed', String(button.dataset.world === world));
   }
   $('world-generated').hidden = Boolean(fixed);
   $('world-fixed').hidden = !fixed;
@@ -172,31 +185,45 @@ function refreshWorld() {
     $('fixed-hint').textContent = fixed.description;
     drawFixedMap($('fixed-map'), fixed.fixed);
   }
-  const surprise = choice.map.surprise;
-  for (const button of $('map-shapes').children) {
-    const picked = 'surprise' in button.dataset ? surprise : !surprise && button.dataset.shape === choice.map.shape;
-    button.setAttribute('aria-pressed', String(picked));
+  const drawn = (setting) => choice.surprise && SURPRISES.includes(setting) && !choice.kept.includes(setting);
+  $('surprise-hint').hidden = !choice.surprise;
+  $('surprise-hint').innerHTML = surpriseSummary();
+  for (const button of document.querySelectorAll('[data-keep]')) {
+    const kept = !drawn(button.dataset.keep);
+    button.hidden = !choice.surprise;
+    button.setAttribute('aria-pressed', String(kept));
+    button.innerHTML = `${icon(kept ? 'lock' : 'lock-open', 13, 2)}${kept ? 'Kept' : 'Drawn'}`;
+    button.dataset.hint = kept ? 'Kept as chosen · click to draw it at random'
+      : 'Drawn at random and kept secret · click, or pick a value, to keep it';
   }
+  const shapeDrawn = drawn('shape');
+  for (const button of $('map-shapes').children) {
+    button.setAttribute('aria-pressed', String(!shapeDrawn && button.dataset.shape === choice.map.shape));
+  }
+  $('map-shapes').classList.toggle('secret', shapeDrawn);
   const shape = shapes.find((s) => s.id === choice.map.shape);
-  $('shape-hint').textContent = surprise
-    ? 'Shape, land, relief, climate, temperature and age drawn at random and kept secret.'
+  $('shape-hint').textContent = shapeDrawn
+    ? `Drawn at random among the ${shapes.filter((s) => !s.fixed).length} shapes and kept secret.`
     : shape ? shape.description : '';
-  // What a surprise draws stays out of reach.
-  $('land-field').classList.toggle('secret', surprise);
-  $('nature').classList.toggle('secret', surprise);
-  $('land-value').textContent = surprise ? '?' : `${choice.map.land} %`;
+  // What a surprise draws stays out of sight.
+  const landDrawn = drawn('land');
+  $('land-track').classList.toggle('secret', landDrawn);
+  $('land-ticks').classList.toggle('secret', landDrawn);
+  $('land-value').classList.toggle('drawn', landDrawn);
+  $('land-value').textContent = landDrawn ? '?' : `${choice.map.land} %`;
   for (const button of $('land-track').children) {
     const step = Number(button.dataset.land);
-    button.classList.toggle('landed', !surprise && step <= choice.map.land);
-    button.setAttribute('aria-pressed', String(!surprise && step === choice.map.land));
+    button.classList.toggle('landed', !landDrawn && step <= choice.map.land);
+    button.setAttribute('aria-pressed', String(!landDrawn && step === choice.map.land));
   }
   for (const tick of $('land-ticks').children) {
-    tick.classList.toggle('usual', !surprise && Boolean(shape) && Number(tick.dataset.land) === shape.land);
+    tick.classList.toggle('usual', !shapeDrawn && Boolean(shape) && Number(tick.dataset.land) === shape.land);
   }
   for (const group of document.querySelectorAll('[data-map-level]')) {
+    const level = group.dataset.mapLevel;
+    const secret = drawn(level);
+    group.classList.toggle('secret', secret);
     for (const button of group.children) {
-      const level = group.dataset.mapLevel;
-      const secret = surprise && level !== 'huts';
       button.setAttribute('aria-pressed', String(!secret && Number(button.dataset.level) === choice.map[level]));
     }
   }
@@ -229,7 +256,7 @@ export function refreshSaves() {
 export function resetGameDialog() {
   const rules = store.rules;
   if (!choice.map || !rules.map_shapes.some((s) => s.id === choice.map.shape)) {
-    choice.map = { ...rules.defaults.map, surprise: false };
+    choice.map = { ...rules.defaults.map };
     choice.players = rules.defaults.players;
   }
   if (!rules.map_shapes.some((s) => s.id === choice.fixed && s.fixed)) choice.fixed = null;
@@ -246,12 +273,11 @@ export function resetGameDialog() {
   $('levels').innerHTML = rules.levels.map((level) =>
     `<button data-level="${level.id}">${level.name}</button>`).join('');
   const fixed = rules.map_shapes.filter((s) => s.fixed);
-  $('world-mode').hidden = !fixed.length;
-  $('world-mode').innerHTML = '<button data-world="">Generated world</button>' + fixed.map((s) =>
+  $('world-mode').innerHTML = '<button data-world="">Generated world</button>'
+    + `<button data-world="${SURPRISE}">${icon('dice', 16)}Surprise</button>` + fixed.map((s) =>
     `<button data-world="${s.id}">${icon('globe', 16)}${s.name}</button>`).join('');
   $('map-shapes').innerHTML = rules.map_shapes.filter((s) => !s.fixed).map((s) =>
-    `<button data-shape="${s.id}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('')
-    + `<button data-shape="" data-surprise>${shapeGlyph(SURPRISE)}<span>Surprise</span></button>`;
+    `<button data-shape="${s.id}">${shapeGlyph(s.id)}<span>${s.name}</span></button>`).join('');
   $('land-track').innerHTML = rules.land_steps.map((step) =>
     `<button data-land="${step}" aria-label="${step} % land"></button>`).join('');
   $('land-ticks').innerHTML = rules.land_steps.map((step) => `<span data-land="${step}">${step}</span>`).join('');
@@ -285,9 +311,11 @@ function startNewGame() {
     $('new-name').focus();
     return;
   }
-  // The server draws the seed. A fixed world is never a surprise.
-  const map = { ...choice.map, shape: choice.fixed || choice.map.shape,
-    surprise: !choice.fixed && choice.map.surprise };
+  // The server draws the seed, and from it what a surprise world does not keep. A fixed world
+  // is never a surprise.
+  const surprise = choice.surprise && !choice.fixed
+    ? SURPRISES.filter((setting) => !choice.kept.includes(setting)) : [];
+  const map = { ...choice.map, shape: choice.fixed || choice.map.shape, surprise };
   const message = { cmd: 'new_game', name, seed: null, players: choice.players, map, ruleset: choice.ruleset };
   if (choice.mode === 'play') {
     const civs = playableCivs();
@@ -306,6 +334,13 @@ function save() {
     return;
   }
   send({ cmd: 'save', name });
+}
+
+// A value picked in a surprise world is kept, no longer drawn.
+function keep(setting) {
+  if (choice.surprise && SURPRISES.includes(setting) && !choice.kept.includes(setting)) {
+    choice.kept = [...choice.kept, setting];
+  }
 }
 
 // Makes `handler(button)` answer the clicks on the buttons of a group carrying `attribute`.
@@ -338,18 +373,31 @@ export function initDialogs() {
     choice.civ = choice.civ === button.dataset.civ ? null : button.dataset.civ;
   });
   pick($('levels'), 'data-level', (button) => { choice.level = button.dataset.level; });
-  pick($('world-mode'), 'data-world', (button) => { choice.fixed = button.dataset.world || null; });
-  pick($('map-shapes'), 'data-shape', (button) => {
-    choice.map.surprise = 'surprise' in button.dataset;
-    if (!choice.map.surprise) choice.map.shape = button.dataset.shape;
+  pick($('world-mode'), 'data-world', (button) => {
+    const world = button.dataset.world;
+    choice.surprise = world === SURPRISE;
+    choice.fixed = world && world !== SURPRISE ? world : null;
   });
-  pick($('land-track'), 'data-land', (button) => { choice.map.land = Number(button.dataset.land); });
+  pick($('world-generated'), 'data-keep', (button) => {
+    const setting = button.dataset.keep;
+    choice.kept = choice.kept.includes(setting)
+      ? choice.kept.filter((s) => s !== setting) : [...choice.kept, setting];
+  });
+  pick($('map-shapes'), 'data-shape', (button) => {
+    choice.map.shape = button.dataset.shape;
+    keep('shape');
+  });
+  pick($('land-track'), 'data-land', (button) => {
+    choice.map.land = Number(button.dataset.land);
+    keep('land');
+  });
   pick($('starts'), 'data-historical', (button) => {
     choice.map.historical_starts = button.dataset.historical === 'true';
   });
   for (const group of document.querySelectorAll('[data-map-level]')) {
     pick(group, 'data-level', (button) => {
       choice.map[group.dataset.mapLevel] = Number(button.dataset.level);
+      keep(group.dataset.mapLevel);
     });
   }
   $('civ-random').addEventListener('click', () => {

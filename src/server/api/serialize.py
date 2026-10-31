@@ -26,10 +26,11 @@ from ..human.controller import HumanController
 F_SPECIAL, F_PATTERN, F_HUT, F_ROAD, F_RAILROAD, F_IRRIGATION, F_MINE, F_FORTRESS, F_POLLUTION = (
     1, 2, 4, 8, 16, 32, 64, 128, 256)
 
-# Map settings picked in the new-game dialog, each from 0 to 2; a surprise world draws the
-# nature ones.
+# Map settings picked in the new-game dialog, each from 0 to 2; a surprise world may draw the
+# nature ones, and the shape and land too (SURPRISES), never the huts.
 NATURE_LEVELS = ("relief", "climate", "temperature", "age")
 MAP_LEVELS = NATURE_LEVELS + ("huts",)
+SURPRISES = ("shape", "land") + NATURE_LEVELS
 UNKNOWN_COLOR = "#8A95A5"
 
 

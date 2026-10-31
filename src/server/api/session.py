@@ -166,8 +166,9 @@ class Session:
     def _map_settings(self, rules: Rules, choices: Any, seed: int) -> MapSettings:
         """The map settings of the rules, with the valid choices of the new-game dialog.
 
-        A surprise world draws its shape, land and nature from the seed (never a fixed
-        world), and keeps the huts chosen.
+        A surprise world draws from the seed the settings its `surprise` lists (all of
+        `SURPRISES` for true), never a fixed world, and keeps the others, the huts always, as
+        chosen. A seed draws the same values whatever the list.
         """
         settings = rules.game.map
         if not isinstance(choices, dict):
@@ -185,13 +186,18 @@ class Session:
                 changes[name] = level
         if type(choices.get("historical_starts")) is bool:
             changes["historical_starts"] = choices["historical_starts"]
-        if choices.get("surprise") is True:
+        surprise = choices.get("surprise")
+        if surprise is True:
+            surprise = serialize.SURPRISES
+        if isinstance(surprise, (list, tuple)):
             draw = random.Random(seed)
-            changes["shape"] = draw.choice(
-                [shape_id for shape_id, s in settings.shapes.items() if s.fixed is None])
-            changes["land"] = draw.choice(LAND_STEPS)
+            drawn: dict[str, Any] = {
+                "shape": draw.choice(
+                    [shape_id for shape_id, s in settings.shapes.items() if s.fixed is None]),
+                "land": draw.choice(LAND_STEPS)}
             for name in serialize.NATURE_LEVELS:
-                changes[name] = draw.randrange(3)
+                drawn[name] = draw.randrange(3)
+            changes.update({name: value for name, value in drawn.items() if name in surprise})
         return dataclasses.replace(settings, **changes)
 
     def _history_row(self) -> dict:

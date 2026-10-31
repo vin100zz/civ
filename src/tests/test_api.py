@@ -168,6 +168,15 @@ def test_surprise_world(client, rules):
     assert len({s.shape for s in drawn}) > 4 and len({s.land for s in drawn}) > 3
     assert all(s.huts == 2 and rules.game.map.shapes[s.shape].fixed is None for s in drawn)
     assert len({(s.relief, s.climate, s.temperature, s.age) for s in drawn}) > 10
+    # Only the listed settings are drawn, with the values the seed gives them all.
+    choices["surprise"] = ["shape", "climate"]
+    partial = [session._map_settings(rules, choices, seed) for seed in range(1, 30)]
+    assert [(s.shape, s.climate) for s in partial] == [(s.shape, s.climate) for s in drawn]
+    assert all((s.land, s.relief, s.huts) == (20, 1, 2) for s in partial)
+    defaults = rules.game.map
+    assert all((s.temperature, s.age) == (defaults.temperature, defaults.age) for s in partial)
+    choices["surprise"] = []
+    assert session._map_settings(rules, choices, 1).shape == "continents"
 
 
 # ── A person leads a civilization ─────────────────────────────────────────────

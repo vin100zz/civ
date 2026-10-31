@@ -25,6 +25,8 @@ const PATHS = {
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/>',
   dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 8.5v.01M15.5 8.5v.01M12 12v.01M8.5 15.5v.01M15.5 15.5v.01"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  'lock-open': '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 7.8-1.2"/>',
   sword: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2"/>',
   coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18M7 6h1v4"/>',
   rocket: '<path d="M12 2.5c3 2.2 4.5 5.4 4.5 9.5v4h-9v-4c0-4.1 1.5-7.3 4.5-9.5zM7.5 13 4 16.5V19l3.5-1.2M16.5 13l3.5 3.5V19l-3.5-1.2M10 19.5c0 1 .8 2 2 2.5 1.2-.5 2-1.5 2-2.5"/><circle cx="12" cy="9.5" r="1.6"/>',

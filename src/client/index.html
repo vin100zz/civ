@@ -195,16 +195,24 @@
         <div class="field">
           <span id="world-label" class="field-label">World</span>
           <div id="world-mode" class="seg fill tall" role="group" aria-labelledby="world-label"></div>
+          <span id="surprise-hint" class="sub surprise-hint" hidden></span>
         </div>
         <div id="world-generated" class="world-part">
           <div class="field">
-            <div id="map-shapes" class="shapes three" role="group" aria-labelledby="world-label"></div>
+            <div class="between">
+              <span id="shape-label" class="field-label">Shape</span>
+              <button class="keep" data-keep="shape" hidden></button>
+            </div>
+            <div id="map-shapes" class="shapes three" role="group" aria-labelledby="shape-label"></div>
             <span id="shape-hint" class="sub"></span>
           </div>
           <div id="land-field" class="field share">
             <div class="between">
               <span id="land-label" class="field-label">Land</span>
-              <b id="land-value" class="share-value"></b>
+              <span class="keep-end">
+                <b id="land-value" class="share-value"></b>
+                <button class="keep" data-keep="land" hidden></button>
+              </span>
             </div>
             <div id="land-track" class="share-track" role="group" aria-labelledby="land-label"></div>
             <div id="land-ticks" class="share-ticks" aria-hidden="true"></div>
@@ -213,8 +221,11 @@
             <span class="field-group">Nature</span>
             <div class="nature-grid">
               <div class="field">
-                <span id="relief-label" class="field-label" data-hint-wide
-                  data-hint="How much of the land rises into hills and mountains&#10;Flat: open plains and grassland, the best land for food.&#10;Rugged: long ranges of hills and mountains, rich in shields and easy to defend, but poor in food.">Relief</span>
+                <div class="between">
+                  <span id="relief-label" class="field-label" data-hint-wide
+                    data-hint="How much of the land rises into hills and mountains&#10;Flat: open plains and grassland, the best land for food.&#10;Rugged: long ranges of hills and mountains, rich in shields and easy to defend, but poor in food.">Relief</span>
+                  <button class="keep" data-keep="relief" hidden></button>
+                </div>
                 <div class="seg fill" data-map-level="relief" role="group" aria-labelledby="relief-label">
                   <button data-level="0">Flat</button>
                   <button data-level="1">Normal</button>
@@ -222,8 +233,11 @@
                 </div>
               </div>
               <div class="field">
-                <span id="climate-label" class="field-label" data-hint-wide
-                  data-hint="How much rain the winds carry inland&#10;Dry: more desert, plains and hills.&#10;Wet: more grassland, forest, jungle, swamp and rivers.">Climate</span>
+                <div class="between">
+                  <span id="climate-label" class="field-label" data-hint-wide
+                    data-hint="How much rain the winds carry inland&#10;Dry: more desert, plains and hills.&#10;Wet: more grassland, forest, jungle, swamp and rivers.">Climate</span>
+                  <button class="keep" data-keep="climate" hidden></button>
+                </div>
                 <div class="seg fill" data-map-level="climate" role="group" aria-labelledby="climate-label">
                   <button data-level="0">Dry</button>
                   <button data-level="1">Normal</button>
@@ -231,8 +245,11 @@
                 </div>
               </div>
               <div class="field">
-                <span id="temperature-label" class="field-label" data-hint-wide
-                  data-hint="How far the ice reaches from the poles, and the desert from the equator&#10;Cold: more tundra and ice.&#10;Hot: less of them, and a little more desert. The difference stays small.">Temperature</span>
+                <div class="between">
+                  <span id="temperature-label" class="field-label" data-hint-wide
+                    data-hint="How far the ice reaches from the poles, and the desert from the equator&#10;Cold: more tundra and ice.&#10;Hot: less of them, and a little more desert. The difference stays small.">Temperature</span>
+                  <button class="keep" data-keep="temperature" hidden></button>
+                </div>
                 <div class="seg fill" data-map-level="temperature" role="group" aria-labelledby="temperature-label">
                   <button data-level="0">Cold</button>
                   <button data-level="1">Temperate</button>
@@ -240,8 +257,11 @@
                 </div>
               </div>
               <div class="field">
-                <span id="age-label" class="field-label" data-hint-wide
-                  data-hint="How long erosion has shaped the land: 3, 4 or 5 billion years&#10;Young: open, gentle land, with more grassland and plains.&#10;Old: rougher, more varied land, with forest, jungle, hills and mountains, and lakes where mountains collapsed.">Age</span>
+                <div class="between">
+                  <span id="age-label" class="field-label" data-hint-wide
+                    data-hint="How long erosion has shaped the land: 3, 4 or 5 billion years&#10;Young: open, gentle land, with more grassland and plains.&#10;Old: rougher, more varied land, with forest, jungle, hills and mountains, and lakes where mountains collapsed.">Age</span>
+                  <button class="keep" data-keep="age" hidden></button>
+                </div>
                 <div class="seg fill" data-map-level="age" role="group" aria-labelledby="age-label">
                   <button data-level="0">Young</button>
                   <button data-level="1">Normal</button>
