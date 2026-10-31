@@ -450,6 +450,21 @@ class Session:
             if game.turn != before and game.turn % AUTOSAVE_EVERY == 0:
                 await self._save(self.save_name or AUTOSAVE)
 
+    async def retire(self) -> None:
+        """The game ends now, as asked from a browser: nothing is hidden any more, and every
+        browser gets the whole world, the scores of all and the replay. The save on disk is
+        left as it was."""
+        async with self._busy:
+            game = self.game
+            if game is None or game.finished:
+                return
+            self.playing = False
+            self._steps = []
+            turn.retire(game, self.human if self.in_play() else None)
+            self._read_events()
+            game.changed_tiles.clear()
+            await self.broadcast_init()
+
     async def run(self) -> None:
         """Background loop: plays turns while the game is in "play" mode."""
         while True:
@@ -624,6 +639,8 @@ class Session:
             await self._notice(client, f"Game {name} loaded.", True)
         elif command == "end_turn":
             await self.end_turn(message.get("turn"))
+        elif command == "retire":
+            await self.retire()
         elif command == "action":
             await self.act(message)
         elif command in ("goto", "automate", "govern"):

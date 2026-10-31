@@ -741,6 +741,32 @@ def test_no_replay_while_a_person_plays(client):
             "type": "notice", "text": "The replay opens once the game is over.", "ok": False}
 
 
+def test_a_person_can_end_the_game_and_see_everything(client):
+    with client.websocket_connect("/ws") as socket:
+        init = start_playing(socket)
+        explored = init["state"]["explored"]
+        assert "0" in explored and init["state"]["players"][2]["gold"] is None
+        socket.send_json({"cmd": "end_turn"})
+        receive(socket, "turn")
+        socket.send_json({"cmd": "retire"})
+        over = receive(socket, "init")
+        state = over["state"]
+        assert state["finished"] and state["victory"] == "retired" and state["winner"] is None
+        assert state["play"] == {"human": 1, "active": False} and state["pov"] is None
+        assert state["players"][2]["gold"] is not None and state["players"][2]["nation"] != "Unknown"
+        assert over["log"][-1]["type"] == "game_over" and over["log"][-1]["player"] == 1
+        # The whole map, and the replay of the game.
+        sea = {i for i, t in enumerate(over["rules"]["terrains"]) if not t["land"]}
+        assert any(t not in sea for i, t in enumerate(over["map"]["terrain"]) if explored[i] == "0")
+        socket.send_json({"cmd": "replay"})
+        assert receive(socket, "replay")["since"] == 0
+        # Once over, the game stays over: no second end, no more turns.
+        socket.send_json({"cmd": "retire"})
+        socket.send_json({"cmd": "end_turn"})
+        socket.send_json({"cmd": "step"})
+        assert socket.receive_json()["type"] == "status"
+
+
 def test_the_replay_is_saved_with_the_game(rules, tmp_path):
     session = Session({rules.ruleset.id: rules}, saves_dir=tmp_path)
     session.new_game(7, players=3)

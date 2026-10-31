@@ -1594,6 +1594,8 @@ dialog::backdrop { background: rgba(6, 8, 11, 0.74); backdrop-filter: blur(6px);
 .dialog-bar { height: 76px; padding: 0 28px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; flex: none; }
 .dialog-bar .sub { margin-right: auto; }
 #game-saves .dialog-col { min-height: 420px; }
+.retire-field { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--line); }
+.retire-field[hidden] { display: none; }
 /* The name of the new game, beside the button that starts it. */
 .bar-name { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
 .bar-name .field-label { white-space: nowrap; }

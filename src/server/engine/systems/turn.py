@@ -110,6 +110,19 @@ def check_end(game: Game) -> None:
                   player=winner.id, victory=game.victory)
 
 
+def retire(game: Game, player_id: Optional[int] = None) -> None:
+    """The game stops here, before its end (Civ 1's Retire): nobody wins, the civilizations
+    are ranked by their scores as they stand. `player_id` is the civilization a person led."""
+    if game.finished:
+        return
+    update_scores(game)
+    game.finished, game.winner, game.victory = True, None, "retired"
+    who = f"The {game.players[player_id].civ.nation} retire" if player_id is not None \
+        else "The game is stopped"
+    game.emit("game_over", f"{who}: the game ends before its time.", player=player_id,
+              victory="retired")
+
+
 def play_turn(game: Game, after_player: Callable[[Player], None] | None = None) -> None:
     """Plays one full turn: every living player, then the calendar."""
     if game.finished:

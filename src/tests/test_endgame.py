@@ -330,6 +330,18 @@ def test_best_score_wins_at_the_end_of_the_calendar(rules):
     assert game.finished and game.winner == 2 and game.victory == "score"
 
 
+def test_retiring_ends_the_game_without_a_winner(rules):
+    game = make_game(rules)
+    add_city(game, 1, 5, 5, size=3)
+    add_city(game, 2, 10, 5, size=8)
+    turn.retire(game, 1)
+    assert game.finished and game.winner is None and game.victory == "retired"
+    assert game.players[2].score > game.players[1].score > 0, "scores as they stand"
+    assert game.events[-1]["type"] == "game_over" and game.events[-1]["player"] == 1
+    turn.retire(game)                                   # already over: nothing more
+    assert [e["type"] for e in game.events].count("game_over") == 1
+
+
 def test_score_counts_citizens_wonders_and_advances(rules):
     game = make_game(rules)
     city = add_city(game, 1, 5, 5, size=3)

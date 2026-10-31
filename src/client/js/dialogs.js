@@ -12,6 +12,7 @@ const VICTORY = {
   conquest: ['Conquest victory', 'conquer the world', 'sword'],
   spaceship: ['Spaceship victory', 'reach Alpha Centauri', 'rocket'],
   score: ['Victory on score', 'have the greatest civilization', 'trophy'],
+  retired: ['Game ended', '', 'flag'],
 };
 // The choices of the next new game. They survive from one game to the next. `map.shape` is the
 // generated world picked last; `fixed` the fixed world (the Earth) when that is the choice.
@@ -267,6 +268,7 @@ export function openGameDialog(focus) {
   const current = store.rulesets.length > 1 ? `${store.rules.ruleset.name} rules, map ${map}` : `Map ${map}`;
   setDialogStatus(`${current} · a new or loaded game replaces the current one.`);
   $('btn-start').title = `${current} · the new game replaces the current one.`;
+  $('retire-field').hidden = !store.state || store.state.finished;
   refreshChoices();
   show(dialog);
   if (focus === 'save') {
@@ -357,6 +359,10 @@ export function initDialogs() {
   $('players-less').addEventListener('click', () => setPlayers(choice.players - 1));
   $('players-more').addEventListener('click', () => setPlayers(choice.players + 1));
   $('btn-start').addEventListener('click', startNewGame);
+  $('btn-retire').addEventListener('click', () => {
+    dialog.close();
+    openRetireConfirm();
+  });
   $('new-name').addEventListener('input', refreshName);
   $('new-name').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') startNewGame();
@@ -516,6 +522,19 @@ export function openWarConfirm(id) {
   });
 }
 
+export function openRetireConfirm() {
+  const led = store.state.play && store.state.play.active ? player(store.state.play.human) : null;
+  message({
+    color: led ? led.color : '#8A95A5', glyph: 'flag',
+    eyebrow: `${yearLabel(store.state.year)} · turn ${store.state.turn}`,
+    title: led ? `Retire the ${led.nation}?` : 'End this game?',
+    text: 'The game ends here and nobody wins. The whole map, the score of every civilization and the '
+      + 'replay of the game are revealed.',
+    note: 'The saves stay as they are: load one to take the game up again.',
+    buttons: [['Keep playing', '', null], ['End the game', 'danger', () => send({ cmd: 'retire' })]],
+  });
+}
+
 export function openDefeat() {
   const me = player(store.state.play.human);
   message({
@@ -570,13 +589,19 @@ export function showGameOver() {
   // The person who led a civilization is told how it ended for it.
   const you = state.play ? state.play.human : null;
   const verdict = you === null || !winner ? '' : winner.id === you ? 'You win · ' : 'You lose · ';
+  const retired = state.victory === 'retired';
   let story = winner ? `Led by ${winner.leader}.` : 'Nobody wins this game.';
-  if (winner && state.victory === 'spaceship' && winner.spaceship && winner.spaceship.launched_turn !== null) {
+  if (retired && civs[0]) {
+    const rank = civs.findIndex((p) => p.id === you);
+    story = rank >= 0
+      ? `Stopped before its time. The ${civs[rank].nation} rank ${rank + 1} of ${civs.length}, with ${plural(civs[rank].score, 'point')}.`
+      : `Stopped before its time. The ${civs[0].nation} lead, with ${plural(civs[0].score, 'point')}.`;
+  } else if (winner && state.victory === 'spaceship' && winner.spaceship && winner.spaceship.launched_turn !== null) {
     story += ` Launched on turn ${winner.spaceship.launched_turn}, landed on turn ${winner.spaceship.arrival_turn}.`;
   } else if (winner) {
     story += ` ${winner.cities} cities, ${winner.population} citizens, ${winner.techs} advances.`;
   }
-  const color = winner ? winner.color : '#8A95A5';
+  const color = winner ? winner.color : retired && you !== null ? player(you).color : '#8A95A5';
   const rows = civs.map((p, i) => `
     <div class="standing${winner && p.id === winner.id ? ' winner' : ''}${p.alive ? '' : ' dead'}">
       <span class="rank">${i + 1}</span>
@@ -592,7 +617,7 @@ export function showGameOver() {
       <span class="over-mark" style="background:${color};color:${inkOn(color)}">${icon(mark, 44, 1.5)}</span>
       <div class="titles">
         <span class="eyebrow">${verdict}${label} · ${yearLabel(state.year)} · turn ${state.turn}</span>
-        <h1>${winner ? `The ${winner.nation} ${deed}.` : 'Game over.'}</h1>
+        <h1>${winner ? `The ${winner.nation} ${deed}.` : retired ? `The game ends in ${yearLabel(state.year)}.` : 'Game over.'}</h1>
         <p>${story}</p>
       </div>
     </div>

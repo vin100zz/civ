@@ -18,7 +18,7 @@
       <img class="brand-mark" src="favicon.svg" width="22" height="22" alt="">
       <span class="brand-name">CIVILIZATION</span>
       <div class="brand-tools">
-        <button id="btn-game" class="btn ghost icon" aria-label="Game" data-hint="New game, save, load">
+        <button id="btn-game" class="btn ghost icon" aria-label="Game" data-hint="New game, save, load, end the game">
           <span data-icon="folder" data-size="18"></span></button>
         <button id="btn-options" class="btn ghost icon" aria-label="Map display" data-hint="Map display"
           aria-expanded="false" aria-controls="map-options"><span data-icon="gear" data-size="19" data-stroke="1.6"></span></button>
@@ -285,6 +285,15 @@
           <span class="sub">Letters, digits, - and _ · 40 characters at most. A game you play also saves
             itself every 5 turns under that name, the one given when it was started; the save it
             replaces is kept as name-year, and the one before goes.</span>
+        </div>
+        <!-- Civ 1's Retire: the game stops, and everything it hid is shown. -->
+        <div id="retire-field" class="field retire-field">
+          <span class="field-label">End this game</span>
+          <div class="row">
+            <button id="btn-retire" class="btn tall danger"><span data-icon="flag" data-size="16"></span>End the game</button>
+          </div>
+          <span class="sub">Nobody wins: the whole map, the score of every civilization and the replay
+            of the game are revealed. The saves on the server stay as they are.</span>
         </div>
       </section>
       <section class="dialog-col alt">
